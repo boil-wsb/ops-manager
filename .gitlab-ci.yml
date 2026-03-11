@@ -3,6 +3,11 @@ stages:
   - build
   - deploy
 
+default:
+  interruptible: true
+  tags:
+    - runner-192.168.23.36
+
 variables:
   DOCKER_IMAGE_BACKEND: opsmanager/backend:v1.0.$CI_PIPELINE_IID
   DOCKER_IMAGE_FRONTEND: opsmanager/frontend:v1.0.$CI_PIPELINE_IID
@@ -83,8 +88,6 @@ docker-build-backend:
   stage: build
   services:
     - docker:dind
-  tags:
-    - runner-192.168.23.36
   script:
     - echo "Building backend image..."
     - docker build --pull -t $REGISTRY_URL/$DOCKER_IMAGE_BACKEND ./backend
@@ -100,8 +103,6 @@ docker-build-frontend:
   stage: build
   services:
     - docker:dind
-  tags:
-    - runner-192.168.23.36
   script:
     - echo "Building frontend image..."
     - docker build --pull -t $REGISTRY_URL/$DOCKER_IMAGE_FRONTEND ./frontend
@@ -114,8 +115,6 @@ docker-build-frontend:
 # Deploy Stage
 deploy-docker:
   stage: deploy
-  tags:
-    - runner-192.168.23.36
   script:
     - |
       ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${REMOTE_HOST} << EOF
