@@ -9,7 +9,6 @@ variables:
   REMOTE_USER: root
   REMOTE_HOST: "192.168.23.19"
   REMOTE_DIR: "/opt/opsmanager"
-  REGISTRY_URL: "192.168.23.19:5000"
 
 ### RULES REUSED VIA YAML ANCHORS:
 .if-release-branch: &if-release-branch
