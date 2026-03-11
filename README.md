@@ -81,8 +81,8 @@ docker-compose up -d
 ```
 
 4. 访问系统
-- 前端: http://localhost
-- API 文档: http://localhost/docs
+- 前端: http://localhost:8080
+- API 文档: http://localhost:8080/docs
 
 ### 本地开发
 
@@ -168,8 +168,8 @@ ops-manager/
 ## API 文档
 
 启动服务后，访问以下地址查看 API 文档：
-- Swagger UI: http://localhost/docs
-- ReDoc: http://localhost/redoc
+- Swagger UI: http://localhost:8080/docs
+- ReDoc: http://localhost:8080/redoc
 
 ## 数据库模型
 
