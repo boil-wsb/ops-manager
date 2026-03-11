@@ -84,7 +84,7 @@ docker-build-backend:
   services:
     - docker:dind
   tags:
-    - shared-PD4-runner-46
+    - runner-192.168.23.36
   script:
     - echo "Building backend image..."
     - docker build --pull -t $REGISTRY_URL/$DOCKER_IMAGE_BACKEND ./backend
@@ -101,7 +101,7 @@ docker-build-frontend:
   services:
     - docker:dind
   tags:
-    - shared-PD4-runner-46
+    - runner-192.168.23.36
   script:
     - echo "Building frontend image..."
     - docker build --pull -t $REGISTRY_URL/$DOCKER_IMAGE_FRONTEND ./frontend
@@ -115,7 +115,7 @@ docker-build-frontend:
 deploy-docker:
   stage: deploy
   tags:
-    - shared-PD4-runner-46
+    - runner-192.168.23.36
   script:
     - |
       ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${REMOTE_HOST} << EOF
