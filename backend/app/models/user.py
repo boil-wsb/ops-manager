@@ -1,0 +1,64 @@
+"""
+User model.
+"""
+from datetime import datetime
+from typing import List, Optional
+
+from sqlalchemy import String, Boolean, DateTime, Text, Table, Column, ForeignKey, Integer
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.models.base import BaseModel
+
+# User-Role association table
+user_roles = Table(
+    "user_roles",
+    BaseModel.metadata,
+    Column("user_id", Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+    Column("role_id", Integer, ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True),
+    Column("created_at", DateTime(timezone=True), default=datetime.utcnow),
+)
+
+
+class User(BaseModel):
+    """User model."""
+    
+    __tablename__ = "users"
+    
+    username: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
+    email: Mapped[Optional[str]] = mapped_column(String(100), unique=True, index=True, nullable=True)
+    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    full_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    last_login: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    
+    # Relationships
+    roles: Mapped[List["Role"]] = relationship(
+        "Role",
+        secondary=user_roles,
+        back_populates="users",
+        lazy="selectin"
+    )
+    
+    def __repr__(self) -> str:
+        return f"<User {self.username}>"
+
+
+class Role(BaseModel):
+    """Role model."""
+    
+    __tablename__ = "roles"
+    
+    name: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    
+    # Relationships
+    users: Mapped[List["User"]] = relationship(
+        "User",
+        secondary=user_roles,
+        back_populates="roles",
+        lazy="selectin"
+    )
+    
+    def __repr__(self) -> str:
+        return f"<Role {self.name}>"
