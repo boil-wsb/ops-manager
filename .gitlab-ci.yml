@@ -1,0 +1,180 @@
+stages:
+  - setup
+  - build
+  - deploy
+
+variables:
+  DOCKER_IMAGE_BACKEND: opsmanager/backend:v1.0.$CI_PIPELINE_IID
+  DOCKER_IMAGE_FRONTEND: opsmanager/frontend:v1.0.$CI_PIPELINE_IID
+  REMOTE_USER: root
+  REMOTE_HOST: "192.168.23.19"
+  REMOTE_DIR: "/opt/opsmanager"
+  REGISTRY_URL: "192.168.23.19:5000"
+
+### RULES REUSED VIA YAML ANCHORS:
+.if-release-branch: &if-release-branch
+  if: '($CI_COMMIT_REF_NAME =~ /release/) && $CI_PIPELINE_SOURCE != "merge_request_event"'
+
+.if-release-branch-merge: &if-release-branch-merge
+  if: '($CI_COMMIT_REF_NAME =~ /release/) && $CI_PIPELINE_SOURCE == "merge_request_event"'
+
+.if-dev-int-branch: &if-dev-int-branch
+  if: '($CI_COMMIT_REF_NAME =~ /develop/) && $CI_PIPELINE_SOURCE != "merge_request_event"'
+
+.if-test-int-branch: &if-test-int-branch
+  if: '$CI_PIPELINE_SOURCE != "merge_request_event" && $CI_PIPELINE_SOURCE == "web" && $DEPLOYER == "test"'
+
+.if-other-branch: &if-other-branch
+  if: '($CI_COMMIT_REF_NAME =~ /feature/ || $CI_COMMIT_REF_NAME =~ /hotfix/) && $CI_PIPELINE_SOURCE == "merge_request_event"'
+
+.if-master-branch: &if-master-branch
+  if: '($CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH) && $CI_PIPELINE_SOURCE != "merge_request_event"'
+
+.if-merge-request: &if-merge-request
+  if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+workflow:
+  rules:
+    - <<: *if-other-branch
+      when: never
+    - if: $CI_MERGE_REQUEST_IID
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - <<: *if-dev-int-branch
+    - <<: *if-test-int-branch
+    - <<: *if-release-branch
+    - <<: *if-release-branch-merge
+    - <<: *if-master-branch
+    - <<: *if-merge-request
+
+# Setup Stage
+setup-env:
+  stage: setup
+  rules:
+    - <<: *if-dev-int-branch
+      variables:
+        IMAGE_TAG_BACKEND: "${CI_COMMIT_REF_NAME}-${VERSION}"
+        IMAGE_TAG_FRONTEND: "${CI_COMMIT_REF_NAME}-${VERSION}"
+    - <<: *if-test-int-branch
+      variables:
+        IMAGE_TAG_BACKEND: "${CI_COMMIT_REF_NAME}"
+        IMAGE_TAG_FRONTEND: "${CI_COMMIT_REF_NAME}"
+    - <<: *if-release-branch
+      variables:
+        IMAGE_TAG_BACKEND: "${CI_COMMIT_REF_NAME}"
+        IMAGE_TAG_FRONTEND: "${CI_COMMIT_REF_NAME}"
+    - <<: *if-other-branch
+      variables:
+        IMAGE_TAG_BACKEND: "${CI_COMMIT_REF_NAME}-${VERSION}"
+        IMAGE_TAG_FRONTEND: "${CI_COMMIT_REF_NAME}-${VERSION}"
+    - <<: *if-master-branch
+      variables:
+        IMAGE_TAG_BACKEND: "${VERSION}"
+        IMAGE_TAG_FRONTEND: "${VERSION}"
+  script:
+    - echo "VERSION=${VERSION}"
+    - echo "IMAGE_TAG_BACKEND=${IMAGE_TAG_BACKEND}"
+    - echo "IMAGE_TAG_FRONTEND=${IMAGE_TAG_FRONTEND}"
+    - echo "DOCKER_IMAGE_BACKEND=${DOCKER_IMAGE_BACKEND}"
+    - echo "DOCKER_IMAGE_FRONTEND=${DOCKER_IMAGE_FRONTEND}"
+
+# Build Stage - Backend
+docker-build-backend:
+  image: docker:cli
+  stage: build
+  services:
+    - docker:dind
+  tags:
+    - shared-PD4-runner-46
+  script:
+    - echo "Building backend image..."
+    - docker build --pull -t $REGISTRY_URL/$DOCKER_IMAGE_BACKEND ./backend
+    - docker push $REGISTRY_URL/$DOCKER_IMAGE_BACKEND
+  rules:
+    - <<: *if-master-branch
+      exists:
+        - backend/Dockerfile
+
+# Build Stage - Frontend
+docker-build-frontend:
+  image: docker:cli
+  stage: build
+  services:
+    - docker:dind
+  tags:
+    - shared-PD4-runner-46
+  script:
+    - echo "Building frontend image..."
+    - docker build --pull -t $REGISTRY_URL/$DOCKER_IMAGE_FRONTEND ./frontend
+    - docker push $REGISTRY_URL/$DOCKER_IMAGE_FRONTEND
+  rules:
+    - <<: *if-master-branch
+      exists:
+        - frontend/Dockerfile
+
+# Deploy Stage
+deploy-docker:
+  stage: deploy
+  tags:
+    - shared-PD4-runner-46
+  script:
+    - |
+      ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${REMOTE_HOST} << EOF
+      #!/bin/bash
+      set -e
+      
+      echo "=== Deploying OpsManager ==="
+      
+      # Update docker-compose.yml with new images
+      if [ -f "$REMOTE_DIR/docker-compose.yml" ]; then
+        sed -i "s|image: ${REGISTRY_URL}/opsmanager/backend:.*|image: ${REGISTRY_URL}/${DOCKER_IMAGE_BACKEND}|g" $REMOTE_DIR/docker-compose.yml
+        sed -i "s|image: ${REGISTRY_URL}/opsmanager/frontend:.*|image: ${REGISTRY_URL}/${DOCKER_IMAGE_FRONTEND}|g" $REMOTE_DIR/docker-compose.yml
+        echo "Updated docker-compose.yml with new images"
+      fi
+      
+      # Pull latest images
+      cd $REMOTE_DIR
+      docker-compose pull
+      
+      # Restart services
+      docker-compose down
+      docker-compose up -d
+      
+      # Wait for services to be healthy
+      echo "Waiting for services to start..."
+      sleep 10
+      
+      # Check health
+      if curl -f http://localhost:8080/health > /dev/null 2>&1; then
+        echo "=== Deployment successful ==="
+      else
+        echo "=== Health check failed ==="
+        docker-compose logs --tail=50
+        exit 1
+      fi
+      EOF
+  after_script:
+    - |
+      # Clean up old images
+      IMAGE_BACKEND="${REGISTRY_URL}/opsmanager/backend"
+      IMAGE_FRONTEND="${REGISTRY_URL}/opsmanager/frontend"
+      
+      for IMAGE_NAME in "$IMAGE_BACKEND" "$IMAGE_FRONTEND"; do
+        IMAGE_IDS=$(docker images --format "{{.ID}} {{.Repository}}" | grep "$IMAGE_NAME" | awk '{print $1}')
+        if [ -z "$IMAGE_IDS" ]; then
+          echo "No images found for $IMAGE_NAME"
+        else
+          echo "Cleaning up old images for $IMAGE_NAME"
+          for IMAGE_ID in $IMAGE_IDS; do
+            CONTAINER_IDS=$(docker ps -a --filter "ancestor=$IMAGE_ID" --format "{{.ID}}")
+            if [ -z "$CONTAINER_IDS" ]; then
+              echo "Removing unused image $IMAGE_ID"
+              docker rmi -f $IMAGE_ID || true
+            else
+              echo "Image $IMAGE_ID is in use, skipping"
+            fi
+          done
+        fi
+      done
+  rules:
+    - <<: *if-master-branch
