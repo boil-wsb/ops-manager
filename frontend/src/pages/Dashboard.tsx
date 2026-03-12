@@ -12,7 +12,6 @@ import {
   FallOutlined,
 } from '@ant-design/icons';
 import { assetApi } from '../services/assets';
-import type { Asset } from '../types';
 
 const Dashboard = () => {
   const { data: assetsData } = useQuery({

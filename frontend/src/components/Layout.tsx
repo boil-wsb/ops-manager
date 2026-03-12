@@ -75,7 +75,7 @@ const Layout = () => {
       label: '系统设置',
     },
     {
-      type: 'divider',
+      type: 'divider' as const,
     },
     {
       key: 'logout',
