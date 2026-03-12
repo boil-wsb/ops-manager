@@ -287,6 +287,7 @@ def check_all_monitors():
     import asyncio
     
     async def _check_all():
+        from sqlalchemy import select
         from sqlalchemy.ext.asyncio import AsyncSession
         from app.db.session import AsyncSessionLocal
         from app.models.monitor import Monitor
