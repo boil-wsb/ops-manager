@@ -54,31 +54,8 @@ workflow:
 # Setup Stage
 setup-env:
   stage: setup
-  rules:
-    - <<: *if-dev-int-branch
-      variables:
-        IMAGE_TAG_BACKEND: "${CI_COMMIT_REF_NAME}-${VERSION}"
-        IMAGE_TAG_FRONTEND: "${CI_COMMIT_REF_NAME}-${VERSION}"
-    - <<: *if-test-int-branch
-      variables:
-        IMAGE_TAG_BACKEND: "${CI_COMMIT_REF_NAME}"
-        IMAGE_TAG_FRONTEND: "${CI_COMMIT_REF_NAME}"
-    - <<: *if-release-branch
-      variables:
-        IMAGE_TAG_BACKEND: "${CI_COMMIT_REF_NAME}"
-        IMAGE_TAG_FRONTEND: "${CI_COMMIT_REF_NAME}"
-    - <<: *if-other-branch
-      variables:
-        IMAGE_TAG_BACKEND: "${CI_COMMIT_REF_NAME}-${VERSION}"
-        IMAGE_TAG_FRONTEND: "${CI_COMMIT_REF_NAME}-${VERSION}"
-    - <<: *if-master-branch
-      variables:
-        IMAGE_TAG_BACKEND: "${VERSION}"
-        IMAGE_TAG_FRONTEND: "${VERSION}"
   script:
     - echo "VERSION=${VERSION}"
-    - echo "IMAGE_TAG_BACKEND=${IMAGE_TAG_BACKEND}"
-    - echo "IMAGE_TAG_FRONTEND=${IMAGE_TAG_FRONTEND}"
     - echo "DOCKER_IMAGE_BACKEND=${DOCKER_IMAGE_BACKEND}"
     - echo "DOCKER_IMAGE_FRONTEND=${DOCKER_IMAGE_FRONTEND}"
 
@@ -117,12 +94,8 @@ deploy-docker:
   stage: deploy
   script:
     - |
-      ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${REMOTE_HOST} << EOF
-      #!/bin/bash
       set -e
-      
       echo "=== Deploying OpsManager ==="
-      
       # Update docker-compose.yml with new images
       if [ -f "$REMOTE_DIR/docker-compose.yml" ]; then
         sed -i "s|image: ${REGISTRY_URL}/opsmanager/backend:.*|image: ${REGISTRY_URL}/${DOCKER_IMAGE_BACKEND}|g" $REMOTE_DIR/docker-compose.yml
@@ -150,29 +123,5 @@ deploy-docker:
         docker-compose logs --tail=50
         exit 1
       fi
-      EOF
-  after_script:
-    - |
-      # Clean up old images
-      IMAGE_BACKEND="${REGISTRY_URL}/opsmanager/backend"
-      IMAGE_FRONTEND="${REGISTRY_URL}/opsmanager/frontend"
-      
-      for IMAGE_NAME in "$IMAGE_BACKEND" "$IMAGE_FRONTEND"; do
-        IMAGE_IDS=$(docker images --format "{{.ID}} {{.Repository}}" | grep "$IMAGE_NAME" | awk '{print $1}')
-        if [ -z "$IMAGE_IDS" ]; then
-          echo "No images found for $IMAGE_NAME"
-        else
-          echo "Cleaning up old images for $IMAGE_NAME"
-          for IMAGE_ID in $IMAGE_IDS; do
-            CONTAINER_IDS=$(docker ps -a --filter "ancestor=$IMAGE_ID" --format "{{.ID}}")
-            if [ -z "$CONTAINER_IDS" ]; then
-              echo "Removing unused image $IMAGE_ID"
-              docker rmi -f $IMAGE_ID || true
-            else
-              echo "Image $IMAGE_ID is in use, skipping"
-            fi
-          done
-        fi
-      done
   rules:
     - <<: *if-master-branch

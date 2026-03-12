@@ -8,6 +8,17 @@ import type { Asset } from '../../types';
 
 const { Option } = Select;
 
+// Button component for navigation
+const LinkButton: React.FC<{ text: string; record: Asset; onClick: (id: number) => void }> = ({
+  text,
+  record,
+  onClick,
+}) => (
+  <Button type="link" onClick={() => onClick(record.id)}>
+    {text}
+  </Button>
+);
+
 const AssetList = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -44,7 +55,7 @@ const AssetList = () => {
       dataIndex: 'name',
       key: 'name',
       render: (text: string, record: Asset) => (
-        <a onClick={() => navigate(`/assets/${record.id}`)}>{text}</a>
+        <LinkButton text={text} record={record} onClick={(id) => navigate(`/assets/${id}`)} />
       ),
     },
     {
@@ -109,7 +120,6 @@ const AssetList = () => {
   return (
     <div>
       <h1>资产管理</h1>
-      
       <Card style={{ marginBottom: 24 }}>
         <Space wrap>
           <Input
