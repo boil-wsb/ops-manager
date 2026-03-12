@@ -4,7 +4,7 @@ User model.
 from datetime import datetime
 from typing import List, Optional
 
-from sqlalchemy import String, Boolean, DateTime, Text, Table, Column, ForeignKey, Integer
+from sqlalchemy import String, Boolean, DateTime, Table, Column, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
@@ -42,23 +42,3 @@ class User(BaseModel):
     
     def __repr__(self) -> str:
         return f"<User {self.username}>"
-
-
-class Role(BaseModel):
-    """Role model."""
-    
-    __tablename__ = "roles"
-    
-    name: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    
-    # Relationships
-    users: Mapped[List["User"]] = relationship(
-        "User",
-        secondary=user_roles,
-        back_populates="roles",
-        lazy="selectin"
-    )
-    
-    def __repr__(self) -> str:
-        return f"<Role {self.name}>"

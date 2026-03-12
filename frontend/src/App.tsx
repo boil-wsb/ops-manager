@@ -13,6 +13,7 @@ import MonitorList from './pages/Monitor/MonitorList';
 import AlertList from './pages/Monitor/AlertList';
 import DeploymentList from './pages/Ops/DeploymentList';
 import CertificateList from './pages/Ops/CertificateList';
+import RoleList from './pages/Roles/RoleList';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -51,6 +52,7 @@ function App() {
               <Route path="alerts" element={<AlertList />} />
               <Route path="deployments" element={<DeploymentList />} />
               <Route path="certificates" element={<CertificateList />} />
+              <Route path="roles" element={<RoleList />} />
             </Route>
           </Routes>
         </BrowserRouter>

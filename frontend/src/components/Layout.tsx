@@ -13,6 +13,7 @@ import {
   SettingOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  SafetyOutlined,
 } from '@ant-design/icons';
 import { useState } from 'react';
 import { useAuthStore } from '../stores/authStore';
@@ -60,6 +61,11 @@ const Layout = () => {
       key: '/certificates',
       icon: <SafetyCertificateOutlined />,
       label: '证书管理',
+    },
+    {
+      key: '/roles',
+      icon: <SafetyOutlined />,
+      label: '角色管理',
     },
   ];
 

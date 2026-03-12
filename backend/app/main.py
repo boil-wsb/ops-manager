@@ -10,6 +10,7 @@ from app.config import settings
 from app.core.logging import configure_logging, get_logger
 from app.core.redis import init_redis, close_redis
 from app.api.router import api_router
+from app.db.init_db import init_db
 
 # Configure logging
 configure_logging()
@@ -27,9 +28,22 @@ async def lifespan(app: FastAPI):
         debug=settings.debug,
     )
     
+    # Initialize database (check and create default data if needed)
+    try:
+        logger.info("Checking database initialization...")
+        await init_db()
+        logger.info("Database initialization check completed")
+    except Exception as e:
+        logger.error(f"Database initialization failed: {e}")
+        # Don't raise here, let the app start even if DB init fails
+        # This allows the app to start and show proper error messages
+    
     # Initialize Redis
-    await init_redis()
-    logger.info("Redis connection initialized")
+    try:
+        await init_redis()
+        logger.info("Redis connection initialized")
+    except Exception as e:
+        logger.error(f"Redis initialization failed: {e}")
     
     yield
     
@@ -37,8 +51,11 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down application")
     
     # Close Redis connection
-    await close_redis()
-    logger.info("Redis connection closed")
+    try:
+        await close_redis()
+        logger.info("Redis connection closed")
+    except Exception as e:
+        logger.error(f"Error closing Redis connection: {e}")
 
 
 # Create FastAPI application

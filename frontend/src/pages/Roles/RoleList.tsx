@@ -1,0 +1,276 @@
+import { useState, useEffect } from 'react';
+import {
+  Table,
+  Button,
+  Space,
+  Tag,
+  Card,
+  Input,
+  Modal,
+  Form,
+  message,
+  Popconfirm,
+  Switch,
+  Typography,
+  Tooltip,
+} from 'antd';
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  SafetyOutlined,
+  TeamOutlined,
+} from '@ant-design/icons';
+import { roleApi, Role } from '../../services/permissions';
+import RoleFormModal from './RoleFormModal';
+import RolePermissionModal from './RolePermissionModal';
+
+const { Title } = Typography;
+const { Search } = Input;
+
+const RoleList = () => {
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [searchText, setSearchText] = useState('');
+  
+  // Modal states
+  const [formModalVisible, setFormModalVisible] = useState(false);
+  const [permissionModalVisible, setPermissionModalVisible] = useState(false);
+  const [editingRole, setEditingRole] = useState<Role | null>(null);
+  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+
+  const fetchRoles = async () => {
+    setLoading(true);
+    try {
+      const response = await roleApi.getRoles({
+        page: currentPage,
+        page_size: pageSize,
+      });
+      setRoles(response.data.items);
+      setTotal(response.data.total);
+    } catch (error) {
+      message.error('获取角色列表失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRoles();
+  }, [currentPage, pageSize]);
+
+  const handleCreate = () => {
+    setEditingRole(null);
+    setFormModalVisible(true);
+  };
+
+  const handleEdit = (role: Role) => {
+    setEditingRole(role);
+    setFormModalVisible(true);
+  };
+
+  const handleDelete = async (id: number) => {
+    try {
+      await roleApi.deleteRole(id);
+      message.success('删除成功');
+      fetchRoles();
+    } catch (error: any) {
+      message.error(error.response?.data?.detail || '删除失败');
+    }
+  };
+
+  const handleManagePermissions = (role: Role) => {
+    setSelectedRole(role);
+    setPermissionModalVisible(true);
+  };
+
+  const handleFormSuccess = () => {
+    setFormModalVisible(false);
+    fetchRoles();
+  };
+
+  const handlePermissionSuccess = () => {
+    setPermissionModalVisible(false);
+    fetchRoles();
+  };
+
+  const filteredRoles = roles.filter(
+    (role) =>
+      role.name.toLowerCase().includes(searchText.toLowerCase()) ||
+      role.description?.toLowerCase().includes(searchText.toLowerCase())
+  );
+
+  const columns = [
+    {
+      title: '角色名称',
+      dataIndex: 'name',
+      key: 'name',
+      render: (text: string, record: Role) => (
+        <Space>
+          <span style={{ fontWeight: 500 }}>{text}</span>
+          {record.is_system && (
+            <Tag color="blue" style={{ fontSize: '11px' }}>
+              系统
+            </Tag>
+          )}
+        </Space>
+      ),
+    },
+    {
+      title: '描述',
+      dataIndex: 'description',
+      key: 'description',
+      ellipsis: true,
+    },
+    {
+      title: '权限数量',
+      dataIndex: 'permission_count',
+      key: 'permission_count',
+      width: 100,
+      render: (count: number) => (
+        <Tag icon={<SafetyOutlined />} color="success">
+          {count}
+        </Tag>
+      ),
+    },
+    {
+      title: '用户数量',
+      dataIndex: 'user_count',
+      key: 'user_count',
+      width: 100,
+      render: (count: number) => (
+        <Tag icon={<TeamOutlined />} color="processing">
+          {count}
+        </Tag>
+      ),
+    },
+    {
+      title: '状态',
+      dataIndex: 'is_active',
+      key: 'is_active',
+      width: 80,
+      render: (isActive: boolean) => (
+        <Tag color={isActive ? 'success' : 'default'}>
+          {isActive ? '启用' : '禁用'}
+        </Tag>
+      ),
+    },
+    {
+      title: '创建时间',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      width: 180,
+      render: (text: string) => new Date(text).toLocaleString(),
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 200,
+      render: (_: any, record: Role) => (
+        <Space size="small">
+          <Tooltip title="分配权限">
+            <Button
+              type="text"
+              icon={<SafetyOutlined />}
+              onClick={() => handleManagePermissions(record)}
+            >
+              权限
+            </Button>
+          </Tooltip>
+          <Tooltip title="编辑">
+            <Button
+              type="text"
+              icon={<EditOutlined />}
+              onClick={() => handleEdit(record)}
+              disabled={record.is_system}
+            />
+          </Tooltip>
+          <Popconfirm
+            title="确认删除"
+            description={`确定要删除角色 "${record.name}" 吗？`}
+            onConfirm={() => handleDelete(record.id)}
+            okText="确定"
+            cancelText="取消"
+            disabled={record.is_system || record.user_count > 0}
+          >
+            <Tooltip title={record.is_system ? '系统角色不能删除' : record.user_count > 0 ? '角色下还有用户' : '删除'}>
+              <Button
+                type="text"
+                danger
+                icon={<DeleteOutlined />}
+                disabled={record.is_system || record.user_count > 0}
+              />
+            </Tooltip>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
+  return (
+    <div>
+      <Card
+        title={
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Title level={4} style={{ margin: 0 }}>
+              角色管理
+            </Title>
+            <Space>
+              <Search
+                placeholder="搜索角色名称或描述"
+                allowClear
+                onSearch={(value) => setSearchText(value)}
+                onChange={(e) => setSearchText(e.target.value)}
+                style={{ width: 250 }}
+              />
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+                创建角色
+              </Button>
+            </Space>
+          </div>
+        }
+        style={{ background: 'var(--bg-card)' }}
+      >
+        <Table
+          columns={columns}
+          dataSource={filteredRoles}
+          rowKey="id"
+          loading={loading}
+          pagination={{
+            current: currentPage,
+            pageSize: pageSize,
+            total: total,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            showTotal: (total) => `共 ${total} 条`,
+            onChange: (page, size) => {
+              setCurrentPage(page);
+              setPageSize(size || 10);
+            },
+          }}
+        />
+      </Card>
+
+      {/* Role Form Modal */}
+      <RoleFormModal
+        visible={formModalVisible}
+        onCancel={() => setFormModalVisible(false)}
+        onSuccess={handleFormSuccess}
+        role={editingRole}
+      />
+
+      {/* Role Permission Modal */}
+      <RolePermissionModal
+        visible={permissionModalVisible}
+        onCancel={() => setPermissionModalVisible(false)}
+        onSuccess={handlePermissionSuccess}
+        role={selectedRole}
+      />
+    </div>
+  );
+};
+
+export default RoleList;

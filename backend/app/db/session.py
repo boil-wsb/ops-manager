@@ -24,6 +24,10 @@ AsyncSessionLocal = async_sessionmaker(
 )
 
 
+# Create async session instance for direct use
+async_session = AsyncSessionLocal
+
+
 async def get_db() -> AsyncSession:
     """Get a database session."""
     async with AsyncSessionLocal() as session:
