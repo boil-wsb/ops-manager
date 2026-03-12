@@ -5,7 +5,7 @@ import {
   Input,
   message,
 } from 'antd';
-import { roleApi, Role, CreateRoleRequest, UpdateRoleRequest } from '../../services/permissions';
+import { roleApi, type Role, type CreateRoleRequest, type UpdateRoleRequest } from '../../services/permissions';
 
 interface RoleFormModalProps {
   visible: boolean;

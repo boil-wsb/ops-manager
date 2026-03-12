@@ -6,11 +6,8 @@ import {
   Tag,
   Card,
   Input,
-  Modal,
-  Form,
   message,
   Popconfirm,
-  Switch,
   Typography,
   Tooltip,
 } from 'antd';
@@ -21,7 +18,7 @@ import {
   SafetyOutlined,
   TeamOutlined,
 } from '@ant-design/icons';
-import { roleApi, Role } from '../../services/permissions';
+import { roleApi, type Role } from '../../services/permissions';
 import RoleFormModal from './RoleFormModal';
 import RolePermissionModal from './RolePermissionModal';
 
