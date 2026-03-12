@@ -92,18 +92,18 @@ deploy-docker:
     - |
       set -e
       echo "=== Deploying OpsManager ==="
-      # Update docker-compose.yml with new images
-      if [ -f "$REMOTE_DIR/docker-compose.yml" ]; then
-        sed -i "s|image: ${REGISTRY_URL}/opsmanager/backend:.*|image: ${REGISTRY_URL}/${DOCKER_IMAGE_BACKEND}|g" $REMOTE_DIR/docker-compose.yml
-        sed -i "s|image: ${REGISTRY_URL}/opsmanager/frontend:.*|image: ${REGISTRY_URL}/${DOCKER_IMAGE_FRONTEND}|g" $REMOTE_DIR/docker-compose.yml
-        echo "Updated docker-compose.yml with new images"
-      fi
+      echo "Backend Image: $REGISTRY_URL/$DOCKER_IMAGE_BACKEND"
+      echo "Frontend Image: $REGISTRY_URL/$DOCKER_IMAGE_FRONTEND"
+      
+      # Export environment variables for docker-compose
+      export REGISTRY_URL=$REGISTRY_URL
+      export VERSION=v1.0.$CI_PIPELINE_IID
       
       # Pull latest images
       cd $REMOTE_DIR
       docker-compose pull
       
-      # Restart services
+      # Restart services with new images
       docker-compose down
       docker-compose up -d
       

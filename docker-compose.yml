@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:15-alpine
+    image: 192.168.100.213:8083/devops/postgres:15-alpine
     container_name: ops-postgres
     environment:
       POSTGRES_USER: ${DB_USER:-opsmanager}
@@ -19,7 +19,7 @@ services:
       - ops-network
 
   redis:
-    image: redis:7-alpine
+    image: 192.168.100.213:8083/devops/redis:7-alpine
     container_name: ops-redis
     command: redis-server --appendonly yes
     volumes:
@@ -33,9 +33,7 @@ services:
       - ops-network
 
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: ${REGISTRY_URL:-192.168.100.213:8083}/opsmanager/backend:${VERSION:-latest}
     container_name: ops-backend
     environment:
       - APP_NAME=${APP_NAME:-OpsManager V2}
@@ -60,9 +58,7 @@ services:
     restart: unless-stopped
 
   celery-worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: ${REGISTRY_URL:-192.168.100.213:8083}/opsmanager/backend:${VERSION:-latest}
     container_name: ops-celery-worker
     environment:
       - APP_NAME=${APP_NAME:-OpsManager V2}
@@ -84,9 +80,7 @@ services:
     restart: unless-stopped
 
   celery-beat:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: ${REGISTRY_URL:-192.168.100.213:8083}/opsmanager/backend:${VERSION:-latest}
     container_name: ops-celery-beat
     environment:
       - APP_NAME=${APP_NAME:-OpsManager V2}
@@ -108,14 +102,11 @@ services:
     restart: unless-stopped
 
   nginx:
-    image: nginx:alpine
+    image: ${REGISTRY_URL:-192.168.100.213:8083}/opsmanager/frontend:${VERSION:-latest}
     container_name: ops-nginx
     ports:
       - "8080:80"
       # - "443:443"  # Enable for HTTPS
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
-      # - ./ssl:/etc/nginx/ssl  # Enable for HTTPS
     depends_on:
       - backend
     networks:
