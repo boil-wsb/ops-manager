@@ -61,10 +61,7 @@ setup-env:
 
 # Build Stage - Backend
 docker-build-backend:
-  image: docker:cli
   stage: build
-  services:
-    - docker:dind
   script:
     - echo "Building backend image..."
     - docker build --pull -t $REGISTRY_URL/$DOCKER_IMAGE_BACKEND ./backend
@@ -76,10 +73,7 @@ docker-build-backend:
 
 # Build Stage - Frontend
 docker-build-frontend:
-  image: docker:cli
   stage: build
-  services:
-    - docker:dind
   script:
     - echo "Building frontend image..."
     - docker build --pull -t $REGISTRY_URL/$DOCKER_IMAGE_FRONTEND ./frontend
