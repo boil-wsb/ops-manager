@@ -13,7 +13,7 @@ variables:
   DOCKER_IMAGE_FRONTEND: opsmanager/frontend:v1.0.$CI_PIPELINE_IID
   REMOTE_USER: root
   REMOTE_HOST: "192.168.23.36"
-  REMOTE_DIR: "/opt/opsmanager"
+  REMOTE_DIR: "/opt/ops-manager"
 
 ### RULES REUSED VIA YAML ANCHORS:
 .if-release-branch: &if-release-branch
