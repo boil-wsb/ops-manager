@@ -1,7 +1,11 @@
 # Multi-stage build for production
-FROM python:3.12-slim as builder
+FROM 192.168.100.213:8083/devops/python:3.12-slim as builder
 
 WORKDIR /app
+
+# Use domestic apt sources
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources && \
+    sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -9,15 +13,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Use domestic pip mirror
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+
 # Install Python dependencies
 COPY requirements/base.txt requirements/base.txt
 COPY requirements/prod.txt requirements/prod.txt
 RUN pip install --no-cache-dir --user -r requirements/prod.txt
 
 # Production stage
-FROM python:3.12-slim
+FROM 192.168.100.213:8083/devops/python:3.12-slim
 
 WORKDIR /app
+
+# Use domestic apt sources
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources && \
+    sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources
 
 # Create non-root user
 RUN groupadd -r appuser && useradd -r -g appuser appuser
