@@ -2,7 +2,7 @@ import { Layout as AntLayout, Menu, Button, Avatar, Dropdown } from 'antd';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   DashboardOutlined,
-  ServerOutlined,
+  DatabaseOutlined,
   MonitorOutlined,
   AlertOutlined,
   DeploymentUnitOutlined,
@@ -27,7 +27,7 @@ const Layout = () => {
     },
     {
       key: '/assets',
-      icon: <ServerOutlined />,
+      icon: <DatabaseOutlined />,
       label: '资产管理',
     },
     {

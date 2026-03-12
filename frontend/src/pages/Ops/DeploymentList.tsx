@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Table, Button, Select, Tag, Space, Card, Timeline } from 'antd';
+import { Table, Button, Select, Tag, Space, Card } from 'antd';
 import { useQuery } from '@tanstack/react-query';
-import { PlusOutlined, DeploymentUnitOutlined } from '@ant-design/icons';
+import { PlusOutlined } from '@ant-design/icons';
 import type { Deployment } from '../../types';
 
 // Mock API for now

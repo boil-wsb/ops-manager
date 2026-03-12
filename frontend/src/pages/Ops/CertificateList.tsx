@@ -45,7 +45,7 @@ const certificateApi = {
 };
 
 const CertificateList = () => {
-  const [filter, setFilter] = useState({
+  const [filter] = useState({
     expiringSoon: false,
   });
 

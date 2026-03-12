@@ -1,8 +1,7 @@
 import { Row, Col, Card, Statistic, Table, Tag } from 'antd';
 import { useQuery } from '@tanstack/react-query';
-import { ServerOutlined, AlertOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { DatabaseOutlined, AlertOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { assetApi } from '../services/assets';
-import type { Asset, Alert } from '../types';
 
 const Dashboard = () => {
   const { data: assetsData } = useQuery({
@@ -59,7 +58,7 @@ const Dashboard = () => {
             <Statistic
               title="总资产"
               value={assetsData?.total || 0}
-              prefix={<ServerOutlined />}
+              prefix={<DatabaseOutlined />}
             />
           </Card>
         </Col>
