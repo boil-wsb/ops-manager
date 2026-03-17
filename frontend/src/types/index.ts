@@ -29,6 +29,7 @@ export interface User {
   createdAt: string;
   updatedAt: string;
   permissions?: string[];
+  roles?: { id: number; name: string }[];
 }
 
 export interface LoginCredentials {
@@ -150,6 +151,31 @@ export interface Alert {
   notificationSent: boolean;
 }
 
+export interface AlertRule {
+  id: number;
+  name: string;
+  monitorId: number;
+  metricName: string;
+  condition: string;
+  threshold: number;
+  duration: number;
+  severity: AlertSeverity;
+  isEnabled: boolean;
+  notificationChannels?: number[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NotificationChannel {
+  id: number;
+  name: string;
+  type: 'email' | 'webhook' | 'dingtalk' | 'wechat';
+  config: Record<string, string | number | boolean>;
+  isEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Ops types
 export type DeploymentStatus = 'pending' | 'running' | 'success' | 'failed' | 'rollback';
 
@@ -185,4 +211,40 @@ export interface Certificate {
   asset_ids: number[];
   created_at: string;
   updated_at: string;
+}
+
+export interface DNSRecord {
+  id: number;
+  domain: string;
+  name: string;
+  type: string;
+  value: string;
+  ttl: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InspectionTask {
+  id: number;
+  name: string;
+  type: string;
+  target: string;
+  schedule: string;
+  isEnabled: boolean;
+  lastRunAt?: string;
+  nextRunAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InspectionReport {
+  id: number;
+  taskId: number;
+  status: string;
+  startedAt: string;
+  finishedAt?: string;
+  summary: string;
+  details?: Record<string, unknown>;
+  createdAt: string;
 }

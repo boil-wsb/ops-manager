@@ -182,7 +182,8 @@ export const assetApi = {
         } : undefined,
         disk: data.metrics.disk ? {
           totalGB: data.metrics.disk.total_gb,
-          usedGB: data.metrics.disk.usage_percent,
+          usedGB: data.metrics.disk.used_gb,
+          usagePercent: data.metrics.disk.usage_percent,
         } : undefined,
         network: data.metrics.network ? {
           receiveRate: data.metrics.network.receive_rate,

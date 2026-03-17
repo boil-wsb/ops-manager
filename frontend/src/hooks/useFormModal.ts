@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useMutation, useQueryClient, UseMutationResult } from '@tanstack/react-query';
+import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
 import { App } from 'antd';
 
 interface UseFormModalOptions<T> {

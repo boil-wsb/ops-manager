@@ -1,5 +1,5 @@
 import api from './api';
-import type { Deployment, Certificate, DNSRecord, InspectionTask, InspectionReport } from '../types';
+import type { Deployment, Certificate, DNSRecord, InspectionTask } from '../types';
 
 export interface DeploymentListParams {
   skip?: number;

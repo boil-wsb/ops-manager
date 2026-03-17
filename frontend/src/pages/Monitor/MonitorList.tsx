@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Table, Button, Select, Tag, Space, Card, Switch, message } from 'antd';
+import { Table, Button, Select, Space, Card, Switch, message } from 'antd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PlusOutlined, PlayCircleOutlined, PauseCircleOutlined } from '@ant-design/icons';
 import { monitorApi } from '../../services/monitor';

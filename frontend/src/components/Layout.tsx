@@ -1,12 +1,11 @@
 import { Layout as AntLayout, Menu, Button, Avatar, Dropdown, Badge, Space, Tooltip } from 'antd';
+import type { MenuProps } from 'antd';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   DashboardOutlined,
   DatabaseOutlined,
   MonitorOutlined,
-  AlertOutlined,
   DeploymentUnitOutlined,
-  SafetyCertificateOutlined,
   LogoutOutlined,
   UserOutlined,
   BellOutlined,
@@ -14,8 +13,6 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   SafetyOutlined,
-  TeamOutlined,
-  LinkOutlined,
   SunOutlined,
   MoonOutlined,
 } from '@ant-design/icons';
@@ -201,7 +198,7 @@ const Layout = () => {
           mode="inline"
           selectedKeys={getSelectedKeys()}
           defaultOpenKeys={getOpenKeys()}
-          items={filteredMenuItems}
+          items={filteredMenuItems as MenuProps['items']}
           onClick={handleMenuClick}
         />
       </Sider>

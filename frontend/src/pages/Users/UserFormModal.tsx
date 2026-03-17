@@ -32,11 +32,11 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ open, onClose, user }) =>
         form.setFieldsValue({
           username: user.username,
           email: user.email,
-          full_name: user.full_name,
-          is_active: user.is_active ?? true,
-          is_superuser: user.is_superuser ?? false,
+          fullName: user.fullName,
+          isActive: user.isActive ?? true,
+          isSuperuser: user.isSuperuser ?? false,
         });
-        setSelectedRoleIds(user.roles?.map((r) => r.id) || []);
+        setSelectedRoleIds(user.roles?.map((r: { id: number; name: string }) => r.id) || []);
       } else {
         form.setFieldsValue({
           username: '',

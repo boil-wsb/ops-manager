@@ -1,5 +1,5 @@
 import api from './api';
-import type { Monitor, Alert, AlertRule, NotificationChannel } from '../types';
+import type { Monitor, AlertRule, NotificationChannel } from '../types';
 
 export interface MonitorListParams {
   skip?: number;

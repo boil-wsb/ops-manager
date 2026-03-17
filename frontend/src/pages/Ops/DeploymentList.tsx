@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import { PlusOutlined } from '@ant-design/icons';
 import { opsApi } from '../../services/ops';
 import StatusTag from '../../components/StatusTag';
-import type { Deployment } from '../../types';
 
 const DeploymentList = () => {
   const [filter, setFilter] = useState({

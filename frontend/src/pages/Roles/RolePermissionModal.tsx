@@ -14,7 +14,6 @@ import {
   roleApi,
   permissionApi,
   type Role,
-  type Permission,
   type PermissionGroup,
 } from '../../services/permissions';
 
