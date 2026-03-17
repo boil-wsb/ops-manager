@@ -156,6 +156,14 @@ class CertificateResponse(CertificateBase):
     updated_at: datetime
 
 
+class CertificateSyncResponse(BaseModel):
+    """Certificate sync response schema."""
+    total: int
+    created: int
+    updated: int
+    certificates: List[CertificateResponse]
+
+
 # DNS schemas
 class DNSRecordBase(BaseModel):
     """Base DNS record schema."""

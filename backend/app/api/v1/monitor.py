@@ -4,7 +4,7 @@ Monitoring and alerting API routes.
 from typing import List, Optional
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, status, Request
 from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,13 +13,14 @@ from app.crud.base import CRUDBase
 from app.models.monitor import Monitor, Alert, AlertRule, NotificationChannel
 from app.schemas.monitor import (
     MonitorCreate, MonitorUpdate, MonitorResponse, MonitorListResponse,
-    AlertCreate, AlertResponse, AlertAction,
+    AlertCreate, AlertResponse, AlertAction, AlertListResponse,
     AlertRuleCreate, AlertRuleUpdate, AlertRuleResponse,
     NotificationChannelCreate, NotificationChannelUpdate, NotificationChannelResponse
 )
 from app.core.exceptions import NotFoundError
+from app.core.audit import audit_log
 
-router = APIRouter()
+router = APIRouter(prefix="/monitor")
 
 # CRUD instances
 crud_monitor = CRUDBase(Monitor)
@@ -67,7 +68,9 @@ async def list_monitors(
 
 
 @router.post("/monitors", response_model=MonitorResponse, status_code=status.HTTP_201_CREATED)
+@audit_log(operation_type="CREATE", module="monitor", object_type="Monitor")
 async def create_monitor(
+    request: Request,
     obj_in: MonitorCreate,
     db: AsyncSession = Depends(get_db),
     current_user = require_permissions(["monitor:write"])
@@ -91,7 +94,9 @@ async def get_monitor(
 
 
 @router.put("/monitors/{monitor_id}", response_model=MonitorResponse)
+@audit_log(operation_type="UPDATE", module="monitor", object_type="Monitor")
 async def update_monitor(
+    request: Request,
     monitor_id: int,
     obj_in: MonitorUpdate,
     db: AsyncSession = Depends(get_db),
@@ -107,7 +112,9 @@ async def update_monitor(
 
 
 @router.delete("/monitors/{monitor_id}", status_code=status.HTTP_204_NO_CONTENT)
+@audit_log(operation_type="DELETE", module="monitor", object_type="Monitor")
 async def delete_monitor(
+    request: Request,
     monitor_id: int,
     db: AsyncSession = Depends(get_db),
     current_user = require_permissions(["monitor:delete"])
@@ -122,7 +129,9 @@ async def delete_monitor(
 
 
 @router.post("/monitors/{monitor_id}/toggle")
+@audit_log(operation_type="UPDATE", module="monitor", object_type="Monitor")
 async def toggle_monitor(
+    request: Request,
     monitor_id: int,
     db: AsyncSession = Depends(get_db),
     current_user = require_permissions(["monitor:write"])
@@ -139,7 +148,7 @@ async def toggle_monitor(
 
 
 # Alert routes
-@router.get("/alerts", response_model=List[AlertResponse])
+@router.get("/alerts", response_model=AlertListResponse)
 async def list_alerts(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
@@ -164,10 +173,17 @@ async def list_alerts(
     if filters:
         query = query.where(and_(*filters))
     
+    # Get total count
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await db.execute(count_query)
+    total = total_result.scalar()
+    
+    # Apply pagination
     query = query.offset(skip).limit(limit).order_by(Alert.started_at.desc())
     result = await db.execute(query)
     alerts = result.scalars().all()
-    return alerts
+    
+    return {"total": total, "items": alerts}
 
 
 @router.get("/alerts/{alert_id}", response_model=AlertResponse)
@@ -184,7 +200,9 @@ async def get_alert(
 
 
 @router.post("/alerts/{alert_id}/action", response_model=AlertResponse)
+@audit_log(operation_type="UPDATE", module="monitor", object_type="Alert")
 async def alert_action(
+    request: Request,
     alert_id: int,
     action: AlertAction,
     db: AsyncSession = Depends(get_db),
@@ -235,7 +253,9 @@ async def list_alert_rules(
 
 
 @router.post("/alert-rules", response_model=AlertRuleResponse, status_code=status.HTTP_201_CREATED)
+@audit_log(operation_type="CREATE", module="monitor", object_type="AlertRule")
 async def create_alert_rule(
+    request: Request,
     obj_in: AlertRuleCreate,
     db: AsyncSession = Depends(get_db),
     current_user = require_permissions(["monitor:write"])
@@ -259,7 +279,9 @@ async def get_alert_rule(
 
 
 @router.put("/alert-rules/{rule_id}", response_model=AlertRuleResponse)
+@audit_log(operation_type="UPDATE", module="monitor", object_type="AlertRule")
 async def update_alert_rule(
+    request: Request,
     rule_id: int,
     obj_in: AlertRuleUpdate,
     db: AsyncSession = Depends(get_db),
@@ -275,7 +297,9 @@ async def update_alert_rule(
 
 
 @router.delete("/alert-rules/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
+@audit_log(operation_type="DELETE", module="monitor", object_type="AlertRule")
 async def delete_alert_rule(
+    request: Request,
     rule_id: int,
     db: AsyncSession = Depends(get_db),
     current_user = require_permissions(["monitor:delete"])
@@ -303,7 +327,9 @@ async def list_notification_channels(
 
 
 @router.post("/notification-channels", response_model=NotificationChannelResponse, status_code=status.HTTP_201_CREATED)
+@audit_log(operation_type="CREATE", module="monitor", object_type="NotificationChannel")
 async def create_notification_channel(
+    request: Request,
     obj_in: NotificationChannelCreate,
     db: AsyncSession = Depends(get_db),
     current_user = require_permissions(["monitor:write"])
@@ -327,7 +353,9 @@ async def get_notification_channel(
 
 
 @router.put("/notification-channels/{channel_id}", response_model=NotificationChannelResponse)
+@audit_log(operation_type="UPDATE", module="monitor", object_type="NotificationChannel")
 async def update_notification_channel(
+    request: Request,
     channel_id: int,
     obj_in: NotificationChannelUpdate,
     db: AsyncSession = Depends(get_db),
@@ -343,7 +371,9 @@ async def update_notification_channel(
 
 
 @router.delete("/notification-channels/{channel_id}", status_code=status.HTTP_204_NO_CONTENT)
+@audit_log(operation_type="DELETE", module="monitor", object_type="NotificationChannel")
 async def delete_notification_channel(
+    request: Request,
     channel_id: int,
     db: AsyncSession = Depends(get_db),
     current_user = require_permissions(["monitor:delete"])
@@ -358,7 +388,9 @@ async def delete_notification_channel(
 
 
 @router.post("/notification-channels/{channel_id}/test")
+@audit_log(operation_type="EXPORT", module="monitor", object_type="NotificationChannel")
 async def test_notification_channel(
+    request: Request,
     channel_id: int,
     db: AsyncSession = Depends(get_db),
     current_user = require_permissions(["monitor:write"])

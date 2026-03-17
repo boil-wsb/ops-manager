@@ -16,18 +16,33 @@ from app.models.base import BaseModel
 
 class AssetType(str, enum.Enum):
     """Asset type enum."""
-    SERVER = "server"
-    VM = "vm"
-    NETWORK = "network"
-    STORAGE = "storage"
+    SERVER = "SERVER"
+    VM = "VM"
+    NETWORK = "NETWORK"
+    STORAGE = "STORAGE"
+    TERMINAL = "TERMINAL"
 
 
 class AssetStatus(str, enum.Enum):
     """Asset status enum."""
-    ACTIVE = "active"
-    OFFLINE = "offline"
-    MAINTENANCE = "maintenance"
-    RETIRED = "retired"
+    ACTIVE = "ACTIVE"
+    OFFLINE = "OFFLINE"
+    MAINTENANCE = "MAINTENANCE"
+    RETIRED = "RETIRED"
+
+
+class AssetSource(str, enum.Enum):
+    """Asset source enum."""
+    MANUAL = "MANUAL"
+    PROMETHEUS = "PROMETHEUS"
+    IMPORTED = "IMPORTED"
+
+
+class SyncStatus(str, enum.Enum):
+    """Sync status enum."""
+    PENDING = "PENDING"
+    SYNCED = "SYNCED"
+    ERROR = "ERROR"
 
 
 # Asset-Label association table
@@ -87,9 +102,30 @@ class Asset(BaseModel):
     disk_gb: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     os_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     os_version: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    arch: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    
+    # Terminal specific info (from pc_info metrics)
+    hostname: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    serial_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    uuid: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    customer: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
+    # Prometheus sync info
+    source: Mapped[str] = mapped_column(
+        String(50),
+        default=AssetSource.MANUAL.value,
+        nullable=False
+    )
+    prometheus_instance: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    last_sync_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    sync_status: Mapped[str] = mapped_column(
+        String(50),
+        default=SyncStatus.PENDING.value,
+        nullable=False
+    )
     
     # Location info
-    idc: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    idc: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     region: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     rack: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     

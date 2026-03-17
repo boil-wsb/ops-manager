@@ -1,9 +1,10 @@
 // Common types
 
 export interface ApiResponse<T> {
-  code: number;
+  code?: number;
   message: string;
   data: T;
+  success?: boolean;
 }
 
 export interface PaginationParams {
@@ -27,6 +28,7 @@ export interface User {
   lastLogin?: string;
   createdAt: string;
   updatedAt: string;
+  permissions?: string[];
 }
 
 export interface LoginCredentials {
@@ -42,8 +44,10 @@ export interface TokenResponse {
 }
 
 // Asset types
-export type AssetType = 'server' | 'vm' | 'network' | 'storage';
-export type AssetStatus = 'active' | 'offline' | 'maintenance' | 'retired';
+export type AssetType = 'SERVER' | 'VM' | 'NETWORK' | 'STORAGE' | 'TERMINAL';
+export type AssetStatus = 'ACTIVE' | 'OFFLINE' | 'MAINTENANCE' | 'RETIRED';
+export type AssetSource = 'MANUAL' | 'PROMETHEUS' | 'IMPORTED';
+export type SyncStatus = 'PENDING' | 'SYNCED' | 'ERROR';
 
 export interface Label {
   id: number;
@@ -67,12 +71,29 @@ export interface Asset {
   diskGb?: number;
   osType?: string;
   osVersion?: string;
+  arch?: string;
   idc?: string;
   region?: string;
   rack?: string;
   labels: Label[];
   description?: string;
   ownerId?: number;
+  owner?: {
+    id: number;
+    username: string;
+    name?: string;
+  };
+  source?: string;
+  prometheusInstance?: string;
+  lastSyncTime?: string;
+  syncStatus?: string;
+  // Terminal specific fields
+  hostname?: string;
+  serialNumber?: string;
+  uuid?: string;
+  customer?: string;
+  // All pc_info labels
+  labelsData?: Record<string, string | number | boolean>;
   createdAt: string;
   updatedAt: string;
 }
@@ -154,14 +175,14 @@ export interface Certificate {
   domain: string;
   issuer: string;
   subject: string;
-  serialNumber: string;
-  validFrom: string;
-  validUntil: string;
-  daysUntilExpiry: number;
-  alertThresholdDays: number;
-  isAutoRenewal: boolean;
+  serial_number: string;
+  valid_from: string;
+  valid_until: string;
+  days_until_expiry: number;
+  alert_threshold_days: number;
+  is_auto_renewal: boolean;
   status: string;
-  assetIds: number[];
-  createdAt: string;
-  updatedAt: string;
+  asset_ids: number[];
+  created_at: string;
+  updated_at: string;
 }

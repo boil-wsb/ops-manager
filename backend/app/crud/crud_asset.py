@@ -1,7 +1,7 @@
 """
 Asset CRUD operations.
 """
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 
 from sqlalchemy import select, and_, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,7 +37,7 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
         idc: Optional[str] = None,
         keyword: Optional[str] = None,
         label_ids: Optional[List[int]] = None
-    ) -> tuple[List[Asset], int]:
+    ) -> Tuple[List[Asset], int]:
         """Get assets with filters and pagination."""
         # Build query
         query = select(Asset)

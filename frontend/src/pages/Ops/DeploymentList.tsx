@@ -2,48 +2,30 @@ import { useState } from 'react';
 import { Table, Button, Select, Tag, Space, Card } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { PlusOutlined } from '@ant-design/icons';
+import { opsApi } from '../../services/ops';
+import StatusTag from '../../components/StatusTag';
 import type { Deployment } from '../../types';
-
-// Mock API for now
-const mockDeployments: Deployment[] = [
-  {
-    id: 1,
-    projectName: 'ops-manager-web',
-    version: 'v2.1.0',
-    environment: 'prod',
-    status: 'success',
-    deployerName: 'admin',
-    deployTime: '2024-01-15T10:00:00Z',
-    durationSeconds: 180,
-    createdAt: '2024-01-15T10:00:00Z',
-  },
-  {
-    id: 2,
-    projectName: 'ops-manager-api',
-    version: 'v2.1.0',
-    environment: 'prod',
-    status: 'running',
-    deployerName: 'admin',
-    deployTime: '2024-01-15T10:05:00Z',
-    createdAt: '2024-01-15T10:05:00Z',
-  },
-];
-
-const deploymentApi = {
-  getDeployments: async () => ({ total: mockDeployments.length, items: mockDeployments }),
-};
 
 const DeploymentList = () => {
   const [filter, setFilter] = useState({
     environment: undefined as string | undefined,
     status: undefined as string | undefined,
   });
-
-  const { data, isLoading } = useQuery({
-    queryKey: ['deployments', filter],
-    queryFn: () => deploymentApi.getDeployments(),
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
   });
 
+  const { data, isLoading } = useQuery({
+    queryKey: ['deployments', filter, pagination],
+    queryFn: () =>
+      opsApi.getDeployments({
+        skip: (pagination.current - 1) * pagination.pageSize,
+        limit: pagination.pageSize,
+        environment: filter.environment,
+        status: filter.status,
+      }),
+  });
   const columns = [
     {
       title: '项目',
@@ -54,7 +36,7 @@ const DeploymentList = () => {
       title: '版本',
       dataIndex: 'version',
       key: 'version',
-      render: (version: string) => <Tag>{version}</Tag>,
+      render: (version: string) => <Tag>{version || '-'}</Tag>,
     },
     {
       title: '环境',
@@ -73,30 +55,14 @@ const DeploymentList = () => {
           staging: '预发布',
           prod: '生产',
         };
-        return <Tag color={colorMap[env]}>{labelMap[env]}</Tag>;
+        return <Tag color={colorMap[env]}>{labelMap[env] || env}</Tag>;
       },
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      render: (status: string) => {
-        const colorMap: Record<string, string> = {
-          pending: 'default',
-          running: 'processing',
-          success: 'success',
-          failed: 'error',
-          rollback: 'warning',
-        };
-        const labelMap: Record<string, string> = {
-          pending: '等待中',
-          running: '发布中',
-          success: '成功',
-          failed: '失败',
-          rollback: '已回滚',
-        };
-        return <Tag color={colorMap[status]}>{labelMap[status]}</Tag>;
-      },
+      render: (status: string) => <StatusTag status={status} type="deployment" />,
     },
     {
       title: '发布人',
@@ -159,9 +125,12 @@ const DeploymentList = () => {
         rowKey="id"
         loading={isLoading}
         pagination={{
+          current: pagination.current,
+          pageSize: pagination.pageSize,
           total: data?.total || 0,
           showSizeChanger: true,
-          showTotal: (total) => `共 ${total} 条`,
+          showTotal: (total: number) => `共 ${total} 条`,
+          onChange: (page: number, pageSize: number) => setPagination({ current: page, pageSize }),
         }}
       />
     </div>

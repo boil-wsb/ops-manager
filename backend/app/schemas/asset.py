@@ -3,7 +3,7 @@ Asset schemas.
 """
 from datetime import datetime
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from app.schemas.base import BaseResponse
 
@@ -22,16 +22,27 @@ class LabelCreate(LabelBase):
 
 class LabelResponse(LabelBase):
     """Label response schema."""
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     created_at: datetime
+
+
+class OwnerResponse(BaseModel):
+    """Owner response schema for nested owner info."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    username: str
+    name: Optional[str] = None
 
 
 class AssetBase(BaseModel):
     """Base asset schema."""
     asset_id: str = Field(..., min_length=1, max_length=100)
     name: str = Field(..., min_length=1, max_length=200)
-    asset_type: str = Field(..., pattern="^(server|vm|network|storage)$")
-    status: str = Field(default="active", pattern="^(active|offline|maintenance|retired)$")
+    asset_type: str = Field(..., pattern="^(SERVER|VM|NETWORK|STORAGE|TERMINAL)$")
+    status: str = Field(default="ACTIVE", pattern="^(ACTIVE|OFFLINE|MAINTENANCE|RETIRED)$")
     
     # Network info
     ip_address: Optional[str] = Field(None, max_length=45)
@@ -44,6 +55,13 @@ class AssetBase(BaseModel):
     disk_gb: Optional[int] = Field(None, ge=1)
     os_type: Optional[str] = Field(None, max_length=50)
     os_version: Optional[str] = Field(None, max_length=100)
+    arch: Optional[str] = Field(None, max_length=50)
+    
+    # Terminal specific info
+    hostname: Optional[str] = Field(None, max_length=100)
+    serial_number: Optional[str] = Field(None, max_length=100)
+    uuid: Optional[str] = Field(None, max_length=100)
+    customer: Optional[str] = Field(None, max_length=100)
     
     # Location info
     idc: Optional[str] = Field(None, max_length=100)
@@ -62,7 +80,7 @@ class AssetCreate(AssetBase):
 class AssetUpdate(BaseModel):
     """Asset update schema."""
     name: Optional[str] = Field(None, min_length=1, max_length=200)
-    status: Optional[str] = Field(None, pattern="^(active|offline|maintenance|retired)$")
+    status: Optional[str] = Field(None, pattern="^(ACTIVE|OFFLINE|MAINTENANCE|RETIRED)$")
     
     ip_address: Optional[str] = Field(None, max_length=45)
     private_ip: Optional[str] = Field(None, max_length=45)
@@ -84,11 +102,29 @@ class AssetUpdate(BaseModel):
 
 class AssetResponse(AssetBase):
     """Asset response schema."""
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=lambda x: ''.join(word.capitalize() if i else word for i, word in enumerate(x.split('_'))),
+        populate_by_name=True
+    )
+
     id: int
     labels: List[LabelResponse] = []
     owner_id: Optional[int] = None
+    owner: Optional[OwnerResponse] = None
     created_at: datetime
     updated_at: datetime
+    # Prometheus sync fields
+    source: Optional[str] = None
+    prometheus_instance: Optional[str] = None
+    last_sync_time: Optional[datetime] = None
+    sync_status: Optional[str] = None
+    # Additional fields
+    cpu_cores: Optional[int] = None
+    memory_gb: Optional[int] = None
+    disk_gb: Optional[int] = None
+    # All pc_info labels for terminals
+    labels_data: Optional[Dict[str, Any]] = None
 
 
 class AssetListResponse(BaseModel):

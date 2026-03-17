@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.core.logging import configure_logging, get_logger
 from app.core.redis import init_redis, close_redis
+from app.core.middleware import RequestLoggingMiddleware
 from app.api.router import api_router
 from app.db.init_db import init_db
 
@@ -21,12 +22,7 @@ logger = get_logger(__name__)
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     # Startup
-    logger.info(
-        "Starting up application",
-        app_name=settings.app_name,
-        version=settings.app_version,
-        debug=settings.debug,
-    )
+    logger.info(f"Starting up application: {settings.app_name} v{settings.app_version}")
     
     # Initialize database (check and create default data if needed)
     try:
@@ -35,8 +31,6 @@ async def lifespan(app: FastAPI):
         logger.info("Database initialization check completed")
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
-        # Don't raise here, let the app start even if DB init fails
-        # This allows the app to start and show proper error messages
     
     # Initialize Redis
     try:
@@ -77,6 +71,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add request logging middleware
+app.add_middleware(RequestLoggingMiddleware)
 
 # Include API router
 app.include_router(api_router, prefix="/api")

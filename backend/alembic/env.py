@@ -10,35 +10,34 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
+# Import application models and config
 from app.config import settings
-from app.db.base_class import Base
-from app.models.user import User, Role  # noqa
-from app.models.asset import Asset, Label, AssetHistory  # noqa
-from app.models.ops import Deployment, InspectionTask, InspectionReport, Certificate, DNSRecord  # noqa
-from app.models.monitor import Monitor, Alert, AlertRule, NotificationChannel  # noqa
+from app.models.base import BaseModel
 
-# this is the Alembic Config object, which provides
-# access to the values within the .ini file in use.
+# Import all models to ensure they are registered with SQLAlchemy
+from app.models.user import User, user_roles
+from app.models.permission import Permission, Role, role_permissions
+from app.models.asset import Asset, Label, asset_labels
+from app.models.monitor import Monitor, Alert, AlertRule, NotificationChannel
+
+# this is the Alembic Config object
 config = context.config
 
-# Interpret the config file for Python logging.
-# This line sets up loggers basically.
+# Interpret the config file for Python logging
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# add your model's MetaData object here
-# for 'autogenerate' support
-target_metadata = Base.metadata
+# Set target metadata
+# This is used by Alembic to generate migrations
+target_metadata = BaseModel.metadata
 
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
+# Get database URL from settings
+# Convert asyncpg URL to sync psycopg2 URL for Alembic
+database_url = settings.database_url
+if database_url.startswith("postgresql+asyncpg://"):
+    database_url = database_url.replace("postgresql+asyncpg://", "postgresql://", 1)
 
-
-def get_url():
-    """Get database URL from settings."""
-    return settings.async_database_url
+config.set_main_option("sqlalchemy.url", database_url)
 
 
 def run_migrations_offline() -> None:
@@ -51,9 +50,8 @@ def run_migrations_offline() -> None:
 
     Calls to context.execute() here emit the given string to the
     script output.
-
     """
-    url = get_url()
+    url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -66,6 +64,7 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
+    """Run migrations with the given connection."""
     context.configure(connection=connection, target_metadata=target_metadata)
 
     with context.begin_transaction():
@@ -75,13 +74,12 @@ def do_run_migrations(connection: Connection) -> None:
 async def run_async_migrations() -> None:
     """In this scenario we need to create an Engine
     and associate a connection with the context.
-
     """
-    configuration = config.get_section(config.config_ini_section, {})
-    configuration["sqlalchemy.url"] = get_url()
-    connectable = async_engine_from_config(
-        configuration,
-        prefix="sqlalchemy.",
+    from sqlalchemy.ext.asyncio import create_async_engine
+    
+    # Create async engine using the asyncpg URL from settings
+    connectable = create_async_engine(
+        settings.database_url,
         poolclass=pool.NullPool,
     )
 

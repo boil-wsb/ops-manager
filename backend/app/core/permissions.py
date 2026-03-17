@@ -8,53 +8,10 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_db
-from app.crud.crud_user import crud_user
-from app.core.security import verify_token
+from app.api.deps import get_db, get_current_user
 from app.models.user import User
 
 security = HTTPBearer(auto_error=False)
-
-
-async def get_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    db: AsyncSession = Depends(get_db)
-) -> User:
-    """Get current user from JWT token."""
-    if not credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="未提供认证凭据",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    token = credentials.credentials
-    user_id = verify_token(token, token_type="access")
-    
-    if user_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="无效的访问令牌",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    user = await crud_user.get(db, id=int(user_id))
-    
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="用户不存在",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="用户已被禁用",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    return user
 
 
 def get_user_permissions(user: User) -> List[str]:
@@ -101,13 +58,13 @@ def has_all_permissions(user: User, permission_codes: List[str]) -> bool:
 
 
 class PermissionChecker:
-    """Permission checker dependency."""
+    """Permission checker class."""
     
     def __init__(self, required_permissions: List[str], require_all: bool = False):
         self.required_permissions = required_permissions
         self.require_all = require_all
     
-    async def __call__(self, current_user: User = Depends(get_current_user)):
+    def __call__(self, current_user: User):
         """Check if user has required permissions."""
         # Superuser bypass
         if current_user.is_superuser:
@@ -128,17 +85,26 @@ class PermissionChecker:
         return None
 
 
+# Create global checker instances
+require_role_read = PermissionChecker(["role:read"])
+require_role_create = PermissionChecker(["role:create"])
+require_role_update = PermissionChecker(["role:update"])
+require_role_delete = PermissionChecker(["role:delete"])
+
+
 def require_permissions(permissions: List[str], require_all: bool = False):
     """Create a permission checker dependency.
     
     Usage:
         @router.get("/items")
         async def list_items(
+            current_user: User = Depends(get_current_user),
             _: None = Depends(require_permissions(["item:read"]))
         ):
             ...
     """
-    return Depends(PermissionChecker(permissions, require_all))
+    checker = PermissionChecker(permissions, require_all)
+    return checker
 
 
 def check_permission(user: User, permission_code: str):

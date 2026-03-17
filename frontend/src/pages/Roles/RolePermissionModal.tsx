@@ -12,7 +12,9 @@ import {
 import { SafetyOutlined } from '@ant-design/icons';
 import {
   roleApi,
+  permissionApi,
   type Role,
+  type Permission,
   type PermissionGroup,
 } from '../../services/permissions';
 
@@ -48,16 +50,13 @@ const RolePermissionModal = ({
 
     setLoading(true);
     try {
-      // Fetch role permissions
+      // Fetch all permissions grouped by module
+      const allPermissionsRes = await permissionApi.getPermissions({ page: 1, page_size: 1000 });
+      
+      // Fetch role's current permissions
       const rolePermissionsRes = await roleApi.getRolePermissions(role.id);
-      
-      // Build permission groups from the response
-      // In a real scenario, you'd fetch all permissions, but for now we'll use a simplified approach
-      const groups: PermissionGroup[] = [];
-      
-      // This is a simplified version - in production, you'd fetch all permissions
-      // and group them by module
-      setPermissionGroups(groups);
+
+      setPermissionGroups(allPermissionsRes.data.items || []);
 
       // Get currently selected permission IDs
       const currentPermIds = rolePermissionsRes.data.permissions.map((p) => p.id);
@@ -65,9 +64,9 @@ const RolePermissionModal = ({
 
       // Calculate check-all status for each module
       const checkAllStatus: Record<string, boolean> = {};
-      groups.forEach((group) => {
+      (allPermissionsRes.data.items || []).forEach((group) => {
         const groupPermIds = group.permissions.map((p) => p.id);
-        const allSelected = groupPermIds.every((id) => currentPermIds.includes(id));
+        const allSelected = groupPermIds.length > 0 && groupPermIds.every((id) => currentPermIds.includes(id));
         checkAllStatus[group.module] = allSelected;
       });
       setCheckAllMap(checkAllStatus);
@@ -86,15 +85,31 @@ const RolePermissionModal = ({
 
     let newSelectedPermissions: number[];
     if (checked) {
-      // Add all permissions from this module
       newSelectedPermissions = [...new Set([...selectedPermissions, ...groupPermIds])];
     } else {
-      // Remove all permissions from this module
       newSelectedPermissions = selectedPermissions.filter((id) => !groupPermIds.includes(id));
     }
 
     setSelectedPermissions(newSelectedPermissions);
     setCheckAllMap({ ...checkAllMap, [module]: checked });
+  };
+
+  const handlePermissionChange = (permId: number, checked: boolean, module: string) => {
+    let newSelectedPermissions: number[];
+    if (checked) {
+      newSelectedPermissions = [...selectedPermissions, permId];
+    } else {
+      newSelectedPermissions = selectedPermissions.filter((id) => id !== permId);
+    }
+    setSelectedPermissions(newSelectedPermissions);
+
+    // Update check-all status for this module
+    const group = permissionGroups.find((g) => g.module === module);
+    if (group) {
+      const groupPermIds = group.permissions.map((p) => p.id);
+      const allSelected = groupPermIds.every((id) => newSelectedPermissions.includes(id));
+      setCheckAllMap({ ...checkAllMap, [module]: allSelected });
+    }
   };
 
   const handleSubmit = async () => {
@@ -173,6 +188,9 @@ const RolePermissionModal = ({
             padding: 16,
           }}
         >
+          {permissionGroups.length === 0 && !loading && (
+            <Text type="secondary">暂无权限数据</Text>
+          )}
           {permissionGroups.map((group) => (
             <Card
               key={group.module}
@@ -195,12 +213,7 @@ const RolePermissionModal = ({
                   <Checkbox
                     key={perm.id}
                     checked={selectedPermissions.includes(perm.id)}
-                    onChange={(e) => {
-                      const newSelected = e.target.checked
-                        ? [...selectedPermissions, perm.id]
-                        : selectedPermissions.filter((id) => id !== perm.id);
-                      setSelectedPermissions(newSelected);
-                    }}
+                    onChange={(e) => handlePermissionChange(perm.id, e.target.checked, group.module)}
                   >
                     <Space direction="vertical" size={0}>
                       <Text style={{ fontSize: 13 }}>{perm.name}</Text>

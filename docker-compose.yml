@@ -69,32 +69,11 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
       - ./logs:/app/logs
+      - celery_beat:/app/celerybeat
     depends_on:
       - postgres
       - redis
-    command: celery -A app.tasks.celery_app worker -l info -c 4
-    networks:
-      - ops-network
-    restart: unless-stopped
-
-  celery-beat:
-    image: ${REGISTRY_URL:-192.168.100.213:8083}/opsmanager/backend:${VERSION:-latest}
-    container_name: ops-celery-beat
-    environment:
-      - APP_NAME=${APP_NAME:-OpsManager V2}
-      - DEBUG=${DEBUG:-false}
-      - SECRET_KEY=${SECRET_KEY}
-      - DATABASE_URL=postgresql+asyncpg://${DB_USER:-opsmanager}:${DB_PASSWORD:-opsmanager}@postgres:5432/${DB_NAME:-opsmanager}
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/1
-      - CELERY_RESULT_BACKEND=redis://redis:6379/2
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-    volumes:
-      - ./logs:/app/logs
-    depends_on:
-      - postgres
-      - redis
-    command: celery -A app.tasks.celery_app beat -l info
+    command: celery -A app.tasks.celery_app worker -B -l info -c 4
     networks:
       - ops-network
     restart: unless-stopped
@@ -114,6 +93,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  celery_beat:
 
 networks:
   ops-network:

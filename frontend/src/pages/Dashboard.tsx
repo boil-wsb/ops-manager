@@ -1,322 +1,295 @@
-import { Row, Col, Card, Statistic, Table, Tag, Progress, List, Avatar, Badge } from 'antd';
+import { Row, Col, Card, Statistic, Table, Tag, Space, Button, Tooltip, Tabs } from 'antd';
+import { LinkOutlined, MonitorOutlined, CloudUploadOutlined, DatabaseOutlined, CloudOutlined, SettingOutlined, DashboardOutlined, SafetyOutlined, ApiOutlined, DesktopOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import {
-  DatabaseOutlined,
-  AlertOutlined,
-  CheckCircleOutlined,
-  ExclamationCircleOutlined,
-  SafetyCertificateOutlined,
-  DeploymentUnitOutlined,
-  ClockCircleOutlined,
-  RiseOutlined,
-  FallOutlined,
-} from '@ant-design/icons';
+import { monitorApi } from '../services/monitor';
+import { opsApi } from '../services/ops';
 import { assetApi } from '../services/assets';
+import { navigationApi } from '../services/navigation';
+
+const iconMap: Record<string, React.ReactNode> = {
+  MonitorOutlined: <MonitorOutlined />,
+  CloudUploadOutlined: <CloudUploadOutlined />,
+  LinkOutlined: <LinkOutlined />,
+  DatabaseOutlined: <DatabaseOutlined />,
+  DesktopOutlined: <DesktopOutlined />,
+  CloudOutlined: <CloudOutlined />,
+  SettingOutlined: <SettingOutlined />,
+  DashboardOutlined: <DashboardOutlined />,
+  SafetyOutlined: <SafetyOutlined />,
+  ApiOutlined: <ApiOutlined />,
+};
 
 const Dashboard = () => {
-  const { data: assetsData } = useQuery({
-    queryKey: ['assets', { limit: 1 }],
-    queryFn: () => assetApi.getAssets({ limit: 1 }),
+  const { data: navigationGroups } = useQuery({
+    queryKey: ['navigation-links'],
+    queryFn: () => navigationApi.getPublicLinks(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const { data: alertStats, isLoading: alertLoading } = useQuery({
+    queryKey: ['alert-stats'],
+    queryFn: async () => {
+      const firing = await monitorApi.getAlerts({ status: 'firing', limit: 1 });
+      const resolved = await monitorApi.getAlerts({ status: 'resolved', limit: 1 });
+      return {
+        firing: firing.total || 0,
+        resolved: resolved.total || 0,
+      };
+    },
   });
 
-  const recentAssets = assetsData?.items.slice(0, 5) || [];
+  const { data: monitorStats, isLoading: monitorLoading } = useQuery({
+    queryKey: ['monitor-stats'],
+    queryFn: async () => {
+      const all = await monitorApi.getMonitors({ limit: 1 });
+      const up = await monitorApi.getMonitors({ status: 'up', limit: 1 });
+      const down = await monitorApi.getMonitors({ status: 'down', limit: 1 });
+      return {
+        total: all.total || 0,
+        up: up.total || 0,
+        down: down.total || 0,
+      };
+    },
+  });
 
-  // Mock data for dashboard
-  const stats = {
-    totalAssets: assetsData?.total || 0,
-    onlineAssets: 42,
-    alerts: 3,
-    pendingTasks: 5,
-    certificatesExpiring: 2,
-    deploymentsToday: 1,
-  };
+  const { data: certStats, isLoading: certLoading } = useQuery({
+    queryKey: ['cert-stats'],
+    queryFn: async () => {
+      const all = await opsApi.getCertificates({ limit: 100 });
+      const certArray = Array.isArray(all) ? all : [];
+      const valid = certArray.filter((c: any) => c.status === 'active');
+      const expiring = certArray.filter((c: any) => c.status === 'expiring');
+      const expired = certArray.filter((c: any) => c.status === 'expired');
+      return {
+        total: certArray.length,
+        valid: valid.length,
+        expiring: expiring.length,
+        expired: expired.length,
+      };
+    },
+  });
 
-  const assetColumns = [
-    {
-      title: '资产编号',
-      dataIndex: 'assetId',
-      key: 'assetId',
-      width: 120,
+  const { data: assetStats, isLoading: assetLoading } = useQuery({
+    queryKey: ['asset-stats'],
+    queryFn: async () => {
+      const all = await assetApi.getAssets({ limit: 1 });
+      const servers = await assetApi.getAssets({ assetType: 'SERVER', limit: 1 });
+      const domains = await assetApi.getAssets({ assetType: 'DOMAIN', limit: 1 });
+      return {
+        total: all?.total || 0,
+        servers: servers?.total || 0,
+        domains: domains?.total || 0,
+      };
     },
-    {
-      title: '名称',
-      dataIndex: 'name',
-      key: 'name',
-      ellipsis: true,
-    },
-    {
-      title: '类型',
-      dataIndex: 'assetType',
-      key: 'assetType',
-      width: 100,
-      render: (type: string) => (
-        <Tag color="blue" style={{ borderRadius: '4px' }}>
-          {type.toUpperCase()}
-        </Tag>
-      ),
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      width: 100,
-      render: (status: string) => {
-        const colorMap: Record<string, string> = {
-          active: 'success',
-          offline: 'error',
-          maintenance: 'warning',
-          retired: 'default',
-        };
-        const labelMap: Record<string, string> = {
-          active: '运行中',
-          offline: '离线',
-          maintenance: '维护中',
-          retired: '已退役',
-        };
-        return (
-          <Badge
-            status={colorMap[status] as any}
-            text={labelMap[status] || status}
-          />
-        );
-      },
-    },
-    {
-      title: 'IP地址',
-      dataIndex: 'ipAddress',
-      key: 'ipAddress',
-      width: 140,
-      render: (ip: string) => ip || '-',
-    },
-  ];
+  });
 
-  const recentAlerts = [
-    { id: 1, title: '服务器 CPU 使用率过高', severity: 'critical', time: '5分钟前' },
-    { id: 2, title: '数据库连接数接近上限', severity: 'warning', time: '15分钟前' },
-    { id: 3, title: 'SSL 证书即将过期', severity: 'warning', time: '1小时前' },
-  ];
+  const { data: recentAlerts, isLoading: alertsLoading } = useQuery({
+    queryKey: ['recent-alerts'],
+    queryFn: () => monitorApi.getAlerts({ limit: 5 }),
+  });
 
-  const quickActions = [
-    { title: '添加资产', icon: <DatabaseOutlined />, color: '#1890ff' },
-    { title: '创建监控', icon: <AlertOutlined />, color: '#52c41a' },
-    { title: '发布应用', icon: <DeploymentUnitOutlined />, color: '#722ed1' },
-    { title: '查看证书', icon: <SafetyCertificateOutlined />, color: '#fa8c16' },
-  ];
+  const { data: recentDeployments, isLoading: deploymentsLoading } = useQuery({
+    queryKey: ['recent-deployments'],
+    queryFn: () => opsApi.getDeployments({ limit: 5 }),
+  });
 
   return (
-    <div className="animate-fade-in">
-      <h1 style={{ marginBottom: 24, fontSize: 24, fontWeight: 600 }}>仪表盘</h1>
+    <div>
+      {navigationGroups && navigationGroups.groups.length > 0 && (
+        <Card
+          size="small"
+          style={{ marginBottom: 16 }}
+          styles={{ body: { padding: '0 16px 12px' } }}
+        >
+          <Tabs
+            defaultActiveKey={navigationGroups.groups[0]?.category}
+            items={navigationGroups.groups.map((group) => ({
+              key: group.category,
+              label: group.category,
+              children: (
+                <Space size={8} wrap>
+                  {group.links.map((link) => (
+                    <Tooltip key={link.id} title={link.description || link.url} placement="top">
+                      <Button
+                        type="primary"
+                        size="small"
+                        icon={link.icon ? iconMap[link.icon] : <LinkOutlined />}
+                        onClick={() => window.open(link.url, '_blank')}
+                      >
+                        {link.name}
+                        <LinkOutlined style={{ marginLeft: 4, fontSize: 12 }} />
+                      </Button>
+                    </Tooltip>
+                  ))}
+                </Space>
+              ),
+            }))}
+            size="small"
+            tabBarStyle={{ marginBottom: 12 }}
+          />
+        </Card>
+      )}
 
-      {/* Stats Cards */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col span={6}>
-          <Card className="hover-lift" style={{ borderRadius: 'var(--radius-md)' }}>
+      <h1 style={{ marginBottom: 24 }}>仪表盘</h1>
+
+      <Row gutter={[16, 16]}>
+        <Col xs={24} sm={12} lg={6}>
+          <Card loading={monitorLoading}>
             <Statistic
-              title="总资产"
-              value={stats.totalAssets}
-              prefix={<DatabaseOutlined style={{ color: '#1890ff' }} />}
-              valueStyle={{ color: '#1890ff', fontSize: 32, fontWeight: 600 }}
+              title="监控总数"
+              value={monitorStats?.total || 0}
+              suffix="个"
+              styles={{ content: { color: '#1890ff' } }}
             />
-            <div style={{ marginTop: 8, fontSize: 12, color: '#8c8c8c' }}>
-              <RiseOutlined style={{ color: '#52c41a' }} /> 较上周增长 12%
+            <div style={{ marginTop: 8 }}>
+              <Tag color="green">正常: {monitorStats?.up || 0}</Tag>
+              <Tag color="red">故障: {monitorStats?.down || 0}</Tag>
             </div>
           </Card>
         </Col>
-        <Col span={6}>
-          <Card className="hover-lift" style={{ borderRadius: 'var(--radius-md)' }}>
+
+        <Col xs={24} sm={12} lg={6}>
+          <Card loading={alertLoading}>
             <Statistic
-              title="在线资产"
-              value={stats.onlineAssets}
-              prefix={<CheckCircleOutlined style={{ color: '#52c41a' }} />}
-              valueStyle={{ color: '#52c41a', fontSize: 32, fontWeight: 600 }}
+              title="活跃告警"
+              value={alertStats?.firing || 0}
+              suffix="个"
+              styles={{ content: { color: alertStats?.firing > 0 ? '#ff4d4f' : '#52c41a' } }}
             />
-            <div style={{ marginTop: 8, fontSize: 12, color: '#8c8c8c' }}>
-              <Progress percent={85} size="small" showInfo={false} style={{ margin: 0 }} />
+            <div style={{ marginTop: 8 }}>
+              <Tag color="orange">待处理: {alertStats?.firing || 0}</Tag>
+              <Tag color="green">已解决: {alertStats?.resolved || 0}</Tag>
             </div>
           </Card>
         </Col>
-        <Col span={6}>
-          <Card className="hover-lift" style={{ borderRadius: 'var(--radius-md)' }}>
+
+        <Col xs={24} sm={12} lg={6}>
+          <Card loading={certLoading}>
             <Statistic
-              title="告警事件"
-              value={stats.alerts}
-              prefix={<AlertOutlined style={{ color: '#f5222d' }} />}
-              valueStyle={{ color: '#f5222d', fontSize: 32, fontWeight: 600 }}
+              title="证书总数"
+              value={certStats?.total || 0}
+              suffix="个"
+              styles={{ content: { color: '#722ed1' } }}
             />
-            <div style={{ marginTop: 8, fontSize: 12, color: '#8c8c8c' }}>
-              <FallOutlined style={{ color: '#52c41a' }} /> 较昨日减少 2 个
+            <div style={{ marginTop: 8 }}>
+              <Tag color="green">有效: {certStats?.valid || 0}</Tag>
+              <Tag color="orange">即将过期: {certStats?.expiring || 0}</Tag>
+              <Tag color="red">已过期: {certStats?.expired || 0}</Tag>
             </div>
           </Card>
         </Col>
-        <Col span={6}>
-          <Card className="hover-lift" style={{ borderRadius: 'var(--radius-md)' }}>
+
+        <Col xs={24} sm={12} lg={6}>
+          <Card loading={assetLoading}>
             <Statistic
-              title="待处理"
-              value={stats.pendingTasks}
-              prefix={<ExclamationCircleOutlined style={{ color: '#faad14' }} />}
-              valueStyle={{ color: '#faad14', fontSize: 32, fontWeight: 600 }}
+              title="资产总数"
+              value={assetStats?.total || 0}
+              suffix="个"
+              styles={{ content: { color: '#13c2c2' } }}
             />
-            <div style={{ marginTop: 8, fontSize: 12, color: '#8c8c8c' }}>
-              <ClockCircleOutlined /> 包含证书续期等任务
+            <div style={{ marginTop: 8 }}>
+              <Tag color="blue">服务器: {assetStats?.servers || 0}</Tag>
+              <Tag color="purple">域名: {assetStats?.domains || 0}</Tag>
             </div>
           </Card>
         </Col>
       </Row>
 
-      {/* Middle Section */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col span={16}>
-          <Card
-            title="最近添加的资产"
-            style={{ borderRadius: 'var(--radius-md)' }}
-            bodyStyle={{ padding: 0 }}
-          >
+      <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
+        <Col xs={24} lg={12}>
+          <Card title="最近告警" extra={<a href="/monitor/alerts">查看全部</a>}>
             <Table
-              columns={assetColumns}
-              dataSource={recentAssets}
+              dataSource={recentAlerts?.items || []}
               rowKey="id"
+              loading={alertsLoading}
               pagination={false}
               size="small"
+              columns={[
+                {
+                  title: '名称',
+                  dataIndex: 'alertName',
+                  key: 'alertName',
+                  ellipsis: true,
+                },
+                {
+                  title: '严重程度',
+                  dataIndex: 'severity',
+                  key: 'severity',
+                  width: 80,
+                  render: (severity: string) => {
+                    const colorMap: Record<string, string> = {
+                      critical: 'red',
+                      warning: 'orange',
+                      info: 'blue',
+                    };
+                    return <Tag color={colorMap[severity] || 'default'}>{severity?.toUpperCase()}</Tag>;
+                  },
+                },
+                {
+                  title: '状态',
+                  dataIndex: 'status',
+                  key: 'status',
+                  width: 80,
+                  render: (status: string) => {
+                    const colorMap: Record<string, string> = {
+                      firing: 'red',
+                      resolved: 'green',
+                      acknowledged: 'blue',
+                    };
+                    return <Tag color={colorMap[status] || 'default'}>{status?.toUpperCase()}</Tag>;
+                  },
+                },
+              ]}
             />
           </Card>
         </Col>
-        <Col span={8}>
-          <Card
-            title="最近告警"
-            style={{ borderRadius: 'var(--radius-md)', marginBottom: 16 }}
-          >
-            <List
-              dataSource={recentAlerts}
-              renderItem={(item) => (
-                <List.Item style={{ padding: '12px 0' }}>
-                  <List.Item.Meta
-                    avatar={
-                      <Avatar
-                        size="small"
-                        style={{
-                          backgroundColor:
-                            item.severity === 'critical' ? '#f5222d' : '#faad14',
-                        }}
-                      >
-                        <AlertOutlined style={{ fontSize: 12 }} />
-                      </Avatar>
-                    }
-                    title={<span style={{ fontSize: 14 }}>{item.title}</span>}
-                    description={<span style={{ fontSize: 12 }}>{item.time}</span>}
-                  />
-                </List.Item>
-              )}
-            />
-          </Card>
-          <Card title="快捷操作" style={{ borderRadius: 'var(--radius-md)' }}>
-            <Row gutter={[8, 8]}>
-              {quickActions.map((action, index) => (
-                <Col span={12} key={index}>
-                  <Card
-                    hoverable
-                    style={{
-                      textAlign: 'center',
-                      borderRadius: 'var(--radius-sm)',
-                      cursor: 'pointer',
-                    }}
-                    bodyStyle={{ padding: '16px 8px' }}
-                  >
-                    <div
-                      style={{
-                        fontSize: 24,
-                        color: action.color,
-                        marginBottom: 8,
-                      }}
-                    >
-                      {action.icon}
-                    </div>
-                    <div style={{ fontSize: 13 }}>{action.title}</div>
-                  </Card>
-                </Col>
-              ))}
-            </Row>
-          </Card>
-        </Col>
-      </Row>
 
-      {/* Bottom Section */}
-      <Row gutter={[16, 16]}>
-        <Col span={12}>
-          <Card title="系统健康度" style={{ borderRadius: 'var(--radius-md)' }}>
-            <Row gutter={16}>
-              <Col span={12}>
-                <Progress
-                  type="dashboard"
-                  percent={92}
-                  strokeColor={{ '0%': '#108ee9', '100%': '#87d068' }}
-                  format={(percent) => (
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: 24, fontWeight: 600 }}>{percent}%</div>
-                      <div style={{ fontSize: 12, color: '#8c8c8c' }}>整体健康</div>
-                    </div>
-                  )}
-                />
-              </Col>
-              <Col span={12}>
-                <div style={{ padding: '20px 0' }}>
-                  <div style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>
-                      证书有效期
-                    </div>
-                    <Progress percent={75} size="small" status="active" />
-                  </div>
-                  <div style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>
-                      监控覆盖率
-                    </div>
-                    <Progress percent={88} size="small" status="active" />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>
-                      备份完成率
-                    </div>
-                    <Progress percent={100} size="small" />
-                  </div>
-                </div>
-              </Col>
-            </Row>
-          </Card>
-        </Col>
-        <Col span={12}>
-          <Card title="今日概览" style={{ borderRadius: 'var(--radius-md)' }}>
-            <Row gutter={16}>
-              <Col span={8}>
-                <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                  <DeploymentUnitOutlined
-                    style={{ fontSize: 32, color: '#722ed1', marginBottom: 8 }}
-                  />
-                  <div style={{ fontSize: 24, fontWeight: 600 }}>
-                    {stats.deploymentsToday}
-                  </div>
-                  <div style={{ fontSize: 12, color: '#8c8c8c' }}>今日发布</div>
-                </div>
-              </Col>
-              <Col span={8}>
-                <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                  <SafetyCertificateOutlined
-                    style={{ fontSize: 32, color: '#fa8c16', marginBottom: 8 }}
-                  />
-                  <div style={{ fontSize: 24, fontWeight: 600 }}>
-                    {stats.certificatesExpiring}
-                  </div>
-                  <div style={{ fontSize: 12, color: '#8c8c8c' }}>即将过期证书</div>
-                </div>
-              </Col>
-              <Col span={8}>
-                <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                  <ClockCircleOutlined
-                    style={{ fontSize: 32, color: '#1890ff', marginBottom: 8 }}
-                  />
-                  <div style={{ fontSize: 24, fontWeight: 600 }}>99.9%</div>
-                  <div style={{ fontSize: 12, color: '#8c8c8c' }}>系统可用性</div>
-                </div>
-              </Col>
-            </Row>
+        <Col xs={24} lg={12}>
+          <Card title="最近发布" extra={<a href="/ops/deployments">查看全部</a>}>
+            <Table
+              dataSource={recentDeployments?.items || []}
+              rowKey="id"
+              loading={deploymentsLoading}
+              pagination={false}
+              size="small"
+              columns={[
+                {
+                  title: '项目',
+                  dataIndex: 'projectName',
+                  key: 'projectName',
+                  ellipsis: true,
+                },
+                {
+                  title: '环境',
+                  dataIndex: 'environment',
+                  key: 'environment',
+                  width: 80,
+                  render: (env: string) => {
+                    const colorMap: Record<string, string> = {
+                      dev: 'blue',
+                      test: 'cyan',
+                      staging: 'orange',
+                      prod: 'red',
+                    };
+                    return <Tag color={colorMap[env] || 'default'}>{env?.toUpperCase()}</Tag>;
+                  },
+                },
+                {
+                  title: '状态',
+                  dataIndex: 'status',
+                  key: 'status',
+                  width: 80,
+                  render: (status: string) => {
+                    const colorMap: Record<string, string> = {
+                      pending: 'default',
+                      running: 'processing',
+                      success: 'success',
+                      failed: 'error',
+                    };
+                    return <Tag color={colorMap[status] || 'default'}>{status?.toUpperCase()}</Tag>;
+                  },
+                },
+              ]}
+            />
           </Card>
         </Col>
       </Row>

@@ -1,7 +1,7 @@
 """
 Role CRUD operations.
 """
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,7 +33,7 @@ class CRUDRole(CRUDBase[Role, RoleCreate, RoleUpdate]):
         is_active: Optional[bool] = None,
         skip: int = 0,
         limit: int = 100
-    ) -> tuple[List[Role], int]:
+    ) -> Tuple[List[Role], int]:
         """Get roles with filters and total count."""
         query = select(Role)
         count_query = select(func.count(Role.id))

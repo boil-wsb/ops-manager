@@ -1,7 +1,7 @@
 """
 Permission CRUD operations.
 """
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -74,7 +74,7 @@ class CRUDPermission(CRUDBase[Permission, PermissionCreate, PermissionUpdate]):
         is_active: Optional[bool] = None,
         skip: int = 0,
         limit: int = 100
-    ) -> tuple[List[Permission], int]:
+    ) -> Tuple[List[Permission], int]:
         """Get permissions with filters and total count."""
         query = select(Permission)
         count_query = select(func.count(Permission.id))

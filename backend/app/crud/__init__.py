@@ -6,6 +6,7 @@ from app.crud.crud_user import crud_user
 from app.crud.crud_role import crud_role
 from app.crud.crud_permission import crud_permission
 from app.crud.crud_asset import crud_asset
+from app.crud.audit_log import crud_audit_log
 
 __all__ = [
     "CRUDBase",
@@ -13,4 +14,5 @@ __all__ = [
     "crud_role",
     "crud_permission",
     "crud_asset",
+    "crud_audit_log",
 ]

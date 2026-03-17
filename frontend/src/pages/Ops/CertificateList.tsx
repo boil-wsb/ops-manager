@@ -1,72 +1,54 @@
 import { useState } from 'react';
-import { Table, Button, Tag, Space, Card, Progress, Alert } from 'antd';
-import { useQuery } from '@tanstack/react-query';
-import { PlusOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
+import { Table, Button, Select, Tag, Space, Card, App } from 'antd';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { ReloadOutlined, SyncOutlined } from '@ant-design/icons';
+import { opsApi } from '../../services/ops';
+import StatusTag from '../../components/StatusTag';
 import type { Certificate } from '../../types';
 
-// Mock API for now
-const mockCertificates: Certificate[] = [
-  {
-    id: 1,
-    domain: 'ops-manager.example.com',
-    issuer: 'Let\'s Encrypt',
-    subject: 'CN=ops-manager.example.com',
-    serialNumber: '00:11:22:33:44:55:66:77:88:99:aa:bb:cc:dd:ee:ff',
-    validFrom: '2024-01-01T00:00:00Z',
-    validUntil: '2024-04-01T00:00:00Z',
-    daysUntilExpiry: 15,
-    alertThresholdDays: 30,
-    isAutoRenewal: true,
-    status: 'expiring',
-    assetIds: [1, 2],
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-15T00:00:00Z',
-  },
-  {
-    id: 2,
-    domain: 'api.example.com',
-    issuer: 'DigiCert',
-    subject: 'CN=api.example.com',
-    serialNumber: '11:22:33:44:55:66:77:88:99:aa:bb:cc:dd:ee:ff:00',
-    validFrom: '2024-01-01T00:00:00Z',
-    validUntil: '2025-01-01T00:00:00Z',
-    daysUntilExpiry: 350,
-    alertThresholdDays: 30,
-    isAutoRenewal: false,
-    status: 'active',
-    assetIds: [3],
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-  },
-];
-
-const certificateApi = {
-  getCertificates: async () => ({ total: mockCertificates.length, items: mockCertificates }),
-};
-
 const CertificateList = () => {
-  const [filter] = useState({
-    expiringSoon: false,
+  const { message } = App.useApp();
+  const [filter, setFilter] = useState({
+    status: undefined as string | undefined,
+    expiringSoon: undefined as boolean | undefined,
+  });
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
   });
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['certificates', filter],
-    queryFn: () => certificateApi.getCertificates(),
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['certificates', filter, pagination],
+    queryFn: async () => {
+    const result = await opsApi.getCertificates({
+      skip: (pagination.current - 1) * pagination.pageSize,
+      limit: pagination.pageSize,
+      status: filter.status,
+      expiring_soon: filter.expiringSoon,
+    });
+    return {
+      items: Array.isArray(result) ? result : [],
+      total: Array.isArray(result) ? result.length : 0,
+    };
+  },
   });
 
-  const expiringCerts = data?.items.filter((c) => c.daysUntilExpiry <= c.alertThresholdDays) || [];
+  const syncMutation = useMutation({
+    mutationFn: opsApi.syncCertificates,
+    onSuccess: (data) => {
+      message.success(`同步完成: 共 ${data.total} 个证书, 新增 ${data.created} 个, 更新 ${data.updated} 个`);
+      refetch();
+    },
+    onError: () => {
+      message.error('同步失败，请检查 Prometheus 连接');
+    },
+  });
 
   const columns = [
     {
       title: '域名',
       dataIndex: 'domain',
       key: 'domain',
-      render: (domain: string) => (
-        <Space>
-          <SafetyCertificateOutlined />
-          {domain}
-        </Space>
-      ),
     },
     {
       title: '颁发者',
@@ -74,32 +56,21 @@ const CertificateList = () => {
       key: 'issuer',
     },
     {
-      title: '有效期至',
-      dataIndex: 'validUntil',
-      key: 'validUntil',
-      render: (time: string) => new Date(time).toLocaleDateString(),
+      title: '过期时间',
+      dataIndex: 'valid_until',
+      key: 'valid_until',
+      render: (date: string) => (date ? new Date(date).toLocaleDateString() : '-'),
     },
     {
       title: '剩余天数',
-      dataIndex: 'daysUntilExpiry',
-      key: 'daysUntilExpiry',
-      render: (days: number, record: Certificate) => {
-        const percent = Math.max(0, Math.min(100, (days / 365) * 100));
-        let status: 'success' | 'normal' | 'exception' = 'success';
-        if (days <= 7) status = 'exception';
-        else if (days <= record.alertThresholdDays) status = 'normal';
-
+      key: 'days_until_expiry',
+      render: (_: any, record: Certificate) => {
+        const days = record.days_until_expiry;
+        if (days === null || days === undefined) return '-';
         return (
-          <Space>
-            <Progress
-              percent={percent}
-              size="small"
-              status={status}
-              style={{ width: 100 }}
-              showInfo={false}
-            />
-            <span>{days}天</span>
-          </Space>
+          <Tag color={days < 0 ? 'red' : days < 30 ? 'orange' : 'green'}>
+            {days < 0 ? '已过期' : `${days}天`}
+          </Tag>
         );
       },
     },
@@ -107,29 +78,23 @@ const CertificateList = () => {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      render: (status: string) => {
-        const colorMap: Record<string, string> = {
-          active: 'green',
-          expiring: 'orange',
-          expired: 'red',
-          revoked: 'gray',
-        };
-        const labelMap: Record<string, string> = {
-          active: '有效',
-          expiring: '即将过期',
-          expired: '已过期',
-          revoked: '已吊销',
-        };
-        return <Tag color={colorMap[status]}>{labelMap[status]}</Tag>;
-      },
+      render: (status: string) => <StatusTag status={status} type="certificate" />,
     },
     {
       title: '自动续期',
-      dataIndex: 'isAutoRenewal',
-      key: 'isAutoRenewal',
-      render: (enabled: boolean) => (
-        <Tag color={enabled ? 'green' : 'default'}>{enabled ? '是' : '否'}</Tag>
+      dataIndex: 'is_auto_renewal',
+      key: 'is_auto_renewal',
+      render: (isAutoRenewal: boolean) => (
+        <Tag color={isAutoRenewal ? 'green' : 'default'}>
+          {isAutoRenewal ? '是' : '否'}
+        </Tag>
       ),
+    },
+    {
+      title: '更新时间',
+      dataIndex: 'updated_at',
+      key: 'updated_at',
+      render: (time: string) => (time ? new Date(time).toLocaleString() : '-'),
     },
   ];
 
@@ -137,20 +102,39 @@ const CertificateList = () => {
     <div>
       <h1>证书管理</h1>
 
-      {expiringCerts.length > 0 && (
-        <Alert
-          message={`有 ${expiringCerts.length} 个证书即将过期`}
-          description="请及时更新证书以避免服务中断"
-          type="warning"
-          showIcon
-          style={{ marginBottom: 24 }}
-        />
-      )}
-
       <Card style={{ marginBottom: 24 }}>
         <Space wrap>
-          <Button type="primary" icon={<PlusOutlined />}>
-            新增证书
+          <Select
+            placeholder="状态"
+            value={filter.status}
+            onChange={(value) => setFilter({ ...filter, status: value })}
+            style={{ width: 120 }}
+            allowClear
+          >
+            <Select.Option value="active">有效</Select.Option>
+            <Select.Option value="expired">已过期</Select.Option>
+            <Select.Option value="expiring">即将过期</Select.Option>
+          </Select>
+          <Select
+            placeholder="即将过期"
+            value={filter.expiringSoon}
+            onChange={(value) => setFilter({ ...filter, expiringSoon: value })}
+            style={{ width: 120 }}
+            allowClear
+          >
+            <Select.Option value={true}>30天内</Select.Option>
+            <Select.Option value={false}>30天外</Select.Option>
+          </Select>
+          <Button icon={<ReloadOutlined />} onClick={() => refetch()}>
+            刷新
+          </Button>
+          <Button 
+            type="default" 
+            icon={<SyncOutlined spin={syncMutation.isPending} />} 
+            loading={syncMutation.isPending}
+            onClick={() => syncMutation.mutate()}
+          >
+            从Prometheus同步
           </Button>
         </Space>
       </Card>
@@ -161,9 +145,12 @@ const CertificateList = () => {
         rowKey="id"
         loading={isLoading}
         pagination={{
+          current: pagination.current,
+          pageSize: pagination.pageSize,
           total: data?.total || 0,
           showSizeChanger: true,
-          showTotal: (total) => `共 ${total} 条`,
+          showTotal: (total: number) => `共 ${total} 条`,
+          onChange: (page: number, pageSize: number) => setPagination({ current: page, pageSize }),
         }}
       />
     </div>

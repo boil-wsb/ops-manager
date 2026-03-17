@@ -35,6 +35,8 @@ env/
 .DS_Store
 .trae/
 docs/
+test/
+skills/
 
 # Environment variables
 .env

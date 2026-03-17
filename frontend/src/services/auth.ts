@@ -1,12 +1,24 @@
 import api from './api';
 import type { LoginCredentials, User } from '../types';
 
-// Backend returns snake_case, we need to transform to camelCase
 interface TokenResponseBackend {
   access_token: string;
   refresh_token: string;
   token_type: string;
   expires_in: number;
+  permissions: string[];
+  user?: {
+    id: number;
+    username: string;
+    email?: string;
+    full_name?: string;
+    is_active: boolean;
+    is_superuser: boolean;
+    last_login?: string;
+    created_at: string;
+    updated_at: string;
+    permissions: string[];
+  };
 }
 
 export interface TokenResponse {
@@ -14,9 +26,10 @@ export interface TokenResponse {
   refreshToken: string;
   tokenType: string;
   expiresIn: number;
+  permissions: string[];
+  user?: User;
 }
 
-// User response from backend (snake_case)
 interface UserResponseBackend {
   id: number;
   username: string;
@@ -33,12 +46,24 @@ export const authApi = {
   login: async (credentials: LoginCredentials): Promise<TokenResponse> => {
     const response = await api.post<TokenResponseBackend>('/auth/login', credentials);
     const data = response.data;
-    // Transform snake_case to camelCase
     return {
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
       tokenType: data.token_type,
       expiresIn: data.expires_in,
+      permissions: data.permissions || [],
+      user: data.user ? {
+        id: data.user.id,
+        username: data.user.username,
+        email: data.user.email,
+        fullName: data.user.full_name,
+        isActive: data.user.is_active,
+        isSuperuser: data.user.is_superuser,
+        lastLogin: data.user.last_login,
+        createdAt: data.user.created_at,
+        updatedAt: data.user.updated_at,
+        permissions: data.user.permissions || [],
+      } : undefined,
     };
   },
 
@@ -46,21 +71,23 @@ export const authApi = {
     await api.post('/auth/logout');
   },
 
-  refreshToken: async (): Promise<TokenResponse> => {
-    const response = await api.post<TokenResponseBackend>('/auth/refresh');
+  refreshToken: async (refreshToken: string): Promise<TokenResponse> => {
+    const response = await api.post<TokenResponseBackend>('/auth/refresh', null, {
+      params: { refresh_token: refreshToken },
+    });
     const data = response.data;
     return {
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
       tokenType: data.token_type,
       expiresIn: data.expires_in,
+      permissions: data.permissions || [],
     };
   },
 
   getCurrentUser: async (): Promise<User> => {
     const response = await api.get<UserResponseBackend>('/auth/me');
     const data = response.data;
-    // Transform snake_case to camelCase
     return {
       id: data.id,
       username: data.username,

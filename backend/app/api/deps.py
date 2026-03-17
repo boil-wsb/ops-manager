@@ -2,7 +2,7 @@
 API dependencies.
 """
 from typing import Optional, List
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +16,7 @@ security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: AsyncSession = Depends(get_db)
 ) -> dict:
@@ -24,10 +25,17 @@ async def get_current_user(
         raise AuthenticationError(detail="Not authenticated")
     
     token = credentials.credentials
-    user_id = verify_token(token, token_type="access")
+    payload = verify_token(token)
     
-    if user_id is None:
+    if payload is None:
         raise AuthenticationError(detail="Invalid or expired token")
+    
+    if payload.get("type") != "access":
+        raise AuthenticationError(detail="Invalid token type")
+    
+    user_id = payload.get("sub")
+    if user_id is None:
+        raise AuthenticationError(detail="Invalid token payload")
     
     user = await crud_user.get(db, id=int(user_id))
     
@@ -36,6 +44,40 @@ async def get_current_user(
     
     if not user.is_active:
         raise AuthenticationError(detail="User is inactive")
+    
+    request.state.user = user
+    
+    return user
+
+
+async def get_current_user_optional(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    db: AsyncSession = Depends(get_db)
+) -> Optional[dict]:
+    """Get current user from JWT token, returns None if not authenticated."""
+    if not credentials:
+        return None
+    
+    token = credentials.credentials
+    payload = verify_token(token)
+    
+    if payload is None:
+        return None
+    
+    if payload.get("type") != "access":
+        return None
+    
+    user_id = payload.get("sub")
+    if user_id is None:
+        return None
+    
+    user = await crud_user.get(db, id=int(user_id))
+    
+    if not user or not user.is_active:
+        return None
+    
+    request.state.user = user
     
     return user
 
@@ -82,5 +124,13 @@ class PermissionChecker:
 
 
 def require_permissions(permissions: List[str]):
-    """Decorator to require specific permissions."""
-    return Depends(PermissionChecker(permissions))
+    """Create a permission checker dependency.
+    
+    Usage:
+        @router.get("/items")
+        async def list_items(
+            current_user: User = Depends(require_permissions(["item:read"]))
+        ):
+            ...
+    """
+    return PermissionChecker(permissions)

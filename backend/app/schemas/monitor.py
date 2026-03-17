@@ -110,6 +110,12 @@ class AlertAction(BaseModel):
     comment: Optional[str] = None
 
 
+class AlertListResponse(BaseModel):
+    """Alert list response."""
+    total: int
+    items: List[AlertResponse]
+
+
 # Alert rule schemas
 class AlertRuleBase(BaseModel):
     """Base alert rule schema."""

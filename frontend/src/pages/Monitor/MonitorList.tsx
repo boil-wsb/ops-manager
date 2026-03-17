@@ -2,53 +2,9 @@ import { useState } from 'react';
 import { Table, Button, Select, Tag, Space, Card, Switch, message } from 'antd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PlusOutlined, PlayCircleOutlined, PauseCircleOutlined } from '@ant-design/icons';
+import { monitorApi } from '../../services/monitor';
+import StatusTag from '../../components/StatusTag';
 import type { Monitor } from '../../types';
-
-// Mock API for now
-const mockMonitors: Monitor[] = [
-  {
-    id: 1,
-    name: 'Web Server 01',
-    monitorType: 'http',
-    target: 'http://192.168.1.10:8080',
-    intervalSeconds: 60,
-    timeoutSeconds: 10,
-    retryCount: 3,
-    isEnabled: true,
-    currentStatus: 'up',
-    lastCheckAt: '2024-01-15T10:30:00Z',
-    lastCheckResult: 'HTTP 200 OK',
-    lastCheckDurationMs: 45,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-15T10:30:00Z',
-  },
-  {
-    id: 2,
-    name: 'Database Server',
-    monitorType: 'tcp',
-    target: '192.168.1.20:3306',
-    intervalSeconds: 30,
-    timeoutSeconds: 5,
-    retryCount: 3,
-    isEnabled: true,
-    currentStatus: 'up',
-    lastCheckAt: '2024-01-15T10:30:00Z',
-    lastCheckResult: 'TCP port 3306 open',
-    lastCheckDurationMs: 12,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-15T10:30:00Z',
-  },
-];
-
-const monitorApi = {
-  getMonitors: async () => ({ total: mockMonitors.length, items: mockMonitors }),
-  toggleMonitor: async (id: number, enabled: boolean) => {
-    const monitor = mockMonitors.find((m) => m.id === id);
-    if (monitor) {
-      monitor.isEnabled = enabled;
-    }
-  },
-};
 
 const MonitorList = () => {
   const queryClient = useQueryClient();
@@ -56,18 +12,30 @@ const MonitorList = () => {
     monitorType: undefined as string | undefined,
     status: undefined as string | undefined,
   });
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+  });
 
   const { data, isLoading } = useQuery({
-    queryKey: ['monitors', filter],
-    queryFn: () => monitorApi.getMonitors(),
+    queryKey: ['monitors', filter, pagination],
+    queryFn: () =>
+      monitorApi.getMonitors({
+        skip: (pagination.current - 1) * pagination.pageSize,
+        limit: pagination.pageSize,
+        monitor_type: filter.monitorType,
+        status: filter.status,
+      }),
   });
 
   const toggleMutation = useMutation({
-    mutationFn: ({ id, enabled }: { id: number; enabled: boolean }) =>
-      monitorApi.toggleMonitor(id, enabled),
+    mutationFn: (id: number) => monitorApi.toggleMonitor(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['monitors'] });
       message.success('状态已更新');
+    },
+    onError: () => {
+      message.error('操作失败');
     },
   });
 
@@ -81,7 +49,7 @@ const MonitorList = () => {
       title: '类型',
       dataIndex: 'monitorType',
       key: 'monitorType',
-      render: (type: string) => type.toUpperCase(),
+      render: (type: string) => type?.toUpperCase() || '-',
     },
     {
       title: '目标',
@@ -92,15 +60,7 @@ const MonitorList = () => {
       title: '状态',
       dataIndex: 'currentStatus',
       key: 'currentStatus',
-      render: (status: string) => {
-        const colorMap: Record<string, string> = {
-          up: 'green',
-          down: 'red',
-          unknown: 'gray',
-          paused: 'orange',
-        };
-        return <Tag color={colorMap[status] || 'default'}>{status.toUpperCase()}</Tag>;
-      },
+      render: (status: string) => <StatusTag status={status} type="monitor" />,
     },
     {
       title: '响应时间',
@@ -120,7 +80,7 @@ const MonitorList = () => {
       render: (_: any, record: Monitor) => (
         <Switch
           checked={record.isEnabled}
-          onChange={(checked) => toggleMutation.mutate({ id: record.id, enabled: checked })}
+          onChange={() => toggleMutation.mutate(record.id)}
           checkedChildren={<PlayCircleOutlined />}
           unCheckedChildren={<PauseCircleOutlined />}
         />
@@ -168,9 +128,12 @@ const MonitorList = () => {
         rowKey="id"
         loading={isLoading}
         pagination={{
+          current: pagination.current,
+          pageSize: pagination.pageSize,
           total: data?.total || 0,
           showSizeChanger: true,
-          showTotal: (total) => `共 ${total} 条`,
+          showTotal: (total: number) => `共 ${total} 条`,
+          onChange: (page: number, pageSize: number) => setPagination({ current: page, pageSize }),
         }}
       />
     </div>

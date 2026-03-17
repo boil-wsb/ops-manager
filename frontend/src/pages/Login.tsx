@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Form, Input, Button, Card, message, Typography, Space } from 'antd';
+import { Form, Input, Button, Card, Typography, Space, App } from 'antd';
 import { UserOutlined, LockOutlined, DatabaseOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../services/auth';
@@ -10,14 +10,21 @@ const { Title, Text } = Typography;
 const Login = () => {
   const navigate = useNavigate();
   const { setAuth } = useAuthStore();
+  const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
 
   const onFinish = async (values: { username: string; password: string }) => {
     setLoading(true);
     try {
       const tokenData = await authApi.login(values);
-      const user = await authApi.getCurrentUser();
-      setAuth(user, tokenData.accessToken);
+      
+      if (tokenData.user) {
+        setAuth(tokenData.user, tokenData.accessToken, tokenData.refreshToken, tokenData.permissions || []);
+      } else {
+        const user = await authApi.getCurrentUser();
+        setAuth(user, tokenData.accessToken, tokenData.refreshToken, user.permissions || []);
+      }
+      
       message.success('登录成功，欢迎回来！');
       navigate('/');
     } catch (error: any) {
@@ -168,7 +175,7 @@ const Login = () => {
             borderRadius: 'var(--radius-lg)',
             boxShadow: 'var(--shadow-card)',
           }}
-          bodyStyle={{ padding: '40px' }}
+          styles={{ body: { padding: '40px' } }}
         >
           <div style={{ textAlign: 'center', marginBottom: 32 }}>
             <div

@@ -1,18 +1,44 @@
 import { useParams } from 'react-router-dom';
-import { Card, Descriptions, Tag, Button, Space } from 'antd';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowLeftOutlined } from '@ant-design/icons';
+import { Card, Descriptions, Tag, Button, Space, message, Row, Col, Statistic } from 'antd';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeftOutlined, CloudOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { assetApi } from '../../services/assets';
+import { usePermission } from '../../hooks/usePermission';
 
 const AssetDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { hasPermission } = usePermission();
 
   const { data: asset, isLoading } = useQuery({
     queryKey: ['asset', id],
     queryFn: () => assetApi.getAsset(Number(id)),
     enabled: !!id,
+  });
+
+  const { data: metrics, isLoading: metricsLoading, refetch: refetchMetrics } = useQuery({
+    queryKey: ['asset-metrics', id],
+    queryFn: () => assetApi.getAssetMetrics(Number(id)),
+    enabled: !!id && asset?.source === 'prometheus',
+    refetchInterval: 60000, // 每分钟刷新一次
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: () => {
+      if (asset?.prometheusInstance) {
+        return assetApi.importPrometheusAsset(asset.prometheusInstance);
+      }
+      throw new Error('No prometheus instance found');
+    },
+    onSuccess: () => {
+      message.success('重新同步成功');
+      queryClient.invalidateQueries({ queryKey: ['asset', id] });
+    },
+    onError: () => {
+      message.error('同步失败');
+    },
   });
 
   const statusColorMap: Record<string, string> = {
@@ -37,7 +63,30 @@ const AssetDetail = () => {
         </Button>
       </Space>
 
-      <Card title="资产详情" loading={isLoading}>
+      <Card
+        title={
+          <Space>
+            资产详情
+            {asset?.source === 'prometheus' && (
+              <Tag icon={<CloudOutlined />} color="blue">
+                从 Prometheus 同步
+              </Tag>
+            )}
+          </Space>
+        }
+        loading={isLoading}
+        extra={
+          asset?.source === 'prometheus' && hasPermission('asset:admin') ? (
+            <Button
+              icon={<ReloadOutlined spin={syncMutation.isPending} />}
+              onClick={() => syncMutation.mutate()}
+              loading={syncMutation.isPending}
+            >
+              重新同步
+            </Button>
+          ) : null
+        }
+      >
         {asset && (
           <>
             <Descriptions title="基本信息" bordered column={2}>
@@ -49,6 +98,18 @@ const AssetDetail = () => {
                   {statusLabelMap[asset.status]}
                 </Tag>
               </Descriptions.Item>
+              {asset.source === 'prometheus' && (
+                <>
+                  <Descriptions.Item label="同步状态">
+                    <Tag color={asset.syncStatus === 'synced' ? 'green' : asset.syncStatus === 'error' ? 'red' : 'orange'}>
+                      {asset.syncStatus === 'synced' ? '已同步' : asset.syncStatus === 'error' ? '同步失败' : '待同步'}
+                    </Tag>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="上次同步">
+                    {asset.lastSyncTime ? new Date(asset.lastSyncTime).toLocaleString('zh-CN') : '-'}
+                  </Descriptions.Item>
+                </>
+              )}
               <Descriptions.Item label="创建时间">{asset.createdAt}</Descriptions.Item>
               <Descriptions.Item label="更新时间">{asset.updatedAt}</Descriptions.Item>
             </Descriptions>
@@ -89,6 +150,106 @@ const AssetDetail = () => {
               <Descriptions title="描述" bordered column={1} style={{ marginTop: 24 }}>
                 <Descriptions.Item label="描述">{asset.description}</Descriptions.Item>
               </Descriptions>
+            )}
+
+            {asset.source === 'prometheus' && (
+              <Card title="实时指标" style={{ marginTop: 24 }} loading={metricsLoading}>
+                {metrics?.metrics ? (
+                  <Row gutter={16}>
+                    {metrics.metrics.cpu && (
+                      <Col span={6}>
+                        <Card size="small">
+                          <Statistic
+                            title="CPU 使用率"
+                            value={metrics.metrics.cpu.usagePercent}
+                            suffix="%"
+                            precision={1}
+                            styles={{
+                              content: {
+                                color: metrics.metrics.cpu.usagePercent > 80 ? '#cf1322' :
+                                       metrics.metrics.cpu.usagePercent > 60 ? '#faad14' : '#3f8600'
+                              }
+                            }}
+                          />
+                          <div style={{ fontSize: 12, color: '#999', marginTop: 8 }}>
+                            {metrics.metrics.cpu.cores} 核
+                          </div>
+                        </Card>
+                      </Col>
+                    )}
+                    {metrics.metrics.memory && (
+                      <Col span={6}>
+                        <Card size="small">
+                          <Statistic
+                            title="内存使用率"
+                            value={metrics.metrics.memory.usagePercent}
+                            suffix="%"
+                            precision={1}
+                            styles={{
+                              content: {
+                                color: metrics.metrics.memory.usagePercent > 80 ? '#cf1322' :
+                                       metrics.metrics.memory.usagePercent > 60 ? '#faad14' : '#3f8600'
+                              }
+                            }}
+                          />
+                          <div style={{ fontSize: 12, color: '#999', marginTop: 8 }}>
+                            已用 {metrics.metrics.memory.usedGB.toFixed(1)} / 总共 {metrics.metrics.memory.totalGB.toFixed(1)} GB
+                          </div>
+                        </Card>
+                      </Col>
+                    )}
+                    {metrics.metrics.disk && (
+                      <Col span={6}>
+                        <Card size="small">
+                          <Statistic
+                            title="磁盘使用率"
+                            value={metrics.metrics.disk.usagePercent}
+                            suffix="%"
+                            precision={1}
+                            styles={{
+                              content: {
+                                color: metrics.metrics.disk.usagePercent > 80 ? '#cf1322' :
+                                       metrics.metrics.disk.usagePercent > 60 ? '#faad14' : '#3f8600'
+                              }
+                            }}
+                          />
+                          <div style={{ fontSize: 12, color: '#999', marginTop: 8 }}>
+                            已用 {metrics.metrics.disk.usedGB.toFixed(1)} / 总共 {metrics.metrics.disk.totalGB.toFixed(1)} GB
+                          </div>
+                        </Card>
+                      </Col>
+                    )}
+                    {metrics.metrics.network && (
+                      <Col span={6}>
+                        <Card size="small">
+                          <Statistic
+                            title="网络接收"
+                            value={metrics.metrics.network.receiveRate}
+                            suffix="KB/s"
+                            precision={1}
+                          />
+                          <div style={{ fontSize: 12, color: '#999', marginTop: 8 }}>
+                            发送: {metrics.metrics.network.transmitRate.toFixed(1)} KB/s
+                          </div>
+                        </Card>
+                      </Col>
+                    )}
+                  </Row>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
+                    暂无实时指标数据
+                  </div>
+                )}
+                <div style={{ textAlign: 'right', marginTop: 16 }}>
+                  <Button
+                    size="small"
+                    icon={<ReloadOutlined />}
+                    onClick={() => refetchMetrics()}
+                  >
+                    刷新指标
+                  </Button>
+                </div>
+              </Card>
             )}
           </>
         )}

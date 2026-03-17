@@ -13,6 +13,7 @@ from app.schemas.permission import (
     PermissionModule,
 )
 from app.core.permissions import require_permissions
+from app.models.user import User
 
 router = APIRouter(prefix="/permissions")
 
@@ -35,12 +36,14 @@ async def list_permissions(
     module: Optional[str] = Query(None, description="Filter by module"),
     is_active: Optional[bool] = Query(None, description="Filter by active status"),
     page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(20, ge=1, le=100, description="Page size"),
+    page_size: int = Query(20, ge=1, le=1000, description="Page size"),
     db: AsyncSession = Depends(get_db),
-    current_user = Depends(get_current_user),
-    _: None = Depends(require_permissions(["role:read"])),
+    current_user: User = Depends(get_current_user),
 ):
     """Get permission list with filters."""
+    # Check permission
+    require_permissions(["role:read"])(current_user)
+    
     skip = (page - 1) * page_size
     
     permissions, total = await crud_permission.get_multi_with_filters(
@@ -75,10 +78,12 @@ async def list_permissions(
 @router.get("/modules", response_model=list)
 async def get_permission_modules(
     db: AsyncSession = Depends(get_db),
-    current_user = Depends(get_current_user),
-    _: None = Depends(require_permissions(["role:read"])),
+    current_user: User = Depends(get_current_user),
 ):
     """Get all permission modules."""
+    # Check permission
+    require_permissions(["role:read"])(current_user)
+    
     modules = await crud_permission.get_modules(db)
     
     return [
@@ -94,10 +99,12 @@ async def get_permission_modules(
 async def get_permission(
     permission_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user = Depends(get_current_user),
-    _: None = Depends(require_permissions(["role:read"])),
+    current_user: User = Depends(get_current_user),
 ):
     """Get permission by ID."""
+    # Check permission
+    require_permissions(["role:read"])(current_user)
+    
     permission = await crud_permission.get(db, id=permission_id)
     
     if not permission:

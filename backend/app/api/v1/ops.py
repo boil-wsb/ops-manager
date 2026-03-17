@@ -3,8 +3,8 @@ Operations management API routes.
 """
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy import select, and_, or_, func
+from fastapi import APIRouter, Depends, Query, status, Request
+from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db, require_permissions
@@ -14,12 +14,14 @@ from app.schemas.ops import (
     DeploymentCreate, DeploymentUpdate, DeploymentResponse, DeploymentListResponse,
     InspectionTaskCreate, InspectionTaskUpdate, InspectionTaskResponse,
     InspectionReportResponse,
-    CertificateCreate, CertificateUpdate, CertificateResponse,
+    CertificateCreate, CertificateUpdate, CertificateResponse, CertificateSyncResponse,
     DNSRecordCreate, DNSRecordUpdate, DNSRecordResponse
 )
 from app.core.exceptions import NotFoundError
+from app.core.audit import audit_log
+from app.services.prometheus.client import get_prometheus_client
 
-router = APIRouter()
+router = APIRouter(prefix="/ops")
 
 # CRUD instances
 crud_deployment = CRUDBase(Deployment)
@@ -68,7 +70,9 @@ async def list_deployments(
 
 
 @router.post("/deployments", response_model=DeploymentResponse, status_code=status.HTTP_201_CREATED)
+@audit_log(operation_type="CREATE", module="ops", object_type="Deployment")
 async def create_deployment(
+    request: Request,
     obj_in: DeploymentCreate,
     db: AsyncSession = Depends(get_db),
     current_user = require_permissions(["ops:write"])
@@ -98,7 +102,9 @@ async def get_deployment(
 
 
 @router.put("/deployments/{deployment_id}", response_model=DeploymentResponse)
+@audit_log(operation_type="UPDATE", module="ops", object_type="Deployment")
 async def update_deployment(
+    request: Request,
     deployment_id: int,
     obj_in: DeploymentUpdate,
     db: AsyncSession = Depends(get_db),
@@ -127,7 +133,9 @@ async def list_inspection_tasks(
 
 
 @router.post("/inspections/tasks", response_model=InspectionTaskResponse, status_code=status.HTTP_201_CREATED)
+@audit_log(operation_type="CREATE", module="ops", object_type="InspectionTask")
 async def create_inspection_task(
+    request: Request,
     obj_in: InspectionTaskCreate,
     db: AsyncSession = Depends(get_db),
     current_user = require_permissions(["ops:write"])
@@ -151,7 +159,9 @@ async def get_inspection_task(
 
 
 @router.put("/inspections/tasks/{task_id}", response_model=InspectionTaskResponse)
+@audit_log(operation_type="UPDATE", module="ops", object_type="InspectionTask")
 async def update_inspection_task(
+    request: Request,
     task_id: int,
     obj_in: InspectionTaskUpdate,
     db: AsyncSession = Depends(get_db),
@@ -167,7 +177,9 @@ async def update_inspection_task(
 
 
 @router.delete("/inspections/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+@audit_log(operation_type="DELETE", module="ops", object_type="InspectionTask")
 async def delete_inspection_task(
+    request: Request,
     task_id: int,
     db: AsyncSession = Depends(get_db),
     current_user = require_permissions(["ops:delete"])
@@ -239,7 +251,9 @@ async def list_certificates(
 
 
 @router.post("/certificates", response_model=CertificateResponse, status_code=status.HTTP_201_CREATED)
+@audit_log(operation_type="CREATE", module="ops", object_type="Certificate")
 async def create_certificate(
+    request: Request,
     obj_in: CertificateCreate,
     db: AsyncSession = Depends(get_db),
     current_user = require_permissions(["ops:write"])
@@ -278,7 +292,9 @@ async def get_certificate(
 
 
 @router.put("/certificates/{cert_id}", response_model=CertificateResponse)
+@audit_log(operation_type="UPDATE", module="ops", object_type="Certificate")
 async def update_certificate(
+    request: Request,
     cert_id: int,
     obj_in: CertificateUpdate,
     db: AsyncSession = Depends(get_db),
@@ -294,7 +310,9 @@ async def update_certificate(
 
 
 @router.delete("/certificates/{cert_id}", status_code=status.HTTP_204_NO_CONTENT)
+@audit_log(operation_type="DELETE", module="ops", object_type="Certificate")
 async def delete_certificate(
+    request: Request,
     cert_id: int,
     db: AsyncSession = Depends(get_db),
     current_user = require_permissions(["ops:delete"])
@@ -306,6 +324,91 @@ async def delete_certificate(
     
     await crud_certificate.delete(db, id=cert_id)
     return None
+
+
+@router.post("/certificates/sync", response_model=CertificateSyncResponse)
+@audit_log(operation_type="SYNC", module="ops", object_type="Certificate")
+async def sync_certificates_from_prometheus(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user = require_permissions(["ops:write"])
+):
+    """Sync SSL certificates from Prometheus monitoring."""
+    from datetime import datetime
+    
+    prometheus_client = get_prometheus_client()
+    prom_certs = await prometheus_client.get_ssl_certificates()
+    
+    created_count = 0
+    updated_count = 0
+    synced_certs = []
+    
+    for prom_cert in prom_certs:
+        domain = prom_cert.get("domain", "")
+        if not domain:
+            continue
+        
+        expiry_date_str = prom_cert.get("expiry_date")
+        if not expiry_date_str:
+            continue
+        
+        try:
+            expiry_date = datetime.fromisoformat(expiry_date_str.replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            continue
+        
+        days_until_expiry = prom_cert.get("days_until_expiry", 0)
+        status_str = prom_cert.get("status", "active")
+        
+        if status_str == "expired":
+            cert_status = "expired"
+        elif status_str in ["expiring", "critical"]:
+            cert_status = "expiring"
+        else:
+            cert_status = "active"
+        
+        existing_query = select(Certificate).where(Certificate.domain == domain)
+        existing_result = await db.execute(existing_query)
+        existing_cert = existing_result.scalar_one_or_none()
+        
+        if existing_cert:
+            existing_cert.valid_until = expiry_date
+            existing_cert.days_until_expiry = max(0, days_until_expiry)
+            existing_cert.status = cert_status
+            existing_cert.issuer = prom_cert.get("job", "unknown")
+            existing_cert.subject = domain
+            existing_cert.serial_number = f"prom-{domain}"
+            updated_count += 1
+            synced_certs.append(existing_cert)
+        else:
+            new_cert = Certificate(
+                domain=domain,
+                issuer=prom_cert.get("job", "unknown"),
+                subject=domain,
+                serial_number=f"prom-{domain}",
+                valid_from=datetime.utcnow(),
+                valid_until=expiry_date,
+                days_until_expiry=max(0, days_until_expiry),
+                alert_threshold_days=30,
+                is_auto_renewal=False,
+                status=cert_status,
+                asset_ids=[],
+            )
+            db.add(new_cert)
+            created_count += 1
+            synced_certs.append(new_cert)
+    
+    await db.commit()
+    
+    for cert in synced_certs:
+        await db.refresh(cert)
+    
+    return {
+        "total": len(prom_certs),
+        "created": created_count,
+        "updated": updated_count,
+        "certificates": synced_certs,
+    }
 
 
 # DNS routes
@@ -330,7 +433,9 @@ async def list_dns_records(
 
 
 @router.post("/dns", response_model=DNSRecordResponse, status_code=status.HTTP_201_CREATED)
+@audit_log(operation_type="CREATE", module="ops", object_type="DNSRecord")
 async def create_dns_record(
+    request: Request,
     obj_in: DNSRecordCreate,
     db: AsyncSession = Depends(get_db),
     current_user = require_permissions(["ops:write"])
@@ -354,7 +459,9 @@ async def get_dns_record(
 
 
 @router.put("/dns/{record_id}", response_model=DNSRecordResponse)
+@audit_log(operation_type="UPDATE", module="ops", object_type="DNSRecord")
 async def update_dns_record(
+    request: Request,
     record_id: int,
     obj_in: DNSRecordUpdate,
     db: AsyncSession = Depends(get_db),
@@ -370,7 +477,9 @@ async def update_dns_record(
 
 
 @router.delete("/dns/{record_id}", status_code=status.HTTP_204_NO_CONTENT)
+@audit_log(operation_type="DELETE", module="ops", object_type="DNSRecord")
 async def delete_dns_record(
+    request: Request,
     record_id: int,
     db: AsyncSession = Depends(get_db),
     current_user = require_permissions(["ops:delete"])
