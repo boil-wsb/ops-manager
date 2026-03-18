@@ -69,7 +69,7 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
       - ./logs:/app/logs
-      - celery_beat:/app/celerybeat
+      - ./celery_beat:/app/celerybeat
     depends_on:
       - postgres
       - redis
@@ -93,7 +93,6 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  celery_beat:
 
 networks:
   ops-network:
