@@ -3,16 +3,16 @@
 
 从 Prometheus 自动同步资产数据
 """
+import asyncio
 import logging
 from datetime import datetime
 from typing import Dict, Any
 
 from celery import shared_task
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import AsyncSessionLocal
-from app.services.prometheus.asset_sync import AssetSyncService, sync_assets_from_prometheus
 from app.config import settings
+from app.tasks.utils import get_celery_async_session
+from app.services.prometheus.asset_sync import AssetSyncService, sync_assets_from_prometheus
 
 logger = logging.getLogger(__name__)
 
@@ -23,13 +23,12 @@ logger = logging.getLogger(__name__)
     max_retries=3,
     default_retry_delay=60,
 )
-async def sync_assets_from_prometheus_task(self) -> Dict[str, Any]:
+def sync_assets_from_prometheus_task(self) -> Dict[str, Any]:
     """
     从 Prometheus 同步资产的 Celery 任务
 
     每 30 分钟执行一次，自动发现和同步所有监控节点
     """
-    # 检查是否启用同步
     if not getattr(settings, 'PROMETHEUS_SYNC_ENABLED', True):
         logger.info("Asset sync from Prometheus is disabled")
         return {"status": "skipped", "reason": "sync_disabled"}
@@ -37,17 +36,16 @@ async def sync_assets_from_prometheus_task(self) -> Dict[str, Any]:
     logger.info("Starting scheduled asset sync from Prometheus")
     start_time = datetime.utcnow()
 
-    try:
-        # 创建数据库会话
-        async with AsyncSessionLocal() as db:
+    async def _sync():
+        SessionLocal = get_celery_async_session()
+        
+        async with SessionLocal() as db:
             try:
-                # 执行同步
                 result = await sync_assets_from_prometheus(db)
 
                 end_time = datetime.utcnow()
                 duration = (end_time - start_time).total_seconds()
 
-                # 构建任务结果
                 task_result = {
                     "status": "success",
                     "start_time": start_time.isoformat(),
@@ -73,18 +71,16 @@ async def sync_assets_from_prometheus_task(self) -> Dict[str, Any]:
             except Exception as e:
                 await db.rollback()
                 raise e
-            finally:
-                await db.close()
 
+    try:
+        return asyncio.run(_sync())
     except Exception as exc:
         logger.error(f"Asset sync task failed: {exc}")
 
-        # 重试逻辑
         if self.request.retries < self.max_retries:
             logger.info(f"Retrying asset sync task (attempt {self.request.retries + 1}/{self.max_retries})")
             raise self.retry(exc=exc)
 
-        # 所有重试都失败
         return {
             "status": "failed",
             "start_time": start_time.isoformat(),
@@ -100,7 +96,7 @@ async def sync_assets_from_prometheus_task(self) -> Dict[str, Any]:
     max_retries=2,
     default_retry_delay=30,
 )
-async def sync_single_asset_task(self, instance: str) -> Dict[str, Any]:
+def sync_single_asset_task(self, instance: str) -> Dict[str, Any]:
     """
     同步单个资产的 Celery 任务
 
@@ -109,8 +105,10 @@ async def sync_single_asset_task(self, instance: str) -> Dict[str, Any]:
     """
     logger.info(f"Starting single asset sync for instance: {instance}")
 
-    try:
-        async with AsyncSessionLocal() as db:
+    async def _sync():
+        SessionLocal = get_celery_async_session()
+        
+        async with SessionLocal() as db:
             try:
                 service = AssetSyncService(db)
                 result = await service.sync_single_asset(instance)
@@ -135,9 +133,9 @@ async def sync_single_asset_task(self, instance: str) -> Dict[str, Any]:
             except Exception as e:
                 await db.rollback()
                 raise e
-            finally:
-                await db.close()
 
+    try:
+        return asyncio.run(_sync())
     except Exception as exc:
         logger.error(f"Single asset sync task failed for {instance}: {exc}")
 
@@ -159,4 +157,4 @@ def get_sync_interval() -> float:
     从配置中读取，默认 30 分钟
     """
     interval_minutes = getattr(settings, 'PROMETHEUS_SYNC_INTERVAL', 30)
-    return float(interval_minutes * 60)  # 转换为秒
+    return float(interval_minutes * 60)

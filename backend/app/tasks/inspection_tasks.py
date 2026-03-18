@@ -1,10 +1,14 @@
 """
 Inspection task execution.
 """
+import asyncio
+import subprocess
 from datetime import datetime
 from celery import shared_task
+from sqlalchemy import select
 
 from app.core.logging import get_logger
+from app.tasks.utils import get_celery_async_session
 
 logger = get_logger(__name__)
 
@@ -12,16 +16,13 @@ logger = get_logger(__name__)
 @shared_task(bind=True, max_retries=3)
 def run_inspection_task(self, task_id: int):
     """Run an inspection task."""
-    import asyncio
     
     async def _run():
-        from sqlalchemy.ext.asyncio import AsyncSession
-        from app.db.session import AsyncSessionLocal
         from app.models.ops import InspectionTask, InspectionReport
-        from app.models.asset import Asset
         
-        async with AsyncSessionLocal() as db:
-            # Get task
+        SessionLocal = get_celery_async_session()
+        
+        async with SessionLocal() as db:
             result = await db.execute(
                 select(InspectionTask).where(InspectionTask.id == task_id)
             )
@@ -31,7 +32,6 @@ def run_inspection_task(self, task_id: int):
                 logger.warning(f"Inspection task {task_id} not found or disabled")
                 return
             
-            # Create report
             report = InspectionReport(
                 task_id=task.id,
                 status="running",
@@ -45,11 +45,9 @@ def run_inspection_task(self, task_id: int):
             await db.commit()
             await db.refresh(report)
             
-            # Update task last run time
             task.last_run_at = datetime.utcnow()
             await db.commit()
             
-            # Execute checks
             for check_item in task.check_items:
                 check_name = check_item.get("name", "Unknown check")
                 command = check_item.get("command", "")
@@ -57,8 +55,6 @@ def run_inspection_task(self, task_id: int):
                 timeout = check_item.get("timeout", 60)
                 
                 try:
-                    # Execute check command
-                    import subprocess
                     result = subprocess.run(
                         command,
                         shell=True,
@@ -67,7 +63,6 @@ def run_inspection_task(self, task_id: int):
                         timeout=timeout
                     )
                     
-                    # Determine status
                     if result.returncode == 0:
                         if expected_result and expected_result not in result.stdout:
                             status = "warning"
@@ -83,7 +78,7 @@ def run_inspection_task(self, task_id: int):
                         "check_name": check_name,
                         "status": status,
                         "message": result.stdout if result.returncode == 0 else result.stderr,
-                        "duration_ms": None  # Could add timing
+                        "duration_ms": None
                     })
                     
                 except subprocess.TimeoutExpired:
@@ -103,21 +98,16 @@ def run_inspection_task(self, task_id: int):
                         "duration_ms": None
                     })
             
-            # Update report status
             report.status = "completed"
             report.summary = f"Passed: {report.passed_checks}, Failed: {report.failed_checks}, Warnings: {report.warning_checks}"
             await db.commit()
             
             logger.info(
-                "Inspection task completed",
-                task_id=task_id,
-                name=task.name,
-                passed=report.passed_checks,
-                failed=report.failed_checks
+                f"Inspection task completed: id={task_id}, name={task.name}, passed={report.passed_checks}, failed={report.failed_checks}"
             )
     
     try:
         asyncio.run(_run())
     except Exception as exc:
-        logger.error("Inspection task failed", task_id=task_id, error=str(exc))
+        logger.error(f"Inspection task failed: id={task_id}, error={str(exc)}")
         raise self.retry(exc=exc, countdown=60)

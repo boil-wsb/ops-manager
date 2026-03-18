@@ -1,14 +1,17 @@
 """
 Notification tasks.
 """
+import asyncio
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 from celery import shared_task
+from sqlalchemy import select
 
 from app.core.logging import get_logger
 from app.config import settings
+from app.tasks.utils import get_celery_async_session
 
 logger = get_logger(__name__)
 
@@ -21,18 +24,15 @@ def send_email_notification(self, to_addresses: list, subject: str, body: str, h
             logger.warning("SMTP not configured, skipping email notification")
             return
         
-        # Create message
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
         msg["From"] = settings.smtp_user
         msg["To"] = ", ".join(to_addresses)
         
-        # Add body
         msg.attach(MIMEText(body, "plain"))
         if html_body:
             msg.attach(MIMEText(html_body, "html"))
         
-        # Send email
         with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
             if settings.smtp_tls:
                 server.starttls()
@@ -40,10 +40,10 @@ def send_email_notification(self, to_addresses: list, subject: str, body: str, h
                 server.login(settings.smtp_user, settings.smtp_password)
             server.sendmail(settings.smtp_user, to_addresses, msg.as_string())
         
-        logger.info("Email notification sent", to=to_addresses, subject=subject)
+        logger.info(f"Email notification sent: to={to_addresses}, subject={subject}")
         
     except Exception as exc:
-        logger.error("Failed to send email notification", error=str(exc))
+        logger.error(f"Failed to send email notification: {str(exc)}")
         raise self.retry(exc=exc, countdown=60)
 
 
@@ -59,25 +59,23 @@ def send_webhook_notification(self, url: str, payload: dict, headers: dict = Non
         response = httpx.post(url, json=payload, headers=headers, timeout=30)
         response.raise_for_status()
         
-        logger.info("Webhook notification sent", url=url, status=response.status_code)
+        logger.info(f"Webhook notification sent: url={url}, status={response.status_code}")
         
     except Exception as exc:
-        logger.error("Failed to send webhook notification", url=url, error=str(exc))
+        logger.error(f"Failed to send webhook notification: url={url}, error={str(exc)}")
         raise self.retry(exc=exc, countdown=60)
 
 
 @shared_task
 def send_alert_notification(alert_id: int):
     """Send notification for an alert."""
-    import asyncio
     
     async def _send():
-        from sqlalchemy.ext.asyncio import AsyncSession
-        from app.db.session import AsyncSessionLocal
         from app.models.monitor import Alert, NotificationChannel
         
-        async with AsyncSessionLocal() as db:
-            # Get alert
+        SessionLocal = get_celery_async_session()
+        
+        async with SessionLocal() as db:
             result = await db.execute(
                 select(Alert).where(Alert.id == alert_id)
             )
@@ -87,7 +85,6 @@ def send_alert_notification(alert_id: int):
                 logger.warning(f"Alert {alert_id} not found")
                 return
             
-            # Get notification channels
             result = await db.execute(
                 select(NotificationChannel).where(
                     NotificationChannel.is_enabled == True
@@ -95,7 +92,6 @@ def send_alert_notification(alert_id: int):
             )
             channels = result.scalars().all()
             
-            # Send notifications
             for channel in channels:
                 try:
                     if channel.channel_type.value == "email":
@@ -129,16 +125,12 @@ Time: {alert.started_at}
                 
                 except Exception as e:
                     logger.error(
-                        "Failed to send notification",
-                        channel=channel.name,
-                        alert_id=alert_id,
-                        error=str(e)
+                        f"Failed to send notification: channel={channel.name}, alert_id={alert_id}, error={str(e)}"
                     )
             
-            # Mark alert as notification sent
             alert.notification_sent = True
             await db.commit()
             
-            logger.info("Alert notifications sent", alert_id=alert_id)
+            logger.info(f"Alert notifications sent: alert_id={alert_id}")
     
     asyncio.run(_send())

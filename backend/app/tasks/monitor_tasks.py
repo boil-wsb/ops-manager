@@ -11,8 +11,9 @@ from typing import Optional
 import httpx
 from celery import shared_task
 
-from app.tasks.celery_app import celery_app
+from app.config import settings
 from app.core.logging import get_logger
+from app.tasks.utils import get_celery_async_session
 
 logger = get_logger(__name__)
 
@@ -25,7 +26,6 @@ async def check_ping(target: str, timeout: int = 10) -> tuple[bool, Optional[str
     try:
         start_time = time.time()
         
-        # Use ping command (Windows/Linux compatible)
         count_flag = "-n" if subprocess.sys.platform == "win32" else "-c"
         result = subprocess.run(
             ["ping", count_flag, "1", "-W", str(timeout), target],
@@ -79,7 +79,6 @@ async def check_http(
             
             elapsed_ms = int((time.time() - start_time) * 1000)
             
-            # Check status code
             if expected_status and response.status_code != expected_status:
                 return (
                     False,
@@ -87,7 +86,6 @@ async def check_http(
                     elapsed_ms
                 )
             
-            # Check content
             if expected_content and expected_content not in response.text:
                 return False, f"Expected content not found in response", elapsed_ms
             
@@ -137,18 +135,15 @@ async def check_udp(target: str, port: int, timeout: int = 10) -> tuple[bool, Op
     try:
         start_time = time.time()
         
-        # Create UDP socket
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.settimeout(timeout)
         
-        # Try to send a packet
         sock.sendto(b"", (target, port))
         
-        # Wait for response (may timeout, which is normal for UDP)
         try:
             sock.recvfrom(1024)
         except socket.timeout:
-            pass  # UDP may not respond, that's okay
+            pass
         
         elapsed_ms = int((time.time() - start_time) * 1000)
         sock.close()
@@ -180,7 +175,6 @@ async def perform_check(monitor) -> tuple[bool, Optional[str], Optional[int]]:
         )
     
     elif monitor_type == "tcp":
-        # Parse target as host:port
         try:
             host, port = target.rsplit(":", 1)
             port = int(port)
@@ -189,7 +183,6 @@ async def perform_check(monitor) -> tuple[bool, Optional[str], Optional[int]]:
             return False, "Invalid TCP target format (expected host:port)", None
     
     elif monitor_type == "udp":
-        # Parse target as host:port
         try:
             host, port = target.rsplit(":", 1)
             port = int(port)
@@ -204,16 +197,13 @@ async def perform_check(monitor) -> tuple[bool, Optional[str], Optional[int]]:
 @shared_task(bind=True, max_retries=3)
 def check_monitor(self, monitor_id: int):
     """Check a single monitor."""
-    import asyncio
+    from sqlalchemy import select
+    from app.models.monitor import Monitor, Alert, MonitorStatus, AlertSeverity
     
     async def _check():
-        from sqlalchemy.ext.asyncio import AsyncSession
-        from app.db.session import AsyncSessionLocal
-        from app.models.monitor import Monitor, Alert, MonitorStatus, AlertSeverity
-        from app.models.asset import Asset
+        SessionLocal = get_celery_async_session()
         
-        async with AsyncSessionLocal() as db:
-            # Get monitor
+        async with SessionLocal() as db:
             result = await db.execute(
                 select(Monitor).where(Monitor.id == monitor_id)
             )
@@ -222,10 +212,8 @@ def check_monitor(self, monitor_id: int):
             if not monitor or not monitor.is_enabled:
                 return
             
-            # Perform check
             success, message, duration_ms = await perform_check(monitor)
             
-            # Update monitor status
             monitor.last_check_at = datetime.utcnow()
             monitor.last_check_result = message
             monitor.last_check_duration_ms = duration_ms
@@ -236,7 +224,6 @@ def check_monitor(self, monitor_id: int):
             
             await db.commit()
             
-            # Create alert if status changed to DOWN
             if old_status != MonitorStatus.DOWN and new_status == MonitorStatus.DOWN:
                 alert = Alert(
                     monitor_id=monitor.id,
@@ -251,9 +238,7 @@ def check_monitor(self, monitor_id: int):
                 db.add(alert)
                 await db.commit()
             
-            # Resolve alert if status changed to UP
             if old_status == MonitorStatus.DOWN and new_status == MonitorStatus.UP:
-                # Find active alert and resolve it
                 result = await db.execute(
                     select(Alert).where(
                         Alert.monitor_id == monitor.id,
@@ -267,33 +252,26 @@ def check_monitor(self, monitor_id: int):
                     await db.commit()
             
             logger.info(
-                "Monitor check completed",
-                monitor_id=monitor_id,
-                name=monitor.name,
-                success=success,
-                duration_ms=duration_ms
+                f"Monitor check completed: id={monitor_id}, name={monitor.name}, success={success}, duration={duration_ms}ms"
             )
     
     try:
         asyncio.run(_check())
     except Exception as exc:
-        logger.error("Monitor check failed", monitor_id=monitor_id, error=str(exc))
+        logger.error(f"Monitor check failed: id={monitor_id}, error={str(exc)}")
         raise self.retry(exc=exc, countdown=60)
 
 
 @shared_task
 def check_all_monitors():
     """Check all enabled monitors."""
-    import asyncio
+    from sqlalchemy import select
+    from app.models.monitor import Monitor
     
     async def _check_all():
-        from sqlalchemy import select
-        from sqlalchemy.ext.asyncio import AsyncSession
-        from app.db.session import AsyncSessionLocal
-        from app.models.monitor import Monitor
+        SessionLocal = get_celery_async_session()
         
-        async with AsyncSessionLocal() as db:
-            # Get all enabled monitors
+        async with SessionLocal() as db:
             result = await db.execute(
                 select(Monitor).where(Monitor.is_enabled == True)
             )
@@ -301,7 +279,6 @@ def check_all_monitors():
             
             logger.info(f"Checking {len(monitors)} monitors")
             
-            # Queue individual checks
             for monitor in monitors:
                 check_monitor.delay(monitor.id)
     
