@@ -5,6 +5,12 @@ export interface Role {
   name: string;
   description?: string;
   permissions: string[];
+  isSystem?: boolean;
+  isActive?: boolean;
+  userCount?: number;
+  permissionCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export const roleApi = {
