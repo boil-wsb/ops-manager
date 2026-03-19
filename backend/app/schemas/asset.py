@@ -75,6 +75,7 @@ class AssetBase(BaseModel):
 class AssetCreate(AssetBase):
     """Asset creation schema."""
     label_ids: List[int] = []
+    owner_name: Optional[str] = Field(None, max_length=100)
 
 
 class AssetUpdate(BaseModel):
@@ -97,6 +98,7 @@ class AssetUpdate(BaseModel):
     rack: Optional[str] = Field(None, max_length=50)
     
     description: Optional[str] = None
+    owner_name: Optional[str] = Field(None, max_length=100)
     label_ids: Optional[List[int]] = None
 
 
@@ -112,6 +114,7 @@ class AssetResponse(AssetBase):
     labels: List[LabelResponse] = []
     owner_id: Optional[int] = None
     owner: Optional[OwnerResponse] = None
+    owner_name: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     # Prometheus sync fields

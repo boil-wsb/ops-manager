@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Modal,
   message,
@@ -38,30 +38,20 @@ const RolePermissionModal = ({
   const [selectedPermissions, setSelectedPermissions] = useState<number[]>([]);
   const [checkAllMap, setCheckAllMap] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    if (visible && role) {
-      fetchData();
-    }
-  }, [visible, role]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!role) return;
 
     setLoading(true);
     try {
-      // Fetch all permissions grouped by module
       const allPermissionsRes = await permissionApi.getPermissions({ page: 1, page_size: 1000 });
       
-      // Fetch role's current permissions
       const rolePermissionsRes = await roleApi.getRolePermissions(role.id);
 
       setPermissionGroups(allPermissionsRes.data.items || []);
 
-      // Get currently selected permission IDs
       const currentPermIds = rolePermissionsRes.data.permissions.map((p) => p.id);
       setSelectedPermissions(currentPermIds);
 
-      // Calculate check-all status for each module
       const checkAllStatus: Record<string, boolean> = {};
       (allPermissionsRes.data.items || []).forEach((group) => {
         const groupPermIds = group.permissions.map((p) => p.id);
@@ -69,12 +59,18 @@ const RolePermissionModal = ({
         checkAllStatus[group.module] = allSelected;
       });
       setCheckAllMap(checkAllStatus);
-    } catch (error) {
+    } catch {
       message.error('获取权限数据失败');
     } finally {
       setLoading(false);
     }
-  };
+  }, [role]);
+
+  useEffect(() => {
+    if (visible && role) {
+      fetchData();
+    }
+  }, [visible, role, fetchData]);
 
   const handleCheckAll = (module: string, checked: boolean) => {
     const group = permissionGroups.find((g) => g.module === module);
@@ -121,8 +117,9 @@ const RolePermissionModal = ({
       });
       message.success('权限分配成功');
       onSuccess();
-    } catch (error: any) {
-      message.error(error.response?.data?.detail || '权限分配失败');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : '权限分配失败';
+      message.error(errorMessage);
     } finally {
       setSaving(false);
     }

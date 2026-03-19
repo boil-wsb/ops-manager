@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db, get_current_user, require_permissions
+from app.models.user import User
 from app.crud.crud_asset import crud_asset, crud_label
 from app.schemas.asset import (
     AssetCreate, AssetUpdate, AssetResponse, AssetListResponse,
@@ -416,7 +417,8 @@ async def update_asset(
     asset_id: int,
     obj_in: AssetUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user = require_permissions(["asset:write"])
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permissions(["asset:write"]))
 ):
     """Update asset."""
     asset = await crud_asset.get(db, id=asset_id)
@@ -438,7 +440,8 @@ async def batch_delete_assets(
     request: Request,
     asset_ids: List[int],
     db: AsyncSession = Depends(get_db),
-    current_user = require_permissions(["asset:delete"])
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permissions(["asset:delete"]))
 ):
     """Batch delete assets."""
     deleted_ids = []
@@ -466,7 +469,8 @@ async def delete_asset(
     request: Request,
     asset_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user = require_permissions(["asset:delete"])
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permissions(["asset:delete"]))
 ):
     """Delete asset."""
     asset = await crud_asset.get(db, id=asset_id)

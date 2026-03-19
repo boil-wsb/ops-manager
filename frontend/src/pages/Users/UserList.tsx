@@ -14,7 +14,7 @@ const UserList = () => {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useState({
     keyword: '',
-    is_active: undefined as boolean | undefined,
+    isActive: undefined as boolean | undefined,
   });
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -63,39 +63,39 @@ const UserList = () => {
     },
     {
       title: '姓名',
-      key: 'full_name',
-      render: (_: any, record: User) => {
-        return (record as any).full_name || '-';
+      key: 'fullName',
+      render: (_: unknown, record: User) => {
+        return (record as unknown as Record<string, unknown>).fullName || '-';
       },
     },
     {
       title: '状态',
-      dataIndex: 'is_active',
-      key: 'is_active',
-      render: (is_active: boolean) => <StatusTag status={is_active ? 'active' : 'inactive'} type="user" />,
+      dataIndex: 'isActive',
+      key: 'isActive',
+      render: (isActive: boolean) => <StatusTag status={isActive ? 'active' : 'inactive'} type="user" />,
     },
     {
       title: '超级管理员',
-      dataIndex: 'is_superuser',
-      key: 'is_superuser',
-      render: (is_superuser: boolean) => (
-        <Tag color={is_superuser ? 'purple' : 'default'}>
-          {is_superuser ? '是' : '否'}
+      dataIndex: 'isSuperuser',
+      key: 'isSuperuser',
+      render: (isSuperuser: boolean) => (
+        <Tag color={isSuperuser ? 'purple' : 'default'}>
+          {isSuperuser ? '是' : '否'}
         </Tag>
       ),
     },
     {
       title: '最后登录',
-      key: 'last_login',
-      render: (_: any, record: User) => {
-        const last_login = (record as any).last_login;
-        return last_login ? new Date(last_login).toLocaleString('zh-CN') : '-';
+      key: 'lastLogin',
+      render: (_: unknown, record: User) => {
+        const lastLogin = (record as unknown as Record<string, unknown>).lastLogin as string | undefined | null;
+        return lastLogin ? new Date(lastLogin).toLocaleString('zh-CN') : '-';
       },
     },
     {
       title: '操作',
       key: 'action',
-      render: (_: any, record: User) => (
+      render: (_: unknown, record: User) => (
         <Space size="small">
           <PermissionGuard permissions="user:write">
             <Button
@@ -138,8 +138,8 @@ const UserList = () => {
           />
           <Select
             placeholder="状态"
-            value={searchParams.is_active}
-            onChange={(value) => setSearchParams({ ...searchParams, is_active: value })}
+            value={searchParams.isActive}
+            onChange={(value) => setSearchParams({ ...searchParams, isActive: value })}
             style={{ width: 120 }}
             allowClear
           >

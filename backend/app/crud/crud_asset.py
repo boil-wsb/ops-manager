@@ -101,6 +101,7 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
             rack=obj_in.rack,
             description=obj_in.description,
             owner_id=owner_id,
+            owner_name=obj_in.owner_name,
         )
         
         # Add labels if provided

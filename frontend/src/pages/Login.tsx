@@ -1,17 +1,30 @@
 import { useState } from 'react';
-import { Form, Input, Button, Card, Typography, Space, App } from 'antd';
-import { UserOutlined, LockOutlined, DatabaseOutlined } from '@ant-design/icons';
+import { Form, Input, Button, Card, Typography, Space, App, Modal, Select } from 'antd';
+import { UserOutlined, LockOutlined, DatabaseOutlined, DownloadOutlined, MessageOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../services/auth';
 import { useAuthStore } from '../stores/authStore';
+import { itFeedbackApi } from '../services/itFeedback';
 
 const { Title, Text } = Typography;
+const { TextArea } = Input;
+
+interface FeedbackFormValues {
+  computerType: string;
+  usageYears: string;
+  lagLevel: string;
+  lagScenarios?: string[];
+  description?: string;
+  contact?: string;
+}
 
 const Login = () => {
   const navigate = useNavigate();
   const { setAuth } = useAuthStore();
   const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
+  const [feedbackVisible, setFeedbackVisible] = useState(false);
+  const [feedbackForm] = Form.useForm();
 
   const onFinish = async (values: { username: string; password: string }) => {
     setLoading(true);
@@ -27,10 +40,26 @@ const Login = () => {
       
       message.success('登录成功，欢迎回来！');
       navigate('/');
-    } catch (error: any) {
-      message.error(error.response?.data?.message || '登录失败，请检查用户名和密码');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : '登录失败，请检查用户名和密码';
+      message.error(errorMessage);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFeedbackSubmit = async (values: FeedbackFormValues) => {
+    try {
+      const submitData = {
+        ...values,
+        lagScenarios: values.lagScenarios?.join(',') || undefined,
+      };
+      await itFeedbackApi.createITFeedback(submitData);
+      message.success('感谢您的反馈，我们会尽快处理！');
+      setFeedbackVisible(false);
+      feedbackForm.resetFields();
+    } catch {
+      message.error('提交反馈失败');
     }
   };
 
@@ -277,12 +306,148 @@ const Login = () => {
               borderTop: '1px solid var(--border-color)',
             }}
           >
-            <Text style={{ color: 'var(--text-muted)', fontSize: 12, fontFamily: 'var(--font-mono)' }}>
-              OpsManager V2.0.0
-            </Text>
+            <Space direction="vertical" size={8}>
+              <Space size={16}>
+                <a
+                  href="/pcinfo.zip"
+                  download
+                  style={{
+                    color: 'var(--primary-400)',
+                    fontSize: 13,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <DownloadOutlined />
+                  下载 PC 信息采集工具
+                </a>
+                <a
+                  onClick={() => setFeedbackVisible(true)}
+                  style={{
+                    color: 'var(--primary-400)',
+                    fontSize: 13,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <MessageOutlined />
+                  反馈卡顿问题
+                </a>
+              </Space>
+              <Text style={{ color: 'var(--text-muted)', fontSize: 12, fontFamily: 'var(--font-mono)' }}>
+                OpsManager V2.0.0
+              </Text>
+            </Space>
           </div>
         </Card>
       </div>
+
+      {/* Feedback Modal */}
+      <Modal
+        title={
+          <Space>
+            <MessageOutlined />
+            <span>反馈办公卡顿问题</span>
+          </Space>
+        }
+        open={feedbackVisible}
+        onCancel={() => setFeedbackVisible(false)}
+        footer={null}
+        width={500}
+      >
+        <Form
+          form={feedbackForm}
+          layout="vertical"
+          onFinish={handleFeedbackSubmit}
+          style={{ marginTop: 16 }}
+        >
+          <Form.Item
+            name="computerType"
+            label="电脑类型"
+            rules={[{ required: true, message: '请选择电脑类型' }]}
+          >
+            <Select placeholder="请选择电脑类型">
+              <Select.Option value="desktop">台式机</Select.Option>
+              <Select.Option value="laptop">笔记本</Select.Option>
+              <Select.Option value="workstation">工作站</Select.Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="usageYears"
+            label="电脑使用年限"
+            rules={[{ required: true, message: '请选择使用年限' }]}
+          >
+            <Select placeholder="请选择使用年限">
+              <Select.Option value="less1">1年以内</Select.Option>
+              <Select.Option value="1-3">1-3年</Select.Option>
+              <Select.Option value="3-5">3-5年</Select.Option>
+              <Select.Option value="more5">5年以上</Select.Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="lagLevel"
+            label="卡顿程度"
+            rules={[{ required: true, message: '请选择卡顿程度' }]}
+          >
+            <Select placeholder="请选择卡顿程度">
+              <Select.Option value="1">轻微卡顿 - 偶尔卡顿，不影响工作</Select.Option>
+              <Select.Option value="2">一般卡顿 - 经常卡顿，影响工作效率</Select.Option>
+              <Select.Option value="3">严重卡顿 - 频繁卡顿，严重影响工作</Select.Option>
+              <Select.Option value="4">无法使用 - 基本无法正常工作</Select.Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="lagScenarios"
+            label="卡顿场景（可多选）"
+          >
+            <Select mode="multiple" placeholder="请选择卡顿场景">
+              <Select.Option value="startup">开机启动</Select.Option>
+              <Select.Option value="office">办公软件（Word/Excel等）</Select.Option>
+              <Select.Option value="browser">浏览器使用</Select.Option>
+              <Select.Option value="video">视频会议/播放</Select.Option>
+              <Select.Option value="file">文件操作（复制/打开等）</Select.Option>
+              <Select.Option value="multitask">多任务切换</Select.Option>
+              <Select.Option value="other">其他</Select.Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="description"
+            label="详细描述"
+          >
+            <TextArea
+              rows={4}
+              placeholder="请详细描述卡顿情况，例如：具体在什么操作时卡顿、卡顿持续多长时间等"
+              maxLength={500}
+              showCount
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="contact"
+            label="联系方式（选填）"
+          >
+            <Input placeholder="请输入手机号或邮箱，方便我们联系您" />
+          </Form.Item>
+
+          <Form.Item style={{ marginBottom: 0, marginTop: 24 }}>
+            <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+              <Button onClick={() => setFeedbackVisible(false)}>
+                取消
+              </Button>
+              <Button type="primary" htmlType="submit">
+                提交反馈
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

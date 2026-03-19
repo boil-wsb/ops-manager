@@ -133,6 +133,8 @@ class Asset(BaseModel):
     labels_data: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, default=dict, nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     
+    owner_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    
     # Relationships
     owner_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),

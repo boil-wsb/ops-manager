@@ -11,7 +11,6 @@ export interface UserListParams {
 export const userApi = {
   getUsers: async (params?: UserListParams): Promise<PaginationData<User>> => {
     const response = await api.get<PaginationData<User>>('/users', { params });
-    // 后端直接返回 { items, total, page, page_size } 格式
     return response.data;
   },
 
@@ -39,6 +38,6 @@ export const userApi = {
   },
 
   assignRoles: async (id: number, roleIds: number[]): Promise<void> => {
-    await api.post(`/users/${id}/roles`, { role_ids: roleIds });
+    await api.post(`/users/${id}/roles`, roleIds);
   },
 };

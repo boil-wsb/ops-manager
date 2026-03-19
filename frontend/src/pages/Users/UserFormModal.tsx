@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Modal, Form, Input, Select, Switch, App } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { userApi } from '../../services/users';
 import { roleApi, type Role } from '../../services/roles';
+import { useAuthStore } from '../../stores/authStore';
 import type { User } from '../../types';
 
 const { Option } = Select;
@@ -18,37 +19,36 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ open, onClose, user }) =>
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const isEdit = !!user;
+  const currentUser = useAuthStore((state) => state.user);
+  const canEditSuperuser = currentUser?.isSuperuser ?? false;
 
   const { data: rolesData } = useQuery({
     queryKey: ['roles'],
     queryFn: () => roleApi.getRoles(),
   });
 
-  const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>([]);
+  const initialRoleIds = useMemo(() => user?.roles?.map((r) => r.id) || [], [user]);
 
-  useEffect(() => {
-    if (open) {
-      if (user) {
-        form.setFieldsValue({
-          username: user.username,
-          email: user.email,
-          fullName: user.fullName,
-          isActive: user.isActive ?? true,
-          isSuperuser: user.isSuperuser ?? false,
-        });
-        setSelectedRoleIds(user.roles?.map((r: { id: number; name: string }) => r.id) || []);
-      } else {
-        form.setFieldsValue({
-          username: '',
-          email: '',
-          full_name: '',
-          is_active: true,
-          is_superuser: false,
-        });
-        setSelectedRoleIds([]);
-      }
+  const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>(initialRoleIds);
+
+  const initialValues = useMemo(() => {
+    if (user) {
+      return {
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        isActive: user.isActive ?? true,
+        isSuperuser: user.isSuperuser ?? false,
+      };
     }
-  }, [open, user, form]);
+    return {
+      username: '',
+      email: '',
+      fullName: '',
+      isActive: true,
+      isSuperuser: false,
+    };
+  }, [user]);
 
   const createMutation = useMutation({
     mutationFn: userApi.createUser,
@@ -65,7 +65,10 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ open, onClose, user }) =>
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<User> }) =>
       userApi.updateUser(id, data),
-    onSuccess: () => {
+    onSuccess: async () => {
+      if (isEdit && user) {
+        await userApi.assignRoles(user.id, selectedRoleIds);
+      }
       message.success('用户更新成功');
       queryClient.invalidateQueries({ queryKey: ['users'] });
       handleClose();
@@ -94,8 +97,8 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ open, onClose, user }) =>
       } else {
         createMutation.mutate(userData);
       }
-    } catch (error) {
-      console.error('Validation failed:', error);
+    } catch {
+      console.error('Validation failed');
     }
   };
 
@@ -115,7 +118,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ open, onClose, user }) =>
       mask={{ closable: false }}
       keyboard={false}
     >
-      <Form form={form} layout="vertical" preserve={false}>
+      <Form form={form} layout="vertical" preserve={false} initialValues={initialValues}>
         <Form.Item
           name="username"
           label="用户名"
@@ -136,7 +139,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ open, onClose, user }) =>
         </Form.Item>
 
         <Form.Item
-          name="full_name"
+          name="fullName"
           label="姓名"
         >
           <Input placeholder="请输入姓名" />
@@ -156,7 +159,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ open, onClose, user }) =>
         )}
 
         <Form.Item
-          name="is_active"
+          name="isActive"
           label="状态"
           valuePropName="checked"
           initialValue={true}
@@ -164,14 +167,16 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ open, onClose, user }) =>
           <Switch checkedChildren="启用" unCheckedChildren="禁用" />
         </Form.Item>
 
-        <Form.Item
-          name="is_superuser"
-          label="超级管理员"
-          valuePropName="checked"
-          initialValue={false}
-        >
-          <Switch checkedChildren="是" unCheckedChildren="否" />
-        </Form.Item>
+        {canEditSuperuser && (
+          <Form.Item
+            name="isSuperuser"
+            label="超级管理员"
+            valuePropName="checked"
+            initialValue={false}
+          >
+            <Switch checkedChildren="是" unCheckedChildren="否" />
+          </Form.Item>
+        )}
 
         <Form.Item label="角色">
           <Select

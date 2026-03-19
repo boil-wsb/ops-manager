@@ -47,7 +47,7 @@ const Layout = () => {
       try {
         const response = await api.get('/monitor/alerts?status=firing');
         return response.data;
-      } catch (error) {
+      } catch {
         return { total: 0 };
       }
     },
@@ -86,7 +86,8 @@ const Layout = () => {
         label: '运维管理',
         permission: 'deployment:read',
         children: [
-          { key: '/ops/deployments', label: '发布记录' },
+          { key: '/ops/deployments', label: '部署管理', permission: 'deployment:read' },
+          { key: '/ops/it-management', label: 'IT管理', permission: 'it:read' },
         ],
       },
       {
@@ -101,7 +102,7 @@ const Layout = () => {
         ],
       },
     ],
-    [hasPermission]
+    []
   );
 
   const filterMenuItems = (items: MenuItemType[]): MenuItemType[] => {

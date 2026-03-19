@@ -6,6 +6,7 @@ services:
       POSTGRES_USER: ${DB_USER:-opsmanager}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-opsmanager}
       POSTGRES_DB: ${DB_NAME:-opsmanager}
+      TZ: Asia/Shanghai
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -19,6 +20,8 @@ services:
   redis:
     image: 192.168.100.213:8083/devops/redis:7-alpine
     container_name: ops-redis
+    environment:
+      - TZ=Asia/Shanghai
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
@@ -44,6 +47,7 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - LOG_FORMAT=${LOG_FORMAT:-json}
+      - TZ=Asia/Shanghai
     volumes:
       - ./logs:/app/logs
     depends_on:
@@ -67,6 +71,7 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/1
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - TZ=Asia/Shanghai
     volumes:
       - ./logs:/app/logs
       - ./celery_beat:/app/celerybeat
@@ -81,6 +86,8 @@ services:
   nginx:
     image: ${REGISTRY_URL:-192.168.100.213:8083}/opsmanager/frontend:${VERSION:-latest}
     container_name: ops-nginx
+    environment:
+      - TZ=Asia/Shanghai
     ports:
       - "8080:80"
       # - "443:443"  # Enable for HTTPS

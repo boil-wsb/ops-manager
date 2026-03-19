@@ -6,6 +6,19 @@ import { useNavigate } from 'react-router-dom';
 import { assetApi } from '../../services/assets';
 import { usePermission } from '../../hooks/usePermission';
 
+const formatBytes = (bytes: number | undefined | null): string => {
+  if (!bytes) return '-';
+  const gb = bytes / (1024 * 1024 * 1024);
+  if (gb >= 1) {
+    return `${gb.toFixed(2)} GB`;
+  }
+  const mb = bytes / (1024 * 1024);
+  if (mb >= 1) {
+    return `${mb.toFixed(2)} MB`;
+  }
+  return `${bytes} Bytes`;
+};
+
 const AssetDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -22,7 +35,7 @@ const AssetDetail = () => {
     queryKey: ['asset-metrics', id],
     queryFn: () => assetApi.getAssetMetrics(Number(id)),
     enabled: !!id && asset?.source === 'prometheus',
-    refetchInterval: 60000, // 每分钟刷新一次
+    refetchInterval: 60000,
   });
 
   const syncMutation = useMutation({
@@ -54,6 +67,11 @@ const AssetDetail = () => {
     maintenance: '维护中',
     retired: '已退役',
   };
+
+  const labelsData = asset?.labelsData || {};
+  const pcInfoIpAddress = labelsData.ipAddress || asset?.ipAddress || '-';
+  const pcInfoOsCaption = labelsData.osCaption || asset?.osType || '-';
+  const pcMemoryTotalBytes = labelsData.pc_memory_total_bytes;
 
   return (
     <div>
@@ -98,6 +116,22 @@ const AssetDetail = () => {
                   {statusLabelMap[asset.status]}
                 </Tag>
               </Descriptions.Item>
+              <Descriptions.Item label="负责人">
+                {asset.owner ? (
+                  <Space>
+                    <span>{asset.owner.name || asset.owner.username}</span>
+                  </Space>
+                ) : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="标签">
+                {asset.labels && asset.labels.length > 0 ? (
+                  asset.labels.map((label) => (
+                    <Tag key={label.id} color={label.color}>
+                      {label.name}
+                    </Tag>
+                  ))
+                ) : '-'}
+              </Descriptions.Item>
               {asset.source === 'prometheus' && (
                 <>
                   <Descriptions.Item label="同步状态">
@@ -115,16 +149,18 @@ const AssetDetail = () => {
             </Descriptions>
 
             <Descriptions title="网络信息" bordered column={2} style={{ marginTop: 24 }}>
-              <Descriptions.Item label="公网IP">{asset.ipAddress || '-'}</Descriptions.Item>
+              <Descriptions.Item label="IP地址">{pcInfoIpAddress}</Descriptions.Item>
               <Descriptions.Item label="内网IP">{asset.privateIp || '-'}</Descriptions.Item>
               <Descriptions.Item label="MAC地址">{asset.macAddress || '-'}</Descriptions.Item>
             </Descriptions>
 
             <Descriptions title="硬件信息" bordered column={2} style={{ marginTop: 24 }}>
               <Descriptions.Item label="CPU核数">{asset.cpuCores || '-'}</Descriptions.Item>
-              <Descriptions.Item label="内存(GB)">{asset.memoryGb || '-'}</Descriptions.Item>
+              <Descriptions.Item label="内存">
+                {pcMemoryTotalBytes ? formatBytes(Number(pcMemoryTotalBytes)) : (asset.memoryGb ? `${asset.memoryGb} GB` : '-')}
+              </Descriptions.Item>
               <Descriptions.Item label="磁盘(GB)">{asset.diskGb || '-'}</Descriptions.Item>
-              <Descriptions.Item label="操作系统">{asset.osType || '-'}</Descriptions.Item>
+              <Descriptions.Item label="操作系统">{pcInfoOsCaption}</Descriptions.Item>
               <Descriptions.Item label="系统版本">{asset.osVersion || '-'}</Descriptions.Item>
             </Descriptions>
 
@@ -133,18 +169,6 @@ const AssetDetail = () => {
               <Descriptions.Item label="区域">{asset.region || '-'}</Descriptions.Item>
               <Descriptions.Item label="机架">{asset.rack || '-'}</Descriptions.Item>
             </Descriptions>
-
-            {asset.labels.length > 0 && (
-              <Descriptions title="标签" bordered column={1} style={{ marginTop: 24 }}>
-                <Descriptions.Item label="标签">
-                  {asset.labels.map((label) => (
-                    <Tag key={label.id} color={label.color}>
-                      {label.name}
-                    </Tag>
-                  ))}
-                </Descriptions.Item>
-              </Descriptions>
-            )}
 
             {asset.description && (
               <Descriptions title="描述" bordered column={1} style={{ marginTop: 24 }}>

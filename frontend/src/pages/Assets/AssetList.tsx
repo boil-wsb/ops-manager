@@ -160,7 +160,7 @@ const AssetList = () => {
     {
       title: '配置',
       key: 'specs',
-      render: (_: any, record: Asset) => {
+      render: (_: unknown, record: Asset) => {
         const parts = [];
         if (record.cpuCores) parts.push(`${record.cpuCores}核`);
         if (record.memoryGb) parts.push(`${record.memoryGb}GB`);
@@ -171,7 +171,7 @@ const AssetList = () => {
     {
       title: '操作系统',
       key: 'os',
-      render: (_: any, record: Asset) => {
+      render: (_: unknown, record: Asset) => {
         if (!record.osType && !record.osVersion) return '-';
         return (
           <Tooltip title={record.osVersion || ''}>
@@ -182,15 +182,17 @@ const AssetList = () => {
     },
     {
       title: '负责人',
-      dataIndex: 'owner',
-      key: 'owner',
-      sorter: (a: Asset, b: Asset) => ((a as any).owner?.name || '').localeCompare((b as any).owner?.name || ''),
-      render: (owner: any) => {
-        if (!owner) return <span style={{ color: 'var(--text-tertiary)' }}>未分配</span>;
+      dataIndex: 'ownerName',
+      key: 'ownerName',
+      sorter: (a: Asset, b: Asset) => {
+        return (a.ownerName || '').localeCompare(b.ownerName || '');
+      },
+      render: (ownerName: string | null | undefined) => {
+        if (!ownerName) return <span style={{ color: 'var(--text-tertiary)' }}>未分配</span>;
         return (
           <Space>
             <UserOutlined style={{ color: '#1890ff' }} />
-            <span>{owner.name || owner.username || '-'}</span>
+            <span>{ownerName}</span>
           </Space>
         );
       },
@@ -215,7 +217,7 @@ const AssetList = () => {
       title: '操作',
       key: 'action',
       width: 100,
-      render: (_: any, record: Asset) => (
+      render: (_: unknown, record: Asset) => (
         <Space size="small">
           <PermissionGuard permissions="asset:write">
             <Button
@@ -285,10 +287,20 @@ const AssetList = () => {
       render: (customer: string) => customer ? <Tag color="blue">{customer}</Tag> : '-',
     },
     {
+      title: 'IP地址',
+      key: 'ipAddress',
+      width: 130,
+      render: (_: unknown, record: Asset) => {
+        const labelsData = record.labelsData as Record<string, string | number | boolean> | undefined;
+        const ipAddress = labelsData?.ipAddress || labelsData?.ip_address as string | undefined;
+        return ipAddress || record.ipAddress || '-';
+      },
+    },
+    {
       title: '操作系统',
       key: 'os',
       width: 150,
-      render: (_: any, record: Asset) => {
+      render: (_: unknown, record: Asset) => {
         const labelsData = record.labelsData as Record<string, string> | undefined;
         const osCaption = labelsData?.osCaption || labelsData?.os_caption;
         const osType = record.osType;
@@ -310,7 +322,7 @@ const AssetList = () => {
       title: '所有标签',
       key: 'labels',
       width: 250,
-      render: (_: any, record: Asset) => {
+      render: (_: unknown, record: Asset) => {
         const labelsData = record.labelsData;
         if (!labelsData || Object.keys(labelsData).length === 0) return '-';
         const displayLabels = Object.entries(labelsData)
@@ -352,7 +364,7 @@ const AssetList = () => {
       title: '操作',
       key: 'action',
       width: 100,
-      render: (_: any, record: Asset) => (
+      render: (_: unknown, record: Asset) => (
         <Space size="small">
           <PermissionGuard permissions="asset:write">
             <Button

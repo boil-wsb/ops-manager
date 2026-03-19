@@ -12,11 +12,11 @@ export interface NavigationLink {
   url: string;
   icon?: string;
   description?: string;
-  sort_order: number;
-  is_active: boolean;
+  sortOrder: number;
+  isActive: boolean;
   roles: RoleBrief[];
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface NavigationGroup {

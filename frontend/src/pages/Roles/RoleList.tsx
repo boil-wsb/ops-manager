@@ -108,7 +108,7 @@ const RoleList = () => {
       render: (text: string, record: Role) => (
         <Space>
           <span style={{ fontWeight: 500 }}>{text}</span>
-          {record.is_system && (
+          {record.isSystem && (
             <Tag color="blue" style={{ fontSize: '11px' }}>
               系统
             </Tag>
@@ -124,8 +124,8 @@ const RoleList = () => {
     },
     {
       title: '权限数量',
-      dataIndex: 'permission_count',
-      key: 'permission_count',
+      dataIndex: 'permissionCount',
+      key: 'permissionCount',
       width: 100,
       render: (count: number) => (
         <Tag icon={<SafetyOutlined />} color="success">
@@ -135,8 +135,8 @@ const RoleList = () => {
     },
     {
       title: '用户数量',
-      dataIndex: 'user_count',
-      key: 'user_count',
+      dataIndex: 'userCount',
+      key: 'userCount',
       width: 100,
       render: (count: number) => (
         <Tag icon={<TeamOutlined />} color="processing">
@@ -146,8 +146,8 @@ const RoleList = () => {
     },
     {
       title: '状态',
-      dataIndex: 'is_active',
-      key: 'is_active',
+      dataIndex: 'isActive',
+      key: 'isActive',
       width: 80,
       render: (isActive: boolean) => (
         <Tag color={isActive ? 'success' : 'default'}>
@@ -157,8 +157,8 @@ const RoleList = () => {
     },
     {
       title: '创建时间',
-      dataIndex: 'created_at',
-      key: 'created_at',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
       width: 180,
       render: (text: string) => new Date(text).toLocaleString(),
     },
@@ -182,7 +182,7 @@ const RoleList = () => {
               type="text"
               icon={<EditOutlined />}
               onClick={() => handleEdit(record)}
-              disabled={record.is_system}
+              disabled={record.isSystem}
             />
           </Tooltip>
           <Popconfirm
@@ -191,14 +191,14 @@ const RoleList = () => {
             onConfirm={() => handleDelete(record.id)}
             okText="确定"
             cancelText="取消"
-            disabled={record.is_system || record.user_count > 0}
+            disabled={record.isSystem || record.userCount > 0}
           >
-            <Tooltip title={record.is_system ? '系统角色不能删除' : record.user_count > 0 ? '角色下还有用户' : '删除'}>
+            <Tooltip title={record.isSystem ? '系统角色不能删除' : record.userCount > 0 ? '角色下还有用户' : '删除'}>
               <Button
                 type="text"
                 danger
                 icon={<DeleteOutlined />}
-                disabled={record.is_system || record.user_count > 0}
+                disabled={record.isSystem || record.userCount > 0}
               />
             </Tooltip>
           </Popconfirm>

@@ -153,6 +153,13 @@ async def update_user(
                 detail="邮箱已存在",
             )
     
+    if user_in.is_superuser is not None and not current_user.is_superuser:
+        logger.warning(f"[用户管理] 非超级管理员无权修改超级管理员权限")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="只有超级管理员才能修改超级管理员权限",
+        )
+    
     user = await crud_user.update(db, db_obj=user, obj_in=user_in)
     logger.info(f"[用户管理] 用户 '{user.username}' 更新成功")
 

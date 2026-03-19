@@ -84,6 +84,7 @@ export interface Asset {
     username: string;
     name?: string;
   };
+  ownerName?: string;
   source?: string;
   prometheusInstance?: string;
   lastSyncTime?: string;
@@ -204,13 +205,13 @@ export interface Certificate {
   serial_number: string;
   valid_from: string;
   valid_until: string;
-  days_until_expiry: number;
-  alert_threshold_days: number;
-  is_auto_renewal: boolean;
+  daysUntilExpiry: number;
+  alertThresholdDays: number;
+  isAutoRenewal: boolean;
   status: string;
-  asset_ids: number[];
-  created_at: string;
-  updated_at: string;
+  assetIds: number[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface DNSRecord {

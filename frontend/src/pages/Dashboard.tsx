@@ -56,9 +56,9 @@ const Dashboard = () => {
     queryFn: async () => {
       const all = await opsApi.getCertificates({ limit: 100 });
       const certArray = Array.isArray(all) ? all : [];
-      const valid = certArray.filter((c: any) => c.status === 'active');
-      const expiring = certArray.filter((c: any) => c.status === 'expiring');
-      const expired = certArray.filter((c: any) => c.status === 'expired');
+      const valid = certArray.filter((c) => c.status === 'active');
+      const expiring = certArray.filter((c) => c.status === 'expiring');
+      const expired = certArray.filter((c) => c.status === 'expired');
       return {
         total: certArray.length,
         valid: valid.length,

@@ -57,15 +57,15 @@ const CertificateList = () => {
     },
     {
       title: '过期时间',
-      dataIndex: 'valid_until',
-      key: 'valid_until',
+      dataIndex: 'validUntil',
+      key: 'validUntil',
       render: (date: string) => (date ? new Date(date).toLocaleDateString() : '-'),
     },
     {
       title: '剩余天数',
-      key: 'days_until_expiry',
-      render: (_: any, record: Certificate) => {
-        const days = record.days_until_expiry;
+      key: 'daysUntilExpiry',
+      render: (_: unknown, record: Certificate) => {
+        const days = record.daysUntilExpiry;
         if (days === null || days === undefined) return '-';
         return (
           <Tag color={days < 0 ? 'red' : days < 30 ? 'orange' : 'green'}>
@@ -92,8 +92,8 @@ const CertificateList = () => {
     },
     {
       title: '更新时间',
-      dataIndex: 'updated_at',
-      key: 'updated_at',
+      dataIndex: 'updatedAt',
+      key: 'updatedAt',
       render: (time: string) => (time ? new Date(time).toLocaleString() : '-'),
     },
   ];

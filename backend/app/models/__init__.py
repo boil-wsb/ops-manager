@@ -9,6 +9,8 @@ from app.models.asset import Asset, Label, asset_labels
 from app.models.monitor import Monitor, Alert, AlertRule, NotificationChannel
 from app.models.audit_log import AuditLog
 from app.models.navigation import NavigationLink, navigation_link_roles
+from app.models.it_feedback import ITFeedback
+from app.models.ops import Deployment, InspectionTask, InspectionReport, Certificate, DNSRecord
 
 __all__ = [
     "BaseModel",
@@ -23,6 +25,12 @@ __all__ = [
     "NotificationChannel",
     "AuditLog",
     "NavigationLink",
+    "ITFeedback",
+    "Deployment",
+    "InspectionTask",
+    "InspectionReport",
+    "Certificate",
+    "DNSRecord",
     "user_roles",
     "role_permissions",
     "asset_labels",

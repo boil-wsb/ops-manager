@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Table,
   Button,
@@ -79,9 +79,8 @@ const NavigationList = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingLink, setEditingLink] = useState<NavigationLink | null>(null);
   const [form] = Form.useForm();
-  const [restrictToCurrentRole, setRestrictToCurrentRole] = useState(true);
 
-  const fetchLinks = async () => {
+  const fetchLinks = useCallback(async () => {
     setLoading(true);
     try {
       const response = await navigationApi.getLinks({
@@ -91,39 +90,38 @@ const NavigationList = () => {
       });
       setLinks(response.items);
       setTotal(response.total);
-    } catch (error) {
+    } catch {
       message.error('获取导航链接列表失败');
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, pageSize, categoryFilter]);
 
   useEffect(() => {
     fetchLinks();
-  }, [currentPage, pageSize, categoryFilter]);
+  }, [fetchLinks]);
 
   const handleCreate = () => {
     setEditingLink(null);
     form.resetFields();
-    form.setFieldsValue({ sort_order: 0, is_active: true, restrict_to_current_role: true });
-    setRestrictToCurrentRole(true);
+    form.setFieldsValue({ sortOrder: 0, isActive: true, restrictToCurrentRole: true });
     setModalVisible(true);
   };
 
   const handleEdit = (link: NavigationLink) => {
     setEditingLink(link);
     const hasRoles = link.roles && link.roles.length > 0;
-    setRestrictToCurrentRole(hasRoles);
     form.setFieldsValue({
-      ...link,
-      restrict_to_current_role: hasRoles,
+      category: link.category,
+      name: link.name,
+      url: link.url,
+      icon: link.icon,
+      description: link.description,
+      sortOrder: link.sortOrder,
+      isActive: link.isActive ?? true,
+      restrictToCurrentRole: hasRoles,
     });
     setModalVisible(true);
-  };
-
-  const handleRestrictChange = (checked: boolean) => {
-    setRestrictToCurrentRole(checked);
-    form.setFieldValue('restrict_to_current_role', checked);
   };
 
   const handleDelete = async (id: number) => {
@@ -131,8 +129,8 @@ const NavigationList = () => {
       await navigationApi.deleteLink(id);
       message.success('删除成功');
       fetchLinks();
-    } catch (error: any) {
-      message.error(error.response?.data?.detail || '删除失败');
+    } catch {
+      message.error('删除失败');
     }
   };
 
@@ -148,10 +146,9 @@ const NavigationList = () => {
       }
       setModalVisible(false);
       fetchLinks();
-    } catch (error: any) {
-      if (error.response) {
-        message.error(error.response?.data?.detail || '操作失败');
-      }
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : '操作失败';
+      message.error(errorMessage);
     }
   };
 
@@ -225,15 +222,15 @@ const NavigationList = () => {
     },
     {
       title: '排序',
-      dataIndex: 'sort_order',
-      key: 'sort_order',
+      dataIndex: 'sortOrder',
+      key: 'sortOrder',
       width: 80,
       align: 'center' as const,
     },
     {
       title: '状态',
-      dataIndex: 'is_active',
-      key: 'is_active',
+      dataIndex: 'isActive',
+      key: 'isActive',
       width: 80,
       render: (isActive: boolean) => (
         <Tag color={isActive ? 'success' : 'default'}>{isActive ? '启用' : '禁用'}</Tag>
@@ -243,7 +240,7 @@ const NavigationList = () => {
       title: '操作',
       key: 'action',
       width: 120,
-      render: (_: any, record: NavigationLink) => (
+      render: (_: unknown, record: NavigationLink) => (
         <Space size="small">
           <Tooltip title="编辑">
             <Button type="text" icon={<EditOutlined />} onClick={() => handleEdit(record)} />
@@ -367,23 +364,13 @@ const NavigationList = () => {
           <Form.Item name="description" label="描述">
             <Input.TextArea rows={2} placeholder="链接描述（可选）" />
           </Form.Item>
-          <Form.Item label="可见范围">
-            <Space>
-              <Switch
-                checked={restrictToCurrentRole}
-                onChange={handleRestrictChange}
-                checkedChildren="当前角色"
-                unCheckedChildren="全部"
-              />
-              <span style={{ color: '#666' }}>
-                {restrictToCurrentRole ? '仅当前角色可见' : '全部角色可见'}
-              </span>
-            </Space>
+          <Form.Item name="restrictToCurrentRole" label="可见范围" valuePropName="checked">
+            <Switch checkedChildren="当前角色" unCheckedChildren="全部" />
           </Form.Item>
-          <Form.Item name="sort_order" label="排序" help="数字越小越靠前">
+          <Form.Item name="sortOrder" label="排序" help="数字越小越靠前">
             <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="is_active" label="启用状态" valuePropName="checked">
+          <Form.Item name="isActive" label="启用状态" valuePropName="checked">
             <Switch checkedChildren="启用" unCheckedChildren="禁用" />
           </Form.Item>
         </Form>

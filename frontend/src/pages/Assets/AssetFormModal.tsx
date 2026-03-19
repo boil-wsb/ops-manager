@@ -1,9 +1,9 @@
-import { useEffect } from 'react';
-import { Modal, Form, Input, Select, InputNumber, message, Alert, Space, Tag, Tooltip, Row, Col } from 'antd';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
+import { Modal, Form, Input, Select, InputNumber, App, Alert, Space, Tag, Tooltip, Row, Col } from 'antd';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LockOutlined, CloudOutlined } from '@ant-design/icons';
 import { assetApi } from '../../services/assets';
-import type { Asset } from '../../types';
+import type { Asset, Label } from '../../types';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -17,21 +17,57 @@ interface AssetFormModalProps {
 const AssetFormModal: React.FC<AssetFormModalProps> = ({ open, onClose, asset }) => {
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
+  const { message } = App.useApp();
   const isEdit = !!asset;
   const isPrometheusSource = asset?.source === 'PROMETHEUS';
 
-  useEffect(() => {
-    if (open) {
-      if (asset) {
-        form.setFieldsValue(asset);
-      } else {
-        form.resetFields();
-      }
+  const { data: labelsData } = useQuery({
+    queryKey: ['labels'],
+    queryFn: assetApi.getLabels,
+  });
+
+  const initialLabelIds = useMemo(() => asset?.labels?.map((l) => l.id) || [], [asset]);
+
+  const [selectedLabelIds, setSelectedLabelIds] = useState<number[]>(initialLabelIds);
+
+  const initialValues = useMemo(() => {
+    if (asset) {
+      return {
+        assetId: asset.assetId,
+        name: asset.name,
+        assetType: asset.assetType,
+        status: asset.status,
+        ipAddress: asset.ipAddress,
+        privateIp: asset.privateIp,
+        cpuCores: asset.cpuCores,
+        memoryGb: asset.memoryGb,
+        diskGb: asset.diskGb,
+        osType: asset.osType,
+        osVersion: asset.osVersion,
+        description: asset.description,
+        ownerName: asset.ownerName,
+    };
     }
-  }, [open, asset, form]);
+    return {
+      assetId: '',
+      name: '',
+      assetType: 'SERVER',
+      status: 'ACTIVE',
+      ipAddress: '',
+      privateIp: '',
+      cpuCores: undefined,
+      memoryGb: undefined,
+      diskGb: undefined,
+      osType: '',
+      osVersion: '',
+      description: '',
+      ownerName: '',
+    };
+  }, [asset]);
 
   const createMutation = useMutation({
-    mutationFn: assetApi.createAsset,
+    mutationFn: (data: Partial<Asset>) =>
+      assetApi.createAsset({ ...data, label_ids: selectedLabelIds } as unknown as Partial<Asset>),
     onSuccess: () => {
       message.success('资产创建成功');
       queryClient.invalidateQueries({ queryKey: ['assets'] });
@@ -43,8 +79,8 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ open, onClose, asset })
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Asset> }) =>
-      assetApi.updateAsset(id, data),
+    mutationFn: ({ id, data }: { id: number; data: Partial<Asset> & { label_ids?: number[] } }) =>
+      assetApi.updateAsset(id, { ...data, label_ids: selectedLabelIds } as unknown as Partial<Asset>),
     onSuccess: () => {
       message.success('资产更新成功');
       queryClient.invalidateQueries({ queryKey: ['assets'] });
@@ -57,6 +93,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ open, onClose, asset })
 
   const handleClose = () => {
     form.resetFields();
+    setSelectedLabelIds([]);
     onClose();
   };
 
@@ -68,8 +105,8 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ open, onClose, asset })
       } else {
         createMutation.mutate(values);
       }
-    } catch (error) {
-      console.error('Validation failed:', error);
+    } catch {
+      console.error('Validation failed');
     }
   };
 
@@ -85,6 +122,8 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ open, onClose, asset })
       )}
     </Space>
   );
+
+  const labels = labelsData || [];
 
   return (
     <Modal
@@ -103,7 +142,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ open, onClose, asset })
       onOk={handleSubmit}
       confirmLoading={isLoading}
       width={700}
-      destroyOnHidden
+      destroyOnClose
     >
       {isPrometheusSource && (
         <Alert
@@ -115,7 +154,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ open, onClose, asset })
         />
       )}
 
-      <Form form={form} layout="vertical" preserve={false}>
+      <Form form={form} layout="vertical" preserve={false} initialValues={initialValues}>
         <Row gutter={16}>
           <Col span={12}>
             <Form.Item
@@ -170,17 +209,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ open, onClose, asset })
 
         <Row gutter={16}>
           <Col span={12}>
-            <Form.Item
-              name="ipAddress"
-              label={renderLabel('IP地址', isPrometheusSource)}
-              rules={[
-                { required: true, message: '请输入IP地址' },
-                {
-                  pattern: /^((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)$/,
-                  message: '请输入有效的IP地址',
-                },
-              ]}
-            >
+            <Form.Item name="ipAddress" label={renderLabel('IP地址', isPrometheusSource)}>
               <Input placeholder="请输入IP地址" disabled={isPrometheusSource} />
             </Form.Item>
           </Col>
@@ -218,6 +247,32 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ open, onClose, asset })
           <Col span={12}>
             <Form.Item name="osVersion" label={renderLabel('系统版本', isPrometheusSource)}>
               <Input placeholder="请输入系统版本" disabled={isPrometheusSource} />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item name="ownerName" label="负责人">
+              <Input placeholder="请输入负责人姓名" />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item label="标签">
+              <Select
+                mode="multiple"
+                placeholder="请选择标签"
+                value={selectedLabelIds}
+                onChange={setSelectedLabelIds}
+                style={{ width: '100%' }}
+                optionFilterProp="children"
+              >
+                {labels.map((label: Label) => (
+                  <Option key={label.id} value={label.id}>
+                    <Tag color={label.color}>{label.name}</Tag>
+                  </Option>
+                ))}
+              </Select>
             </Form.Item>
           </Col>
         </Row>

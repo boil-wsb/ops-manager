@@ -15,10 +15,16 @@ from app.config import settings
 from app.models.base import BaseModel
 
 # Import all models to ensure they are registered with SQLAlchemy
-from app.models.user import User, user_roles
-from app.models.permission import Permission, Role, role_permissions
-from app.models.asset import Asset, Label, asset_labels
-from app.models.monitor import Monitor, Alert, AlertRule, NotificationChannel
+from app.models import (
+    User, user_roles,
+    Permission, Role, role_permissions,
+    Asset, Label, asset_labels,
+    Monitor, Alert, AlertRule, NotificationChannel,
+    AuditLog,
+    NavigationLink, navigation_link_roles,
+    ITFeedback,
+    Deployment, InspectionTask, InspectionReport, Certificate, DNSRecord,
+)
 
 # this is the Alembic Config object
 config = context.config

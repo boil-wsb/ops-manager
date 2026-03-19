@@ -3,7 +3,7 @@ User schemas.
 """
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 import re
 
 from app.schemas.base import BaseResponse
@@ -38,6 +38,7 @@ class UserUpdate(BaseModel):
     email: Optional[str] = None
     full_name: Optional[str] = Field(None, max_length=100)
     is_active: Optional[bool] = None
+    is_superuser: Optional[bool] = None
     password: Optional[str] = Field(None, min_length=8, max_length=100)
     role_ids: Optional[List[int]] = None
     
@@ -65,6 +66,8 @@ class UserInDB(UserBase):
 
 class UserResponse(UserBase):
     """User response schema."""
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     is_superuser: bool
     last_login: Optional[datetime] = None

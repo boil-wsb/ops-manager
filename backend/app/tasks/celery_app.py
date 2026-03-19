@@ -27,9 +27,9 @@ celery_app.conf.update(
     accept_content=["json"],
     result_serializer="json",
     
-    # Timezone
-    timezone="UTC",
-    enable_utc=True,
+    # Timezone - Use Asia/Shanghai for local time
+    timezone="Asia/Shanghai",
+    enable_utc=False,
     
     # Task settings
     task_track_started=True,
@@ -63,14 +63,14 @@ def setup_periodic_tasks(sender, **kwargs):
         name="check-all-monitors"
     )
 
-    # Add periodic task for audit log database cleanup - daily at 03:00 UTC
+    # Add periodic task for audit log database cleanup - daily at 03:00 (Asia/Shanghai)
     sender.add_periodic_task(
         crontab(hour=3, minute=0),
         cleanup_audit_logs_db.s(),
         name="cleanup-audit-logs-db"
     )
 
-    # Add periodic task for audit log file cleanup - daily at 03:30 UTC
+    # Add periodic task for audit log file cleanup - daily at 03:30 (Asia/Shanghai)
     sender.add_periodic_task(
         crontab(hour=3, minute=30),
         cleanup_audit_logs_file.s(),

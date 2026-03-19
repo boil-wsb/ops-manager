@@ -1,5 +1,6 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '../stores/authStore';
+import { toSnakeCaseObj, toCamelCaseObj } from '../utils/transform';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api/v1',
@@ -115,6 +116,10 @@ api.interceptors.request.use(
       }
     }
 
+    if (config.data && typeof config.data === 'object') {
+      config.data = toSnakeCaseObj(config.data as Record<string, unknown>);
+    }
+
     return config;
   },
   (error) => {
@@ -124,6 +129,9 @@ api.interceptors.request.use(
 
 api.interceptors.response.use(
   (response) => {
+    if (response.data && typeof response.data === 'object') {
+      response.data = toCamelCaseObj(response.data as Record<string, unknown>);
+    }
     return response;
   },
   async (error: AxiosError) => {
