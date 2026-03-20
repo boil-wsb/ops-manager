@@ -100,8 +100,6 @@ const CertificateList = () => {
 
   return (
     <div>
-      <h1>证书管理</h1>
-
       <Card style={{ marginBottom: 24 }}>
         <Space wrap>
           <Select

@@ -129,8 +129,6 @@ const Dashboard = () => {
         </Card>
       )}
 
-      <h1 style={{ marginBottom: 24 }}>仪表盘</h1>
-
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} lg={6}>
           <Card loading={monitorLoading}>

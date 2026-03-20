@@ -6,7 +6,7 @@ import {
   Tag,
   Card,
   Input,
-  message,
+  App,
   Popconfirm,
   Typography,
   Tooltip,
@@ -26,6 +26,7 @@ const { Title } = Typography;
 const { Search } = Input;
 
 const RoleList = () => {
+  const { message } = App.useApp();
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
@@ -48,7 +49,7 @@ const RoleList = () => {
       });
       setRoles(response.data.items);
       setTotal(response.data.total);
-    } catch (error) {
+    } catch {
       message.error('获取角色列表失败');
     } finally {
       setLoading(false);
@@ -57,6 +58,7 @@ const RoleList = () => {
 
   useEffect(() => {
     fetchRoles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, pageSize]);
 
   const handleCreate = () => {
@@ -74,8 +76,9 @@ const RoleList = () => {
       await roleApi.deleteRole(id);
       message.success('删除成功');
       fetchRoles();
-    } catch (error: any) {
-      message.error(error.response?.data?.detail || '删除失败');
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { detail?: string } } };
+      message.error(err.response?.data?.detail || '删除失败');
     }
   };
 
@@ -166,7 +169,7 @@ const RoleList = () => {
       title: '操作',
       key: 'action',
       width: 200,
-      render: (_: any, record: Role) => (
+      render: (_: unknown, record: Role) => (
         <Space size="small">
           <Tooltip title="分配权限">
             <Button

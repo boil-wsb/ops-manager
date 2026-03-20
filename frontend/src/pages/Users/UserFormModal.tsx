@@ -114,7 +114,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ open, onClose, user }) =>
       onOk={handleSubmit}
       confirmLoading={isLoading}
       width={600}
-      destroyOnHidden
+      destroyOnClose
       mask={{ closable: false }}
       keyboard={false}
     >

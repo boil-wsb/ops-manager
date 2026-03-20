@@ -976,24 +976,28 @@ End Sub
 '==========================================================================
 Sub ReportToServer()
     Dim http, postData, retryCount
-    Dim contentType
+    Dim contentType, endpointUrl
     
     On Error Resume Next
     
     If LCase(g_httpFormat) = "prometheus" Then
         postData = BuildPrometheusMetrics()
         contentType = "text/plain"
-        WScript.Echo "Reporting Prometheus metrics to: " & g_httpEndpoint
+        ' Build unique endpoint URL with instance identifier to prevent metrics overwriting
+        ' Use UUID as instance identifier to ensure each device has its own metric group
+        endpointUrl = g_httpEndpoint & "/instance/" & g_uuid
+        WScript.Echo "Reporting Prometheus metrics to: " & endpointUrl
     Else
         postData = BuildReportJSON()
         contentType = "application/json"
-        WScript.Echo "Reporting JSON data to: " & g_httpEndpoint
+        endpointUrl = g_httpEndpoint
+        WScript.Echo "Reporting JSON data to: " & endpointUrl
     End If
     
     retryCount = 0
     Do While retryCount < g_httpRetryCount
         Set http = CreateObject("Microsoft.XMLHTTP")
-        http.Open "POST", g_httpEndpoint, False
+        http.Open "POST", endpointUrl, False
         http.SetRequestHeader "Content-Type", contentType
         http.Send postData
         

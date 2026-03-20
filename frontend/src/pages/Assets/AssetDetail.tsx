@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom';
-import { Card, Descriptions, Tag, Button, Space, message, Row, Col, Statistic } from 'antd';
+import { Card, Descriptions, Tag, Button, Space, App, Row, Col, Statistic } from 'antd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeftOutlined, CloudOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -24,6 +24,7 @@ const AssetDetail = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { hasPermission } = usePermission();
+  const { message } = App.useApp();
 
   const { data: asset, isLoading } = useQuery({
     queryKey: ['asset', id],

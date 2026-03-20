@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, Table, Button, Tag, Space, message, Alert, Statistic, Row, Col, Popconfirm } from 'antd';
+import { Card, Table, Button, Tag, Space, App, Alert, Statistic, Row, Col, Popconfirm } from 'antd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CloudOutlined, ImportOutlined, ReloadOutlined, ArrowLeftOutlined, CheckSquareOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -8,6 +8,7 @@ import { assetApi } from '../../services/assets';
 const AssetDiscovery = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { message } = App.useApp();
   const [importingInstances, setImportingInstances] = useState<Set<string>>(new Set());
   const [selectedInstances, setSelectedInstances] = useState<string[]>([]);
 
@@ -35,7 +36,7 @@ const AssetDiscovery = () => {
       queryClient.invalidateQueries({ queryKey: ['prometheus-discovery'] });
       queryClient.invalidateQueries({ queryKey: ['assets'] });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       message.error(`导入失败: ${error.message || '未知错误'}`);
     },
   });
@@ -50,8 +51,9 @@ const AssetDiscovery = () => {
         try {
           const result = await assetApi.importPrometheusAsset(instance);
           results.push(result);
-        } catch (error: any) {
-          errors.push({ instance, error: error.message || '未知错误' });
+        } catch (error: unknown) {
+          const err = error as Error;
+          errors.push({ instance, error: err.message || '未知错误' });
         } finally {
           setImportingInstances(prev => {
             const newSet = new Set(prev);
@@ -75,7 +77,7 @@ const AssetDiscovery = () => {
       queryClient.invalidateQueries({ queryKey: ['prometheus-discovery'] });
       queryClient.invalidateQueries({ queryKey: ['assets'] });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       message.error(`批量导入失败: ${error.message || '未知错误'}`);
     },
   });
@@ -103,10 +105,10 @@ const AssetDiscovery = () => {
     {
       title: '操作系统',
       key: 'os',
-      render: (_: any, record: any) => (
-        <Space orientation="vertical" size={0}>
-          <span>{record.sysname || '-'}</span>
-          <span style={{ fontSize: 12, color: '#999' }}>{record.release || ''}</span>
+      render: (_: unknown, record: Record<string, unknown>) => (
+        <Space size={0}>
+          <span>{(record.sysname as string) || '-'}</span>
+          <span style={{ fontSize: 12, color: '#999' }}>{(record.release as string) || ''}</span>
         </Space>
       ),
     },
@@ -131,18 +133,21 @@ const AssetDiscovery = () => {
     {
       title: '操作',
       key: 'action',
-      render: (_: any, record: any) => (
-        <Button
-          type="primary"
-          size="small"
-          icon={<ImportOutlined />}
-          onClick={() => importMutation.mutate(record.instance)}
-          loading={importingInstances.has(record.instance)}
-          disabled={importingInstances.has(record.instance)}
-        >
-          导入
-        </Button>
-      ),
+      render: (_: unknown, record: Record<string, unknown>) => {
+        const instanceId = record.instance as string;
+        return (
+          <Button
+            type="primary"
+            size="small"
+            icon={<ImportOutlined />}
+            onClick={() => importMutation.mutate(instanceId)}
+            loading={importingInstances.has(instanceId)}
+            disabled={importingInstances.has(instanceId)}
+          >
+            导入
+          </Button>
+        );
+      },
     },
   ];
 

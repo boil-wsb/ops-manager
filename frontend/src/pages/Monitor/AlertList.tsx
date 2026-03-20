@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Table, Button, Select, Space, Card, Modal, message } from 'antd';
+import { Table, Button, Select, Space, Card, Modal, App } from 'antd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircleOutlined, EyeOutlined } from '@ant-design/icons';
 import type { Alert } from '../../types';
@@ -8,6 +8,7 @@ import StatusTag from '../../components/StatusTag';
 
 const AlertList = () => {
   const queryClient = useQueryClient();
+  const { message } = App.useApp();
   const [filter, setFilter] = useState({
     status: undefined as string | undefined,
     severity: undefined as string | undefined,
@@ -66,7 +67,7 @@ const AlertList = () => {
     {
       title: '操作',
       key: 'action',
-      render: (_: any, record: Alert) => (
+      render: (_: unknown, record: Alert) => (
         <Space size="small">
           <Button
             type="text"
@@ -109,8 +110,6 @@ const AlertList = () => {
 
   return (
     <div>
-      <h1>告警事件</h1>
-
       <Card style={{ marginBottom: 24 }}>
         <Space wrap>
           <Select

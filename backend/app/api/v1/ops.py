@@ -231,7 +231,7 @@ async def list_certificates(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     status: Optional[str] = Query(None),
-    expiring_soon: bool = Query(False),
+    expiring_soon: Optional[bool] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user = require_permissions(["ops:read"])
 ):
@@ -241,8 +241,10 @@ async def list_certificates(
     if status:
         query = query.where(Certificate.status == status)
     
-    if expiring_soon:
+    if expiring_soon is True:
         query = query.where(Certificate.days_until_expiry <= Certificate.alert_threshold_days)
+    elif expiring_soon is False:
+        query = query.where(Certificate.days_until_expiry > Certificate.alert_threshold_days)
     
     query = query.offset(skip).limit(limit).order_by(Certificate.valid_until.asc())
     result = await db.execute(query)

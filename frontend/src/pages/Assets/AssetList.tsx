@@ -544,7 +544,6 @@ const AssetList = () => {
 
   return (
     <div>
-      <h1 style={{ marginBottom: 24 }}>资产管理</h1>
       <Tabs
         activeKey={activeTab}
         items={tabItems}

@@ -84,8 +84,6 @@ const DeploymentList = () => {
 
   return (
     <div>
-      <h1>发布记录</h1>
-
       <Card style={{ marginBottom: 24 }}>
         <Space wrap>
           <Select

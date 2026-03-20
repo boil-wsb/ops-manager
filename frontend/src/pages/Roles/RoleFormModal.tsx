@@ -66,7 +66,7 @@ const RoleFormModal = ({ visible, onCancel, onSuccess, role }: RoleFormModalProp
       onCancel={onCancel}
       okText={isEditing ? '更新' : '创建'}
       cancelText="取消"
-      destroyOnHidden
+      destroyOnClose
     >
       <Form
         form={form}

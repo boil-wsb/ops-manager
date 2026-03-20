@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Table, Button, Select, Space, Card, Switch, message } from 'antd';
+import { Table, Button, Select, Space, Card, Switch, App } from 'antd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PlusOutlined, PlayCircleOutlined, PauseCircleOutlined } from '@ant-design/icons';
 import { monitorApi } from '../../services/monitor';
@@ -8,6 +8,7 @@ import type { Monitor } from '../../types';
 
 const MonitorList = () => {
   const queryClient = useQueryClient();
+  const { message } = App.useApp();
   const [filter, setFilter] = useState({
     monitorType: undefined as string | undefined,
     status: undefined as string | undefined,
@@ -77,7 +78,7 @@ const MonitorList = () => {
     {
       title: '启用',
       key: 'isEnabled',
-      render: (_: any, record: Monitor) => (
+      render: (_: unknown, record: Monitor) => (
         <Switch
           checked={record.isEnabled}
           onChange={() => toggleMutation.mutate(record.id)}
@@ -90,8 +91,6 @@ const MonitorList = () => {
 
   return (
     <div>
-      <h1>监控管理</h1>
-
       <Card style={{ marginBottom: 24 }}>
         <Space wrap>
           <Select

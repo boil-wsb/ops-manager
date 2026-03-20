@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Table, Button, Input, Select, Tag, Space, Card, message, Popconfirm } from 'antd';
+import { Table, Button, Input, Select, Tag, Space, Card, App, Popconfirm } from 'antd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { userApi } from '../../services/users';
@@ -12,6 +12,7 @@ const { Option } = Select;
 
 const UserList = () => {
   const queryClient = useQueryClient();
+  const { message } = App.useApp();
   const [searchParams, setSearchParams] = useState({
     keyword: '',
     isActive: undefined as boolean | undefined,
@@ -125,7 +126,6 @@ const UserList = () => {
 
   return (
     <div>
-      <h1>用户管理</h1>
       <Card style={{ marginBottom: 24 }}>
         <Space wrap>
           <Input

@@ -1,4 +1,4 @@
-import { Card, Form, Input, Button, message, Descriptions, Divider } from 'antd';
+import { Card, Form, Input, Button, App, Descriptions, Divider } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { UserOutlined, LockOutlined, SaveOutlined } from '@ant-design/icons';
 import { useAuthStore } from '../../stores/authStore';
@@ -8,6 +8,7 @@ import type { User } from '../../types';
 const Profile = () => {
   const { user, setUser } = useAuthStore();
   const queryClient = useQueryClient();
+  const { message } = App.useApp();
   const [passwordForm] = Form.useForm();
   const [profileForm] = Form.useForm();
 
@@ -71,8 +72,6 @@ const Profile = () => {
 
   return (
     <div>
-      <h1>个人中心</h1>
-      
       <Card style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
           <div

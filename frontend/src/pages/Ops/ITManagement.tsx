@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Card, Table, Tag, Button, Space, Input, Select, Modal, Form, message, Popconfirm } from 'antd';
+import { Card, Table, Tag, Button, Space, Input, Select, Modal, Form, App, Popconfirm } from 'antd';
 import { itFeedbackApi, type ITFeedback } from '../../services/itFeedback';
 
 const { TextArea } = Input;
@@ -37,6 +37,7 @@ const lagLevelLabels: Record<string, string> = {
 };
 
 const ITManagement = () => {
+  const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [feedbackList, setFeedbackList] = useState<ITFeedback[]>([]);
   const [total, setTotal] = useState(0);
@@ -65,7 +66,7 @@ const ITManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, pageSize, filters]);
+  }, [currentPage, pageSize, filters, message]);
 
   useEffect(() => {
     fetchFeedbackList();
