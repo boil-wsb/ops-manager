@@ -72,6 +72,8 @@ setup-env:
 backend-lint:
   stage: lint
   image: $PYTHON_IMAGE
+  tags:
+    - ops-docker
   before_script:
     - cd backend
     - export PYTHONPATH=$PWD:$PYTHONPATH
@@ -89,6 +91,8 @@ backend-lint:
 frontend-lint:
   stage: lint
   image: $NODE_IMAGE
+  tags:
+    - ops-docker
   before_script:
     - cd frontend
     - npm ci
@@ -104,6 +108,8 @@ frontend-lint:
 frontend-typecheck:
   stage: lint
   image: $NODE_IMAGE
+  tags:
+    - ops-docker
   before_script:
     - cd frontend
     - npm ci
@@ -119,6 +125,8 @@ frontend-typecheck:
 backend-test:
   stage: test
   image: $PYTHON_IMAGE
+  tags:
+    - ops-docker
   before_script:
     - cd backend
     - export PYTHONPATH=$PWD:$PYTHONPATH
@@ -145,6 +153,8 @@ backend-test:
 backend-security:
   stage: test
   image: $PYTHON_IMAGE
+  tags:
+    - ops-docker
   before_script:
     - cd backend
     - pip install -r requirements/dev.txt -q
