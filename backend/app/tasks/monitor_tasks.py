@@ -2,8 +2,8 @@
 Monitor check tasks.
 """
 import asyncio
-import subprocess
 import socket
+import subprocess
 import time
 from datetime import datetime
 from typing import Optional
@@ -201,9 +201,9 @@ def check_monitor(self, monitor_id: int):
     from app.models.monitor import Monitor, Alert, MonitorStatus, AlertSeverity
     
     async def _check():
-        SessionLocal = get_celery_async_session()
-        
-        async with SessionLocal() as db:
+        session_local = get_celery_async_session()
+
+        async with session_local() as db:
             result = await db.execute(
                 select(Monitor).where(Monitor.id == monitor_id)
             )
@@ -267,19 +267,19 @@ def check_all_monitors():
     """Check all enabled monitors."""
     from sqlalchemy import select
     from app.models.monitor import Monitor
-    
+
     async def _check_all():
-        SessionLocal = get_celery_async_session()
-        
-        async with SessionLocal() as db:
+        session_local = get_celery_async_session()
+
+        async with session_local() as db:
             result = await db.execute(
-                select(Monitor).where(Monitor.is_enabled == True)
+                select(Monitor).where(Monitor.is_enabled is True)
             )
             monitors = result.scalars().all()
-            
+
             logger.info(f"Checking {len(monitors)} monitors")
-            
+
             for monitor in monitors:
                 check_monitor.delay(monitor.id)
-    
+
     asyncio.run(_check_all())

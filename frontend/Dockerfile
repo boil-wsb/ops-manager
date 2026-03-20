@@ -1,5 +1,5 @@
 # Build stage
-FROM 192.168.100.213:8083/devops/node:18-alpine as builder
+FROM 192.168.100.213:8083/devops/node:24-alpine as builder
 
 WORKDIR /app
 

@@ -12,7 +12,7 @@ default:
 
 variables:
   PYTHON_IMAGE: 192.168.100.213:8083/devops/python:3.12-slim
-  NODE_IMAGE: 192.168.100.213:8083/devops/node:18-alpine
+  NODE_IMAGE: 192.168.100.213:8083/devops/node:24-alpine
   DOCKER_IMAGE_BACKEND: opsmanager/backend:v1.0.$CI_PIPELINE_IID
   DOCKER_IMAGE_FRONTEND: opsmanager/frontend:v1.0.$CI_PIPELINE_IID
   REMOTE_USER: root
