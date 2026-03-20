@@ -5,6 +5,7 @@ import {
   Input,
   message,
 } from 'antd';
+import { AxiosError } from 'axios';
 import { roleApi, type Role, type CreateRoleRequest, type UpdateRoleRequest } from '../../services/permissions';
 
 interface RoleFormModalProps {
@@ -53,8 +54,9 @@ const RoleFormModal = ({ visible, onCancel, onSuccess, role }: RoleFormModalProp
       }
 
       onSuccess();
-    } catch (error: any) {
-      message.error(error.response?.data?.detail || '操作失败');
+    } catch (error: unknown) {
+      const err = error as AxiosError<{ detail: string }>;
+      message.error(err.response?.data?.detail || '操作失败');
     }
   };
 

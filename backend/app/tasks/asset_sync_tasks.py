@@ -12,7 +12,7 @@ from celery import shared_task
 
 from app.config import settings
 from app.tasks.utils import get_celery_async_session
-from app.services.prometheus.asset_sync import AssetSyncService, sync_assets_from_prometheus
+from app.services.prometheus.asset_sync_optimized import OptimizedAssetSyncService
 
 logger = logging.getLogger(__name__)
 
@@ -38,10 +38,11 @@ def sync_assets_from_prometheus_task(self) -> Dict[str, Any]:
 
     async def _sync():
         SessionLocal = get_celery_async_session()
-        
+
         async with SessionLocal() as db:
             try:
-                result = await sync_assets_from_prometheus(db)
+                service = OptimizedAssetSyncService(db)
+                result = await service.sync_all_assets()
 
                 end_time = datetime.utcnow()
                 duration = (end_time - start_time).total_seconds()
@@ -110,7 +111,7 @@ def sync_single_asset_task(self, instance: str) -> Dict[str, Any]:
         
         async with SessionLocal() as db:
             try:
-                service = AssetSyncService(db)
+                service = OptimizedAssetSyncService(db)
                 result = await service.sync_single_asset(instance)
 
                 if result["success"]:

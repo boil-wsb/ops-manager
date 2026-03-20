@@ -6,8 +6,8 @@ interface PaginationState {
   pageSize: number;
 }
 
-interface UseListQueryOptions<TParams> {
-  queryFn: (params: TParams & { skip: number; limit: number }) => Promise<{ total: number; items: any[] }>;
+interface UseListQueryOptions<TParams, TItem> {
+  queryFn: (params: TParams & { skip: number; limit: number }) => Promise<{ total: number; items: TItem[] }>;
   queryKey: string;
   initialFilter?: Partial<TParams>;
 }
@@ -21,8 +21,8 @@ interface UseListQueryReturn<T, TParams> {
   setFilter: (filter: TParams) => void;
 }
 
-function useListQuery<T, TParams extends Record<string, any>>(
-  options: UseListQueryOptions<TParams>
+function useListQuery<T, TParams>(
+  options: UseListQueryOptions<TParams, T>
 ): UseListQueryReturn<T, TParams> {
   const { queryFn, queryKey, initialFilter } = options;
 

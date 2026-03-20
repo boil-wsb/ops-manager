@@ -22,6 +22,7 @@ from app.core.security import (
 from app.core.audit import audit_log
 from app.config import settings
 from app.models.user import User
+from app.core.rate_limit import limiter
 
 router = APIRouter(prefix="/auth")
 security = HTTPBearer(auto_error=False)
@@ -100,6 +101,7 @@ async def get_current_user(
 
 
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit("5/minute")
 @audit_log(operation_type="LOGIN", module="system")
 async def login(
     request: Request,

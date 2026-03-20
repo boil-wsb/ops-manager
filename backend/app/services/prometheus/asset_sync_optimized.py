@@ -194,6 +194,63 @@ class OptimizedAssetSyncService:
         logger.info(f"Batch sync completed: {results}")
         return results
 
+    async def sync_all_assets(self) -> Dict[str, Any]:
+        """
+        从 Prometheus 获取所有节点并同步到数据库
+
+        Returns:
+            同步统计信息字典
+        """
+        stats = {
+            "total": 0,
+            "created": 0,
+            "updated": 0,
+            "failed": 0,
+            "errors": [],
+            "start_time": datetime.utcnow().isoformat(),
+            "end_time": None,
+        }
+
+        try:
+            nodes = await self._get_cached_nodes(force_refresh=True)
+            stats["total"] = len(nodes)
+
+            logger.info(f"Starting sync for {len(nodes)} nodes from Prometheus")
+
+            for node in nodes:
+                instance = node.get("instance", "")
+                if not instance:
+                    stats["failed"] += 1
+                    stats["errors"].append("Empty instance in node data")
+                    continue
+
+                result = await self.sync_single_asset(instance, force_refresh=False)
+
+                if result["success"]:
+                    if result["action"] == "created":
+                        stats["created"] += 1
+                    elif result["action"] == "updated":
+                        stats["updated"] += 1
+                else:
+                    stats["failed"] += 1
+                    if result["error"]:
+                        stats["errors"].append(f"{instance}: {result['error']}")
+
+            stats["end_time"] = datetime.utcnow().isoformat()
+            logger.info(
+                f"Sync completed. Total: {stats['total']}, "
+                f"Created: {stats['created']}, Updated: {stats['updated']}, "
+                f"Failed: {stats['failed']}"
+            )
+
+        except Exception as e:
+            stats["failed"] += 1
+            stats["errors"].append(f"Sync error: {str(e)}")
+            stats["end_time"] = datetime.utcnow().isoformat()
+            logger.error(f"Failed to sync all assets: {e}")
+
+        return stats
+
     def _extract_ip_from_instance(self, instance: str) -> str:
         """从 instance 字符串中提取 IP 地址"""
         if not instance:

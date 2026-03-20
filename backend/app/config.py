@@ -2,27 +2,27 @@
 Application configuration using Pydantic Settings.
 """
 from typing import List, Optional, Union
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Application settings."""
-    
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
     )
-    
+
     # Application
     app_name: str = Field(default="OpsManager V2", alias="APP_NAME")
     app_version: str = Field(default="1.0.0", alias="APP_VERSION")
     debug: bool = Field(default=False, alias="DEBUG")
-    
+
     # Security
     secret_key: str = Field(default="your-secret-key-change-in-production", alias="SECRET_KEY")
-    access_token_expire_minutes: int = Field(default=480, alias="ACCESS_TOKEN_EXPIRE_MINUTES")  # 8 hours
+    access_token_expire_minutes: int = Field(default=480, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     refresh_token_expire_days: int = Field(default=7, alias="REFRESH_TOKEN_EXPIRE_DAYS")
     algorithm: str = Field(default="HS256", alias="ALGORITHM")
     
@@ -89,6 +89,21 @@ class Settings(BaseSettings):
         if self.database_url.startswith("postgresql://"):
             return self.database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
         return self.database_url
+
+    @model_validator(mode="after")
+    def validate_production_security(self) -> "Settings":
+        """Validate security settings in production environment."""
+        if not self.debug:
+            if self.secret_key == "your-secret-key-change-in-production":
+                raise ValueError(
+                    "SECRET_KEY must be set in production environment. "
+                    "Please set a secure random string via SECRET_KEY environment variable."
+                )
+            if len(self.secret_key) < 32:
+                raise ValueError(
+                    "SECRET_KEY must be at least 32 characters long for security."
+                )
+        return self
 
 
 # Global settings instance

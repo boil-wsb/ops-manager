@@ -1,5 +1,7 @@
 stages:
   - setup
+  - lint
+  - test
   - build
   - deploy
 
@@ -9,11 +11,14 @@ default:
     - runner-192.168.23.36
 
 variables:
+  PYTHON_IMAGE: 192.168.100.213:8083/devops/python:3.12-slim
+  NODE_IMAGE: 192.168.100.213:8083/devops/node:18-alpine
   DOCKER_IMAGE_BACKEND: opsmanager/backend:v1.0.$CI_PIPELINE_IID
   DOCKER_IMAGE_FRONTEND: opsmanager/frontend:v1.0.$CI_PIPELINE_IID
   REMOTE_USER: root
   REMOTE_HOST: "192.168.23.36"
   REMOTE_DIR: "/opt/ops-manager"
+  COVERAGE_MIN: "80"
 
 ### RULES REUSED VIA YAML ANCHORS:
 .if-release-branch: &if-release-branch
@@ -58,6 +63,99 @@ setup-env:
     - echo "VERSION=${VERSION}"
     - echo "DOCKER_IMAGE_BACKEND=${DOCKER_IMAGE_BACKEND}"
     - echo "DOCKER_IMAGE_FRONTEND=${DOCKER_IMAGE_FRONTEND}"
+  artifacts:
+    reports:
+      dotenv:
+        - build.env
+
+# Lint Stage - Backend
+backend-lint:
+  stage: lint
+  image: $PYTHON_IMAGE
+  before_script:
+    - cd backend
+    - export PYTHONPATH=$PWD:$PYTHONPATH
+    - pip install -r requirements/dev.txt -q
+  script:
+    - ruff check app/
+    - ruff format --check app/
+  rules:
+    - <<: *if-merge-request
+    - <<: *if-master-branch
+    - <<: *if-release-branch
+  allow_failure: false
+
+# Lint Stage - Frontend
+frontend-lint:
+  stage: lint
+  image: $NODE_IMAGE
+  before_script:
+    - cd frontend
+    - npm ci
+  script:
+    - npm run lint
+  rules:
+    - <<: *if-merge-request
+    - <<: *if-master-branch
+    - <<: *if-release-branch
+  allow_failure: false
+
+# Type Check - Frontend
+frontend-typecheck:
+  stage: lint
+  image: $NODE_IMAGE
+  before_script:
+    - cd frontend
+    - npm ci
+  script:
+    - npx tsc --noEmit
+  rules:
+    - <<: *if-merge-request
+    - <<: *if-master-branch
+    - <<: *if-release-branch
+  allow_failure: false
+
+# Test Stage - Backend
+backend-test:
+  stage: test
+  image: $PYTHON_IMAGE
+  before_script:
+    - cd backend
+    - export PYTHONPATH=$PWD:$PYTHONPATH
+    - pip install -r requirements/dev.txt -q
+    - pip install -e . -q
+  script:
+    - pytest tests/ -v --cov=app --cov-report=xml --cov-report=html --cov-fail-under=$COVERAGE_MIN
+  coverage: '/(?i)TOTAL.*\s+(\d+\.\d+\%)/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - coverage/
+    expire_in: 1 week
+  rules:
+    - <<: *if-merge-request
+    - <<: *if-master-branch
+    - <<: *if-release-branch
+  allow_failure: false
+
+# Security Scan - Backend
+backend-security:
+  stage: test
+  image: $PYTHON_IMAGE
+  before_script:
+    - cd backend
+    - pip install -r requirements/dev.txt -q
+  script:
+    - safety check --json
+    - bandit -r app/ -f json -o bandit-report.json
+  rules:
+    - <<: *if-merge-request
+    - <<: *if-master-branch
+    - <<: *if-release-branch
+  allow_failure: true
 
 # Build Stage - Backend
 docker-build-backend:
@@ -94,23 +192,23 @@ deploy-docker:
       echo "=== Deploying OpsManager ==="
       echo "Backend Image: $REGISTRY_URL/$DOCKER_IMAGE_BACKEND"
       echo "Frontend Image: $REGISTRY_URL/$DOCKER_IMAGE_FRONTEND"
-      
+
       # Export environment variables for docker-compose
       export REGISTRY_URL=$REGISTRY_URL
       export VERSION=v1.0.$CI_PIPELINE_IID
-      
+
       # Pull latest images
       cd $REMOTE_DIR
       docker-compose pull
-      
+
       # Restart services with new images
       docker-compose down
       docker-compose up -d
-      
+
       # Wait for services to be healthy
       echo "Waiting for services to start..."
       sleep 10
-      
+
       # Check health
       if curl -f http://localhost:8080/health > /dev/null 2>&1; then
         echo "=== Deployment successful ==="
