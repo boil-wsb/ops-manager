@@ -191,14 +191,14 @@ const RoleList = () => {
             onConfirm={() => handleDelete(record.id)}
             okText="确定"
             cancelText="取消"
-            disabled={record.isSystem || record.userCount > 0}
+            disabled={!!record.isSystem || !!record.userCount}
           >
-            <Tooltip title={record.isSystem ? '系统角色不能删除' : record.userCount > 0 ? '角色下还有用户' : '删除'}>
+            <Tooltip title={record.isSystem ? '系统角色不能删除' : record.userCount ? '角色下还有用户' : '删除'}>
               <Button
                 type="text"
                 danger
                 icon={<DeleteOutlined />}
-                disabled={record.isSystem || record.userCount > 0}
+                disabled={!!record.isSystem || !!record.userCount}
               />
             </Tooltip>
           </Popconfirm>

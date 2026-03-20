@@ -17,6 +17,7 @@ celery_app = Celery(
         "app.tasks.notification_tasks",
         "app.tasks.audit_log_cleanup",
         "app.tasks.asset_sync_tasks",
+        "app.tasks.certificate_sync_tasks",
     ]
 )
 
@@ -55,6 +56,7 @@ def setup_periodic_tasks(sender, **kwargs):
     from app.tasks.monitor_tasks import check_all_monitors
     from app.tasks.audit_log_cleanup import cleanup_audit_logs_db, cleanup_audit_logs_file
     from app.tasks.asset_sync_tasks import sync_assets_from_prometheus_task, get_sync_interval
+    from app.tasks.certificate_sync_tasks import sync_certificates_from_prometheus_task
 
     # Add periodic task for checking monitors every minute
     sender.add_periodic_task(
@@ -83,6 +85,13 @@ def setup_periodic_tasks(sender, **kwargs):
         sync_interval,
         sync_assets_from_prometheus_task.s(),
         name="sync-assets-from-prometheus"
+    )
+
+    # Add periodic task for certificate sync from Prometheus - daily at 03:00 (Asia/Shanghai)
+    sender.add_periodic_task(
+        crontab(hour=3, minute=0),
+        sync_certificates_from_prometheus_task.s(),
+        name="sync-certificates-from-prometheus"
     )
 
 

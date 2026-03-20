@@ -40,6 +40,12 @@ export interface Role {
   user_count: number;
   created_at: string;
   updated_at: string;
+  isSystem?: boolean;
+  isActive?: boolean;
+  userCount?: number;
+  permissionCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface RoleDetail extends Role {

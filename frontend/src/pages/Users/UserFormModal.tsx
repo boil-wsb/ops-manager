@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Modal, Form, Input, Select, Switch, App } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { userApi } from '../../services/users';
-import { roleApi, type Role } from '../../services/roles';
+import { roleApi, type Role } from '../../services/permissions';
 import { useAuthStore } from '../../stores/authStore';
 import type { User } from '../../types';
 
@@ -104,7 +104,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ open, onClose, user }) =>
 
   const isLoading = createMutation.isPending || updateMutation.isPending;
 
-  const roles = rolesData?.items || [];
+  const roles = rolesData?.data?.items || [];
 
   return (
     <Modal
