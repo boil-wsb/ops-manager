@@ -5,6 +5,7 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -20,6 +21,7 @@ from app.schemas.navigation import (
 from app.core.permissions import require_permissions
 from app.core.audit import audit_log
 from app.models.user import User
+from app.models.permission import Role
 
 router = APIRouter(prefix="/navigation")
 logger = logging.getLogger(__name__)
@@ -146,8 +148,23 @@ async def update_navigation_link(
     
     role_ids = None
     if link_in.restrict_to_current_role is not None:
-        if link_in.restrict_to_current_role and current_user.roles:
-            role_ids = [role.id for role in current_user.roles]
+        if link_in.restrict_to_current_role:
+            if current_user.is_superuser:
+                role_result = await db.execute(
+                    select(Role).where(Role.name == "superadmin")
+                )
+                superadmin_role = role_result.scalar_one_or_none()
+                if superadmin_role:
+                    role_ids = [superadmin_role.id]
+                else:
+                    role_ids = []
+            elif not current_user.roles:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="当前用户没有关联角色，无法设置可见范围为当前角色，请先为用户分配角色",
+                )
+            else:
+                role_ids = [role.id for role in current_user.roles]
         else:
             role_ids = []
     

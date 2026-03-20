@@ -142,7 +142,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ open, onClose, asset })
       onOk={handleSubmit}
       confirmLoading={isLoading}
       width={700}
-      destroyOnClose
+      destroyOnHidden
     >
       {isPrometheusSource && (
         <Alert

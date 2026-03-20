@@ -37,9 +37,9 @@ export interface NavigationLinkCreate {
   url: string;
   icon?: string;
   description?: string;
-  sort_order?: number;
-  is_active?: boolean;
-  restrict_to_current_role?: boolean;
+  sortOrder?: number;
+  isActive?: boolean;
+  restrictToCurrentRole?: boolean;
 }
 
 export interface NavigationLinkUpdate {
@@ -48,9 +48,9 @@ export interface NavigationLinkUpdate {
   url?: string;
   icon?: string;
   description?: string;
-  sort_order?: number;
-  is_active?: boolean;
-  restrict_to_current_role?: boolean;
+  sortOrder?: number;
+  isActive?: boolean;
+  restrictToCurrentRole?: boolean;
 }
 
 export const navigationApi = {
