@@ -75,6 +75,7 @@ backend-lint:
   tags:
     - ops-docker
   before_script:
+    - pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
     - cd backend
     - export PYTHONPATH=$PWD:$PYTHONPATH
     - pip install -r requirements/dev.txt -q
@@ -128,6 +129,7 @@ backend-test:
   tags:
     - ops-docker
   before_script:
+    - pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
     - cd backend
     - export PYTHONPATH=$PWD:$PYTHONPATH
     - pip install -r requirements/dev.txt -q
@@ -156,6 +158,7 @@ backend-security:
   tags:
     - ops-docker
   before_script:
+    - pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
     - cd backend
     - pip install -r requirements/dev.txt -q
   script:
