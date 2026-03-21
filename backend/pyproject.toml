@@ -25,6 +25,14 @@ classifiers = [
 Homepage = "https://github.com/your-org/ops-manager-v2"
 Repository = "https://github.com/your-org/ops-manager-v2"
 
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*", "alembic*"]
+exclude = ["tests*"]
+
+[tool.setuptools.package-data]
+alembic = ["alembic.ini", "env.py", "script.py.mako"]
+
 [tool.black]
 line-length = 100
 target-version = ['py312']
