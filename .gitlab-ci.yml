@@ -134,8 +134,8 @@ backend-test:
     - export PYTHONPATH=$PWD:$PYTHONPATH
     - export SECRET_KEY=test-secret-key-for-ci-only-min-32-chars
     - export ENVIRONMENT=testing
-    - export DATABASE_URL=postgresql+asyncpg://user:pass@192.168.23.36:5432/opsmanager_test
-    - export REDIS_URL=redis://192.168.23.36:6379/0
+    - export DATABASE_URL=postgresql+asyncpg://opsmanager:opsmanager@192.168.23.36:15432/opsmanager_test
+    - export REDIS_URL=redis://192.168.23.36:16379/0
     - pip install -r requirements/dev.txt -q
   script:
     - pytest tests/ -v --cov=app --cov-report=xml --cov-report=html --cov-fail-under=$COVERAGE_MIN
