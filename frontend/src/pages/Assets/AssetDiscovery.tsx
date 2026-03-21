@@ -180,7 +180,6 @@ const AssetDiscovery = () => {
         }
       >
         <Alert
-          title="自动发现"
           description="此页面显示 Prometheus 中监控但尚未导入资产系统的节点。选择节点后点击「批量导入」按钮可一次性导入多个资产。"
           type="info"
           showIcon
@@ -193,7 +192,7 @@ const AssetDiscovery = () => {
               <Statistic
                 title="Prometheus 总节点数"
                 value={data?.total || 0}
-                styles={{ content: { color: '#1890ff' } }}
+                style={{ color: '#1890ff' }}
               />
             </Card>
           </Col>
@@ -202,7 +201,7 @@ const AssetDiscovery = () => {
               <Statistic
                 title="已导入资产数"
                 value={data?.existing || 0}
-                styles={{ content: { color: '#52c41a' } }}
+                style={{ color: '#52c41a' }}
               />
             </Card>
           </Col>
@@ -211,7 +210,7 @@ const AssetDiscovery = () => {
               <Statistic
                 title="待导入节点数"
                 value={data?.discovered || 0}
-                styles={{ content: { color: data?.discovered ? '#faad14' : '#999' } }}
+                style={{ color: data?.discovered ? '#faad14' : '#999' }}
               />
             </Card>
           </Col>

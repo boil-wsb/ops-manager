@@ -1,20 +1,28 @@
 """
 Asset models.
 """
+import enum
 from datetime import datetime
-from typing import List, Optional, Dict, Any
+from typing import Any, Optional
 
 from sqlalchemy import (
-    String, Boolean, DateTime, Text, Table, Column, ForeignKey, 
-    Integer, JSON, Index, Enum as SQLEnum
+    JSON,
+    Column,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Table,
+    Text,
 )
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-import enum
 
 from app.models.base import BaseModel
 
 
-class AssetType(str, enum.Enum):
+class AssetType(enum.StrEnum):
     """Asset type enum."""
     SERVER = "SERVER"
     VM = "VM"
@@ -23,7 +31,7 @@ class AssetType(str, enum.Enum):
     TERMINAL = "TERMINAL"
 
 
-class AssetStatus(str, enum.Enum):
+class AssetStatus(enum.StrEnum):
     """Asset status enum."""
     ACTIVE = "ACTIVE"
     OFFLINE = "OFFLINE"
@@ -31,14 +39,14 @@ class AssetStatus(str, enum.Enum):
     RETIRED = "RETIRED"
 
 
-class AssetSource(str, enum.Enum):
+class AssetSource(enum.StrEnum):
     """Asset source enum."""
     MANUAL = "MANUAL"
     PROMETHEUS = "PROMETHEUS"
     IMPORTED = "IMPORTED"
 
 
-class SyncStatus(str, enum.Enum):
+class SyncStatus(enum.StrEnum):
     """Sync status enum."""
     PENDING = "PENDING"
     SYNCED = "SYNCED"
@@ -57,58 +65,58 @@ asset_labels = Table(
 
 class Label(BaseModel):
     """Label model for tagging assets."""
-    
+
     __tablename__ = "labels"
-    
+
     name: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
     color: Mapped[str] = mapped_column(String(7), default="#1890ff", nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    
+    description: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
     # Relationships
-    assets: Mapped[List["Asset"]] = relationship(
+    assets: Mapped[list["Asset"]] = relationship(
         "Asset",
         secondary=asset_labels,
         back_populates="labels",
         lazy="selectin"
     )
-    
+
     def __repr__(self) -> str:
         return f"<Label {self.name}>"
 
 
 class Asset(BaseModel):
     """Asset model for managing IT assets."""
-    
+
     __tablename__ = "assets"
-    
+
     # Basic info
     asset_id: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     asset_type: Mapped[AssetType] = mapped_column(SQLEnum(AssetType), nullable=False)
     status: Mapped[AssetStatus] = mapped_column(
-        SQLEnum(AssetStatus), 
-        default=AssetStatus.ACTIVE, 
+        SQLEnum(AssetStatus),
+        default=AssetStatus.ACTIVE,
         nullable=False
     )
-    
+
     # Network info
-    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True, index=True)
-    private_ip: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
-    mac_address: Mapped[Optional[str]] = mapped_column(String(17), nullable=True)
-    
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True, index=True)
+    private_ip: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    mac_address: Mapped[str | None] = mapped_column(String(17), nullable=True)
+
     # Hardware info
-    cpu_cores: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    memory_gb: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    disk_gb: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    os_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    os_version: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    arch: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    
+    cpu_cores: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    memory_gb: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    disk_gb: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    os_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    os_version: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    arch: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
     # Terminal specific info (from pc_info metrics)
-    hostname: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
-    serial_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    uuid: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    customer: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    hostname: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    serial_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    uuid: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    customer: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Prometheus sync info
     source: Mapped[str] = mapped_column(
@@ -116,72 +124,72 @@ class Asset(BaseModel):
         default=AssetSource.MANUAL.value,
         nullable=False
     )
-    prometheus_instance: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    last_sync_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    prometheus_instance: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    last_sync_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     sync_status: Mapped[str] = mapped_column(
         String(50),
         default=SyncStatus.PENDING.value,
         nullable=False
     )
-    
+
     # Location info
-    idc: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    region: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    rack: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    
+    idc: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    region: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    rack: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
     # Metadata
-    labels_data: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, default=dict, nullable=True)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    
-    owner_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    
+    labels_data: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=dict, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    owner_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
     # Relationships
-    owner_id: Mapped[Optional[int]] = mapped_column(
+    owner_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True
     )
     owner: Mapped[Optional["User"]] = relationship("User", lazy="selectin")
-    labels: Mapped[List["Label"]] = relationship(
+    labels: Mapped[list["Label"]] = relationship(
         "Label",
         secondary=asset_labels,
         back_populates="assets",
         lazy="selectin"
     )
-    monitors: Mapped[List["Monitor"]] = relationship(
+    monitors: Mapped[list["Monitor"]] = relationship(
         "Monitor",
         back_populates="asset",
         lazy="selectin"
     )
-    
+
     # Indexes
     __table_args__ = (
         Index("ix_assets_status", "status"),
         Index("ix_assets_type", "asset_type"),
         Index("ix_assets_idc", "idc"),
     )
-    
+
     def __repr__(self) -> str:
         return f"<Asset {self.asset_id}: {self.name}>"
 
 
 class AssetHistory(BaseModel):
     """Asset history for tracking changes."""
-    
+
     __tablename__ = "asset_history"
-    
+
     asset_id: Mapped[int] = mapped_column(
         ForeignKey("assets.id", ondelete="CASCADE"),
         nullable=False,
         index=True
     )
     action: Mapped[str] = mapped_column(String(50), nullable=False)  # create, update, delete
-    changes: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
-    
-    operator_id: Mapped[Optional[int]] = mapped_column(
+    changes: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+
+    operator_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True
     )
     operator: Mapped[Optional["User"]] = relationship("User", lazy="selectin")
-    
+
     def __repr__(self) -> str:
         return f"<AssetHistory {self.asset_id}: {self.action}>"

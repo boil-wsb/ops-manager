@@ -2,17 +2,16 @@
 Asset schemas.
 """
 from datetime import datetime
-from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Any
 
-from app.schemas.base import BaseResponse
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class LabelBase(BaseModel):
     """Base label schema."""
     name: str = Field(..., min_length=1, max_length=100)
     color: str = Field(default="#1890ff", max_length=7)
-    description: Optional[str] = Field(None, max_length=255)
+    description: str | None = Field(None, max_length=255)
 
 
 class LabelCreate(LabelBase):
@@ -34,7 +33,7 @@ class OwnerResponse(BaseModel):
 
     id: int
     username: str
-    name: Optional[str] = None
+    name: str | None = None
 
 
 class AssetBase(BaseModel):
@@ -43,63 +42,63 @@ class AssetBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     asset_type: str = Field(..., pattern="^(SERVER|VM|NETWORK|STORAGE|TERMINAL)$")
     status: str = Field(default="ACTIVE", pattern="^(ACTIVE|OFFLINE|MAINTENANCE|RETIRED)$")
-    
+
     # Network info
-    ip_address: Optional[str] = Field(None, max_length=45)
-    private_ip: Optional[str] = Field(None, max_length=45)
-    mac_address: Optional[str] = Field(None, max_length=17)
-    
+    ip_address: str | None = Field(None, max_length=45)
+    private_ip: str | None = Field(None, max_length=45)
+    mac_address: str | None = Field(None, max_length=17)
+
     # Hardware info
-    cpu_cores: Optional[int] = Field(None, ge=1)
-    memory_gb: Optional[int] = Field(None, ge=1)
-    disk_gb: Optional[int] = Field(None, ge=1)
-    os_type: Optional[str] = Field(None, max_length=50)
-    os_version: Optional[str] = Field(None, max_length=100)
-    arch: Optional[str] = Field(None, max_length=50)
-    
+    cpu_cores: int | None = Field(None, ge=1)
+    memory_gb: int | None = Field(None, ge=1)
+    disk_gb: int | None = Field(None, ge=1)
+    os_type: str | None = Field(None, max_length=50)
+    os_version: str | None = Field(None, max_length=100)
+    arch: str | None = Field(None, max_length=50)
+
     # Terminal specific info
-    hostname: Optional[str] = Field(None, max_length=100)
-    serial_number: Optional[str] = Field(None, max_length=100)
-    uuid: Optional[str] = Field(None, max_length=100)
-    customer: Optional[str] = Field(None, max_length=100)
-    
+    hostname: str | None = Field(None, max_length=100)
+    serial_number: str | None = Field(None, max_length=100)
+    uuid: str | None = Field(None, max_length=100)
+    customer: str | None = Field(None, max_length=100)
+
     # Location info
-    idc: Optional[str] = Field(None, max_length=100)
-    region: Optional[str] = Field(None, max_length=100)
-    rack: Optional[str] = Field(None, max_length=50)
-    
+    idc: str | None = Field(None, max_length=100)
+    region: str | None = Field(None, max_length=100)
+    rack: str | None = Field(None, max_length=50)
+
     # Metadata
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class AssetCreate(AssetBase):
     """Asset creation schema."""
-    label_ids: List[int] = []
-    owner_name: Optional[str] = Field(None, max_length=100)
+    label_ids: list[int] = []
+    owner_name: str | None = Field(None, max_length=100)
 
 
 class AssetUpdate(BaseModel):
     """Asset update schema."""
-    name: Optional[str] = Field(None, min_length=1, max_length=200)
-    status: Optional[str] = Field(None, pattern="^(ACTIVE|OFFLINE|MAINTENANCE|RETIRED)$")
-    
-    ip_address: Optional[str] = Field(None, max_length=45)
-    private_ip: Optional[str] = Field(None, max_length=45)
-    mac_address: Optional[str] = Field(None, max_length=17)
-    
-    cpu_cores: Optional[int] = Field(None, ge=1)
-    memory_gb: Optional[int] = Field(None, ge=1)
-    disk_gb: Optional[int] = Field(None, ge=1)
-    os_type: Optional[str] = Field(None, max_length=50)
-    os_version: Optional[str] = Field(None, max_length=100)
-    
-    idc: Optional[str] = Field(None, max_length=100)
-    region: Optional[str] = Field(None, max_length=100)
-    rack: Optional[str] = Field(None, max_length=50)
-    
-    description: Optional[str] = None
-    owner_name: Optional[str] = Field(None, max_length=100)
-    label_ids: Optional[List[int]] = None
+    name: str | None = Field(None, min_length=1, max_length=200)
+    status: str | None = Field(None, pattern="^(ACTIVE|OFFLINE|MAINTENANCE|RETIRED)$")
+
+    ip_address: str | None = Field(None, max_length=45)
+    private_ip: str | None = Field(None, max_length=45)
+    mac_address: str | None = Field(None, max_length=17)
+
+    cpu_cores: int | None = Field(None, ge=1)
+    memory_gb: int | None = Field(None, ge=1)
+    disk_gb: int | None = Field(None, ge=1)
+    os_type: str | None = Field(None, max_length=50)
+    os_version: str | None = Field(None, max_length=100)
+
+    idc: str | None = Field(None, max_length=100)
+    region: str | None = Field(None, max_length=100)
+    rack: str | None = Field(None, max_length=50)
+
+    description: str | None = None
+    owner_name: str | None = Field(None, max_length=100)
+    label_ids: list[int] | None = None
 
 
 class AssetResponse(AssetBase):
@@ -111,29 +110,29 @@ class AssetResponse(AssetBase):
     )
 
     id: int
-    labels: List[LabelResponse] = []
-    owner_id: Optional[int] = None
-    owner: Optional[OwnerResponse] = None
-    owner_name: Optional[str] = None
+    labels: list[LabelResponse] = []
+    owner_id: int | None = None
+    owner: OwnerResponse | None = None
+    owner_name: str | None = None
     created_at: datetime
     updated_at: datetime
     # Prometheus sync fields
-    source: Optional[str] = None
-    prometheus_instance: Optional[str] = None
-    last_sync_time: Optional[datetime] = None
-    sync_status: Optional[str] = None
+    source: str | None = None
+    prometheus_instance: str | None = None
+    last_sync_time: datetime | None = None
+    sync_status: str | None = None
     # Additional fields
-    cpu_cores: Optional[int] = None
-    memory_gb: Optional[int] = None
-    disk_gb: Optional[int] = None
+    cpu_cores: int | None = None
+    memory_gb: int | None = None
+    disk_gb: int | None = None
     # All pc_info labels for terminals
-    labels_data: Optional[Dict[str, Any]] = None
+    labels_data: dict[str, Any] | None = None
 
 
 class AssetListResponse(BaseModel):
     """Asset list response with pagination."""
     total: int
-    items: List[AssetResponse]
+    items: list[AssetResponse]
 
 
 class AssetHistoryResponse(BaseModel):
@@ -141,8 +140,8 @@ class AssetHistoryResponse(BaseModel):
     id: int
     asset_id: int
     action: str
-    changes: Optional[Dict[str, Any]]
-    operator_id: Optional[int]
+    changes: dict[str, Any] | None
+    operator_id: int | None
     created_at: datetime
 
 
@@ -150,15 +149,15 @@ class AssetTreeNode(BaseModel):
     """Asset tree node for hierarchical display."""
     key: str
     title: str
-    children: Optional[List["AssetTreeNode"]] = None
+    children: list["AssetTreeNode"] | None = None
     is_leaf: bool = False
-    data: Optional[Dict[str, Any]] = None
+    data: dict[str, Any] | None = None
 
 
 class AssetFilter(BaseModel):
     """Asset filter parameters."""
-    asset_type: Optional[str] = None
-    status: Optional[str] = None
-    idc: Optional[str] = None
-    keyword: Optional[str] = None
-    label_ids: Optional[List[int]] = None
+    asset_type: str | None = None
+    status: str | None = None
+    idc: str | None = None
+    keyword: str | None = None
+    label_ids: list[int] | None = None

@@ -2,7 +2,7 @@
 Base schemas.
 """
 from datetime import datetime
-from typing import Optional
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -36,4 +36,4 @@ class ApiResponse(BaseSchema):
     """API response wrapper."""
     code: int = 0
     message: str = "success"
-    data: Optional[dict] = None
+    data: dict | None = None

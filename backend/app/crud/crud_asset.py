@@ -1,47 +1,47 @@
 """
 Asset CRUD operations.
 """
-from typing import List, Optional, Dict, Any, Tuple
+from typing import Any
 
-from sqlalchemy import select, and_, or_, func
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.base import CRUDBase
-from app.models.asset import Asset, Label, AssetHistory, AssetType, AssetStatus
+from app.models.asset import Asset, AssetHistory, AssetStatus, AssetType, Label
 from app.schemas.asset import AssetCreate, AssetUpdate
 
 
 class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
     """Asset CRUD operations."""
-    
+
     async def get_by_asset_id(
         self,
         db: AsyncSession,
         *,
         asset_id: str
-    ) -> Optional[Asset]:
+    ) -> Asset | None:
         """Get asset by asset_id."""
         result = await db.execute(
             select(Asset).where(Asset.asset_id == asset_id)
         )
         return result.scalar_one_or_none()
-    
+
     async def get_multi_with_filters(
         self,
         db: AsyncSession,
         *,
         skip: int = 0,
         limit: int = 20,
-        asset_type: Optional[str] = None,
-        status: Optional[str] = None,
-        idc: Optional[str] = None,
-        keyword: Optional[str] = None,
-        label_ids: Optional[List[int]] = None
-    ) -> Tuple[List[Asset], int]:
+        asset_type: str | None = None,
+        status: str | None = None,
+        idc: str | None = None,
+        keyword: str | None = None,
+        label_ids: list[int] | None = None
+    ) -> tuple[list[Asset], int]:
         """Get assets with filters and pagination."""
         # Build query
         query = select(Asset)
-        
+
         # Apply filters
         filters = []
         if asset_type:
@@ -58,28 +58,28 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
                     Asset.ip_address.ilike(f"%{keyword}%")
                 )
             )
-        
+
         if filters:
             query = query.where(and_(*filters))
-        
+
         # Get total count
         count_query = select(func.count()).select_from(query.subquery())
         total_result = await db.execute(count_query)
         total = total_result.scalar()
-        
+
         # Apply pagination
         query = query.offset(skip).limit(limit)
         result = await db.execute(query)
         items = result.scalars().all()
-        
+
         return list(items), total
-    
+
     async def create_with_labels(
         self,
         db: AsyncSession,
         *,
         obj_in: AssetCreate,
-        owner_id: Optional[int] = None
+        owner_id: int | None = None
     ) -> Asset:
         """Create asset with labels."""
         # Create asset
@@ -103,18 +103,18 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
             owner_id=owner_id,
             owner_name=obj_in.owner_name,
         )
-        
+
         # Add labels if provided
         if obj_in.label_ids:
             labels_result = await db.execute(
                 select(Label).where(Label.id.in_(obj_in.label_ids))
             )
             db_obj.labels = list(labels_result.scalars().all())
-        
+
         db.add(db_obj)
         await db.commit()
         await db.refresh(db_obj)
-        
+
         # Create history record
         history = AssetHistory(
             asset_id=db_obj.id,
@@ -124,21 +124,21 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
         )
         db.add(history)
         await db.commit()
-        
+
         return db_obj
-    
+
     async def update_with_labels(
         self,
         db: AsyncSession,
         *,
         db_obj: Asset,
         obj_in: AssetUpdate,
-        operator_id: Optional[int] = None
+        operator_id: int | None = None
     ) -> Asset:
         """Update asset with labels."""
         # Track changes
         changes = {}
-        
+
         # Update fields
         update_data = obj_in.model_dump(exclude_unset=True, exclude={"label_ids"})
         for field, value in update_data.items():
@@ -147,7 +147,7 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
                 if old_value != value:
                     changes[field] = {"old": old_value, "new": value}
                     setattr(db_obj, field, value)
-        
+
         # Update labels if provided
         if obj_in.label_ids is not None:
             labels_result = await db.execute(
@@ -155,11 +155,11 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
             )
             db_obj.labels = list(labels_result.scalars().all())
             changes["labels"] = {"new": obj_in.label_ids}
-        
+
         db.add(db_obj)
         await db.commit()
         await db.refresh(db_obj)
-        
+
         # Create history record
         if changes:
             history = AssetHistory(
@@ -170,19 +170,19 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
             )
             db.add(history)
             await db.commit()
-        
+
         return db_obj
 
 
 class CRUDLabel(CRUDBase[Label, Any, Any]):
     """Label CRUD operations."""
-    
+
     async def get_by_name(
         self,
         db: AsyncSession,
         *,
         name: str
-    ) -> Optional[Label]:
+    ) -> Label | None:
         """Get label by name."""
         result = await db.execute(
             select(Label).where(Label.name == name)

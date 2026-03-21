@@ -2,7 +2,7 @@
 Operations management schemas.
 """
 from datetime import datetime
-from typing import List, Optional, Dict, Any
+
 from pydantic import BaseModel, Field
 
 
@@ -21,38 +21,38 @@ class DeploymentCreate(DeploymentBase):
 
 class DeploymentUpdate(BaseModel):
     """Deployment update schema."""
-    status: Optional[str] = Field(None, pattern="^(pending|running|success|failed|rollback)$")
-    log_output: Optional[str] = None
-    rollback_reason: Optional[str] = None
-    duration_seconds: Optional[int] = None
+    status: str | None = Field(None, pattern="^(pending|running|success|failed|rollback)$")
+    log_output: str | None = None
+    rollback_reason: str | None = None
+    duration_seconds: int | None = None
 
 
 class DeploymentResponse(DeploymentBase):
     """Deployment response schema."""
     id: int
     status: str
-    deployer_id: Optional[int]
-    deployer_name: Optional[str]
-    approver_id: Optional[int]
-    approver_name: Optional[str]
-    deploy_time: Optional[datetime]
-    duration_seconds: Optional[int]
-    rollback_reason: Optional[str]
+    deployer_id: int | None
+    deployer_name: str | None
+    approver_id: int | None
+    approver_name: str | None
+    deploy_time: datetime | None
+    duration_seconds: int | None
+    rollback_reason: str | None
     created_at: datetime
 
 
 class DeploymentListResponse(BaseModel):
     """Deployment list response."""
     total: int
-    items: List[DeploymentResponse]
+    items: list[DeploymentResponse]
 
 
 # Inspection schemas
 class InspectionCheckItem(BaseModel):
     """Inspection check item."""
     name: str
-    command: Optional[str] = None
-    expected_result: Optional[str] = None
+    command: str | None = None
+    expected_result: str | None = None
     timeout: int = 60
 
 
@@ -60,10 +60,10 @@ class InspectionTaskBase(BaseModel):
     """Base inspection task schema."""
     name: str = Field(..., min_length=1, max_length=200)
     task_type: str = Field(default="system", pattern="^(system|security|performance|custom)$")
-    description: Optional[str] = None
+    description: str | None = None
     cron_expression: str = Field(..., min_length=1, max_length=100)
-    target_assets: List[int] = []
-    check_items: List[InspectionCheckItem] = []
+    target_assets: list[int] = []
+    check_items: list[InspectionCheckItem] = []
 
 
 class InspectionTaskCreate(InspectionTaskBase):
@@ -73,20 +73,20 @@ class InspectionTaskCreate(InspectionTaskBase):
 
 class InspectionTaskUpdate(BaseModel):
     """Inspection task update schema."""
-    name: Optional[str] = Field(None, min_length=1, max_length=200)
-    description: Optional[str] = None
-    cron_expression: Optional[str] = Field(None, min_length=1, max_length=100)
-    is_enabled: Optional[bool] = None
-    target_assets: Optional[List[int]] = None
-    check_items: Optional[List[InspectionCheckItem]] = None
+    name: str | None = Field(None, min_length=1, max_length=200)
+    description: str | None = None
+    cron_expression: str | None = Field(None, min_length=1, max_length=100)
+    is_enabled: bool | None = None
+    target_assets: list[int] | None = None
+    check_items: list[InspectionCheckItem] | None = None
 
 
 class InspectionTaskResponse(InspectionTaskBase):
     """Inspection task response schema."""
     id: int
     is_enabled: bool
-    last_run_at: Optional[datetime]
-    next_run_at: Optional[datetime]
+    last_run_at: datetime | None
+    next_run_at: datetime | None
     created_at: datetime
     updated_at: datetime
 
@@ -95,8 +95,8 @@ class InspectionReportDetail(BaseModel):
     """Inspection report detail item."""
     check_name: str
     status: str  # passed, failed, warning
-    message: Optional[str] = None
-    duration_ms: Optional[int] = None
+    message: str | None = None
+    duration_ms: int | None = None
 
 
 class InspectionReportResponse(BaseModel):
@@ -109,8 +109,8 @@ class InspectionReportResponse(BaseModel):
     passed_checks: int
     failed_checks: int
     warning_checks: int
-    summary: Optional[str]
-    details: List[InspectionReportDetail]
+    summary: str | None
+    details: list[InspectionReportDetail]
     created_at: datetime
 
 
@@ -129,19 +129,19 @@ class CertificateCreate(CertificateBase):
     """Certificate creation schema."""
     alert_threshold_days: int = 30
     is_auto_renewal: bool = False
-    cert_content: Optional[str] = None
-    key_content: Optional[str] = None
-    asset_ids: List[int] = []
+    cert_content: str | None = None
+    key_content: str | None = None
+    asset_ids: list[int] = []
 
 
 class CertificateUpdate(BaseModel):
     """Certificate update schema."""
-    alert_threshold_days: Optional[int] = None
-    is_auto_renewal: Optional[bool] = None
-    cert_content: Optional[str] = None
-    key_content: Optional[str] = None
-    asset_ids: Optional[List[int]] = None
-    status: Optional[str] = Field(None, pattern="^(active|expiring|expired|revoked)$")
+    alert_threshold_days: int | None = None
+    is_auto_renewal: bool | None = None
+    cert_content: str | None = None
+    key_content: str | None = None
+    asset_ids: list[int] | None = None
+    status: str | None = Field(None, pattern="^(active|expiring|expired|revoked)$")
 
 
 class CertificateResponse(CertificateBase):
@@ -151,7 +151,7 @@ class CertificateResponse(CertificateBase):
     alert_threshold_days: int
     is_auto_renewal: bool
     status: str
-    asset_ids: List[int]
+    asset_ids: list[int]
     created_at: datetime
     updated_at: datetime
 
@@ -161,7 +161,7 @@ class CertificateSyncResponse(BaseModel):
     total: int
     created: int
     updated: int
-    certificates: List[CertificateResponse]
+    certificates: list[CertificateResponse]
 
 
 # DNS schemas
@@ -172,29 +172,29 @@ class DNSRecordBase(BaseModel):
     host: str = Field(..., min_length=1, max_length=255)
     value: str = Field(..., min_length=1)
     ttl: int = Field(default=3600, ge=60)
-    priority: Optional[int] = Field(None, ge=0, le=65535)
+    priority: int | None = Field(None, ge=0, le=65535)
 
 
 class DNSRecordCreate(DNSRecordBase):
     """DNS record creation schema."""
-    provider: Optional[str] = None
-    asset_ids: List[int] = []
+    provider: str | None = None
+    asset_ids: list[int] = []
 
 
 class DNSRecordUpdate(BaseModel):
     """DNS record update schema."""
-    value: Optional[str] = Field(None, min_length=1)
-    ttl: Optional[int] = Field(None, ge=60)
-    priority: Optional[int] = Field(None, ge=0, le=65535)
-    is_active: Optional[bool] = None
-    asset_ids: Optional[List[int]] = None
+    value: str | None = Field(None, min_length=1)
+    ttl: int | None = Field(None, ge=60)
+    priority: int | None = Field(None, ge=0, le=65535)
+    is_active: bool | None = None
+    asset_ids: list[int] | None = None
 
 
 class DNSRecordResponse(DNSRecordBase):
     """DNS record response schema."""
     id: int
     is_active: bool
-    provider: Optional[str]
-    asset_ids: List[int]
+    provider: str | None
+    asset_ids: list[int]
     created_at: datetime
     updated_at: datetime

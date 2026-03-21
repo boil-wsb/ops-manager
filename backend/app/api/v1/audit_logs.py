@@ -2,7 +2,6 @@
 Audit log API routes.
 """
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,18 +18,18 @@ router = APIRouter()
 async def list_audit_logs(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
-    operator_id: Optional[int] = Query(None, description="操作人ID"),
-    operation_type: Optional[str] = Query(
+    operator_id: int | None = Query(None, description="操作人ID"),
+    operation_type: str | None = Query(
         None, description="操作类型: LOGIN, LOGOUT, CREATE, UPDATE, DELETE, EXPORT"
     ),
-    operation_module: Optional[str] = Query(
+    operation_module: str | None = Query(
         None, description="模块: asset, user, role, monitor, certificate, deploy, system"
     ),
-    object_type: Optional[str] = Query(None, description="对象类型"),
-    status: Optional[str] = Query(None, description="操作状态: SUCCESS, FAILURE"),
-    start_time: Optional[datetime] = Query(None, description="开始时间 (ISO 8601格式)"),
-    end_time: Optional[datetime] = Query(None, description="结束时间 (ISO 8601格式)"),
-    keyword: Optional[str] = Query(None, description="关键词搜索(对象名称、操作人名称)"),
+    object_type: str | None = Query(None, description="对象类型"),
+    status: str | None = Query(None, description="操作状态: SUCCESS, FAILURE"),
+    start_time: datetime | None = Query(None, description="开始时间 (ISO 8601格式)"),
+    end_time: datetime | None = Query(None, description="结束时间 (ISO 8601格式)"),
+    keyword: str | None = Query(None, description="关键词搜索(对象名称、操作人名称)"),
     db: AsyncSession = Depends(get_db),
     current_user=require_permissions(["system:audit:read"]),
 ):

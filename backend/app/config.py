@@ -1,8 +1,7 @@
 """
 Application configuration using Pydantic Settings.
 """
-from typing import List, Optional, Union
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,7 +24,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = Field(default=480, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     refresh_token_expire_days: int = Field(default=7, alias="REFRESH_TOKEN_EXPIRE_DAYS")
     algorithm: str = Field(default="HS256", alias="ALGORITHM")
-    
+
     # Database
     database_url: str = Field(
         default="postgresql+asyncpg://opsmanager:opsmanager@localhost:5432/opsmanager",
@@ -33,34 +32,34 @@ class Settings(BaseSettings):
     )
     db_pool_size: int = Field(default=20, alias="DB_POOL_SIZE")
     db_max_overflow: int = Field(default=10, alias="DB_MAX_OVERFLOW")
-    
+
     # Redis
     redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
-    redis_password: Optional[str] = Field(default=None, alias="REDIS_PASSWORD")
-    
+    redis_password: str | None = Field(default=None, alias="REDIS_PASSWORD")
+
     # Celery
     celery_broker_url: str = Field(default="redis://localhost:6379/1", alias="CELERY_BROKER_URL")
     celery_result_backend: str = Field(default="redis://localhost:6379/2", alias="CELERY_RESULT_BACKEND")
-    
+
     # CORS - Use string type and parse manually
     cors_origins_str: str = Field(default="http://localhost:3000,http://localhost:5173", alias="CORS_ORIGINS")
-    
+
     # Email (optional)
-    smtp_host: Optional[str] = Field(default=None, alias="SMTP_HOST")
+    smtp_host: str | None = Field(default=None, alias="SMTP_HOST")
     smtp_port: int = Field(default=587, alias="SMTP_PORT")
-    smtp_user: Optional[str] = Field(default=None, alias="SMTP_USER")
-    smtp_password: Optional[str] = Field(default=None, alias="SMTP_PASSWORD")
+    smtp_user: str | None = Field(default=None, alias="SMTP_USER")
+    smtp_password: str | None = Field(default=None, alias="SMTP_PASSWORD")
     smtp_tls: bool = Field(default=True, alias="SMTP_TLS")
-    
+
     # Logging
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     log_format: str = Field(default="json", alias="LOG_FORMAT")  # json or console
-    
+
     # Logging File Configuration
     log_file_enabled: bool = Field(default=True, alias="LOG_FILE_ENABLED")
     log_file_dir: str = Field(default="logs", alias="LOG_FILE_DIR")
     log_file_retention_days: int = Field(default=30, alias="LOG_FILE_RETENTION_DAYS")
-    
+
     # Audit Log Configuration
     audit_log_enabled: bool = Field(default=True, alias="AUDIT_LOG_ENABLED")
     audit_log_db_retention_days: int = Field(default=90, alias="AUDIT_LOG_DB_RETENTION_DAYS")
@@ -77,12 +76,12 @@ class Settings(BaseSettings):
     prometheus_retry_count: int = Field(default=3, alias="PROMETHEUS_RETRY_COUNT")
 
     @property
-    def cors_origins(self) -> List[str]:
+    def cors_origins(self) -> list[str]:
         """Parse CORS origins from string."""
         if not self.cors_origins_str:
             return ["http://localhost:3000", "http://localhost:5173"]
         return [origin.strip() for origin in self.cors_origins_str.split(",")]
-    
+
     @property
     def async_database_url(self) -> str:
         """Get async database URL."""

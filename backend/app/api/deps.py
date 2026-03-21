@@ -1,10 +1,10 @@
 """
 API dependencies.
 """
+
 from fastapi import Depends, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional
 
 from app.core.exceptions import AuthenticationError, PermissionDeniedError
 from app.core.security import verify_token
@@ -16,7 +16,7 @@ security = HTTPBearer(auto_error=False)
 
 async def get_current_user(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Get current user from JWT token."""
@@ -51,9 +51,9 @@ async def get_current_user(
 
 async def get_current_user_optional(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: AsyncSession = Depends(get_db),
-) -> Optional[dict]:
+) -> dict | None:
     """Get current user from JWT token, returns None if not authenticated."""
     if not credentials:
         return None

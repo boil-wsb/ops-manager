@@ -2,7 +2,6 @@
 IT Feedback API endpoints.
 """
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
@@ -58,8 +57,8 @@ async def create_feedback(
 
 @router.get("", response_model=ITFeedbackListResponse)
 async def list_feedback(
-    status: Optional[str] = None,
-    lag_level: Optional[str] = None,
+    status: str | None = None,
+    lag_level: str | None = None,
     page: int = Query(1, ge=1, le=100),
     page_size: int = Query(10, ge=10, le=100),
     db: AsyncSession = Depends(get_db),
@@ -105,7 +104,7 @@ async def get_feedback(
 async def resolve_feedback(
     feedback_id: int,
     resolved_by: str,
-    notes: Optional[str] = None,
+    notes: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(

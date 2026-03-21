@@ -4,10 +4,11 @@ Prometheus HTTP API 客户端实现
 
 import asyncio
 import logging
-from typing import Dict, List, Optional, Any
 from datetime import datetime
+from typing import Any
 
 import httpx
+
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -25,7 +26,7 @@ class PrometheusClient:
         """关闭 HTTP 客户端"""
         await self.client.aclose()
 
-    async def query(self, query: str) -> Dict[str, Any]:
+    async def query(self, query: str) -> dict[str, Any]:
         """
         执行 Prometheus 查询
 
@@ -61,7 +62,7 @@ class PrometheusClient:
         start: datetime,
         end: datetime,
         step: str = "1m"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         执行 Prometheus 范围查询
 
@@ -96,7 +97,7 @@ class PrometheusClient:
             logger.error(f"Prometheus range query error: {e}")
             return {"status": "error", "error": str(e)}
 
-    async def get_all_nodes(self) -> List[Dict[str, Any]]:
+    async def get_all_nodes(self) -> list[dict[str, Any]]:
         """
         获取 Prometheus 中所有监控的节点
 
@@ -152,7 +153,7 @@ class PrometheusClient:
 
         return "unknown"
 
-    async def get_node_metrics(self, instance: str) -> Dict[str, Any]:
+    async def get_node_metrics(self, instance: str) -> dict[str, Any]:
         """
         获取节点的实时指标
 
@@ -237,7 +238,7 @@ class PrometheusClient:
 
         return metrics
 
-    async def get_all_nodes_with_metrics(self) -> List[Dict[str, Any]]:
+    async def get_all_nodes_with_metrics(self) -> list[dict[str, Any]]:
         """
         获取所有节点及其指标
 
@@ -257,7 +258,7 @@ class PrometheusClient:
         # 过滤掉异常结果
         return [node for node in enriched_nodes if isinstance(node, dict)]
 
-    async def _enrich_node_data(self, node: Dict[str, Any]) -> Dict[str, Any]:
+    async def _enrich_node_data(self, node: dict[str, Any]) -> dict[str, Any]:
         """
         丰富节点数据，添加状态和指标
 
@@ -283,7 +284,7 @@ class PrometheusClient:
             node["status"] = "unknown"
             return node
 
-    async def get_ssl_certificates(self) -> List[Dict[str, Any]]:
+    async def get_ssl_certificates(self) -> list[dict[str, Any]]:
         """
         获取所有 SSL 证书信息
 
@@ -332,7 +333,7 @@ class PrometheusClient:
         else:
             return "active"
 
-    async def get_certificate_details(self, target: str) -> Dict[str, Any]:
+    async def get_certificate_details(self, target: str) -> dict[str, Any]:
         """
         获取单个证书的详细信息
 
@@ -408,7 +409,7 @@ class PrometheusClient:
 
         return "server"
 
-    async def get_pc_info_terminals(self) -> List[Dict[str, Any]]:
+    async def get_pc_info_terminals(self) -> list[dict[str, Any]]:
         """
         获取 pc_info 指标中的终端信息，提取所有标签
 
@@ -416,20 +417,20 @@ class PrometheusClient:
             终端列表，包含所有 pc_info 标签
         """
         terminals = []
-        
+
         pc_info_query = 'pc_info'
         data = await self.query(pc_info_query)
-        
+
         if data.get("status") != "success":
             logger.warning("Failed to query pc_info metrics")
             return terminals
-        
+
         results = data.get("data", {}).get("result", [])
-        
+
         for result in results:
             metric = result.get("metric", {})
             value = result.get("value", [])
-            
+
             if len(value) >= 2 and value[1] == "1":
                 terminal = {
                     "hostname": metric.get("hostname", ""),
@@ -441,10 +442,10 @@ class PrometheusClient:
                     "pc_info_labels": dict(metric),
                 }
                 terminals.append(terminal)
-        
+
         return terminals
 
-    async def get_terminal_metrics(self, hostname: str) -> Dict[str, Any]:
+    async def get_terminal_metrics(self, hostname: str) -> dict[str, Any]:
         """
         获取终端的详细指标
 
@@ -455,7 +456,7 @@ class PrometheusClient:
             终端指标字典
         """
         metrics = {}
-        
+
         queries = {
             "cpu_usage": f'pc_cpu_usage{{hostname="{hostname}"}}',
             "memory_usage": f'pc_memory_usage{{hostname="{hostname}"}}',
@@ -468,7 +469,7 @@ class PrometheusClient:
             "cpu_cores": f'pc_cpu_cores{{hostname="{hostname}"}}',
             "uptime": f'pc_uptime{{hostname="{hostname}"}}',
         }
-        
+
         for key, query in queries.items():
             data = await self.query(query)
             if data.get("status") == "success":
@@ -486,10 +487,10 @@ class PrometheusClient:
                                 metrics[key] = float(value[1])
                             except (ValueError, TypeError):
                                 metrics[key] = value[1]
-        
+
         return metrics
 
-    async def get_all_terminals_with_metrics(self) -> List[Dict[str, Any]]:
+    async def get_all_terminals_with_metrics(self) -> list[dict[str, Any]]:
         """
         获取所有终端及其指标
 
@@ -497,7 +498,7 @@ class PrometheusClient:
             包含完整信息的终端列表
         """
         terminals = await self.get_pc_info_terminals()
-        
+
         enriched_terminals = []
         for terminal in terminals:
             hostname = terminal.get("hostname", "")
@@ -508,7 +509,7 @@ class PrometheusClient:
                 except Exception as e:
                     logger.error(f"Failed to get metrics for terminal {hostname}: {e}")
             enriched_terminals.append(terminal)
-        
+
         return enriched_terminals
 
 

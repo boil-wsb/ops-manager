@@ -2,9 +2,8 @@
 Permission model for RBAC.
 """
 from datetime import datetime
-from typing import Optional, List
 
-from sqlalchemy import String, Boolean, DateTime, Table, Column, ForeignKey, Integer
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Table
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
@@ -21,51 +20,51 @@ role_permissions = Table(
 
 class Permission(BaseModel):
     """Permission model for RBAC."""
-    
+
     __tablename__ = "permissions"
-    
+
     code: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     module: Mapped[str] = mapped_column(String(50), index=True, nullable=False)
     action: Mapped[str] = mapped_column(String(50), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    description: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    
+
     # Relationships
-    roles: Mapped[List["Role"]] = relationship(
+    roles: Mapped[list["Role"]] = relationship(
         "Role",
         secondary=role_permissions,
         back_populates="permissions",
         lazy="selectin"
     )
-    
+
     def __repr__(self) -> str:
         return f"<Permission {self.code}>"
 
 
 class Role(BaseModel):
     """Role model with RBAC support."""
-    
+
     __tablename__ = "roles"
-    
+
     name: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    description: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_system: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    
+
     # Relationships
-    users: Mapped[List["User"]] = relationship(
+    users: Mapped[list["User"]] = relationship(
         "User",
         secondary="user_roles",
         back_populates="roles",
         lazy="selectin"
     )
-    permissions: Mapped[List["Permission"]] = relationship(
+    permissions: Mapped[list["Permission"]] = relationship(
         "Permission",
         secondary=role_permissions,
         back_populates="roles",
         lazy="selectin"
     )
-    
+
     def __repr__(self) -> str:
         return f"<Role {self.name}>"

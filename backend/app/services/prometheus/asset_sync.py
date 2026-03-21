@@ -8,15 +8,14 @@ Phase 2 实现：
 """
 
 import logging
-from typing import Dict, List, Any, Optional
 from datetime import datetime
+from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.prometheus.client import PrometheusClient, get_prometheus_client
 from app.models.asset import Asset, AssetStatus, AssetType
-from app.crud.crud_asset import crud_asset
+from app.services.prometheus.client import PrometheusClient
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +23,7 @@ logger = logging.getLogger(__name__)
 class AssetSyncService:
     """资产同步服务类"""
 
-    def __init__(self, db: AsyncSession, prometheus_client: Optional[PrometheusClient] = None):
+    def __init__(self, db: AsyncSession, prometheus_client: PrometheusClient | None = None):
         """
         初始化资产同步服务
 
@@ -153,7 +152,7 @@ class AssetSyncService:
             return nodename.strip()
         return ip_address
 
-    async def _get_asset_by_ip(self, ip_address: str) -> Optional[Asset]:
+    async def _get_asset_by_ip(self, ip_address: str) -> Asset | None:
         """
         根据 IP 地址查找资产
 
@@ -171,7 +170,7 @@ class AssetSyncService:
         )
         return result.scalar_one_or_none()
 
-    def _map_prometheus_node_to_asset_data(self, node: Dict[str, Any]) -> Dict[str, Any]:
+    def _map_prometheus_node_to_asset_data(self, node: dict[str, Any]) -> dict[str, Any]:
         """
         将 Prometheus 节点数据映射为 Asset 模型字段
 
@@ -218,7 +217,7 @@ class AssetSyncService:
 
         return asset_data
 
-    async def sync_single_asset(self, instance: str) -> Dict[str, Any]:
+    async def sync_single_asset(self, instance: str) -> dict[str, Any]:
         """
         同步单个节点
 
@@ -353,7 +352,7 @@ class AssetSyncService:
 
         return result
 
-    async def sync_all_assets(self) -> Dict[str, Any]:
+    async def sync_all_assets(self) -> dict[str, Any]:
         """
         从 Prometheus 获取所有节点并同步到数据库
 
@@ -415,8 +414,8 @@ class AssetSyncService:
 
 async def sync_assets_from_prometheus(
     db: AsyncSession,
-    prometheus_client: Optional[PrometheusClient] = None
-) -> Dict[str, Any]:
+    prometheus_client: PrometheusClient | None = None
+) -> dict[str, Any]:
     """
     从 Prometheus 同步资产的便捷函数
 

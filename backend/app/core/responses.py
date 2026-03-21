@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any
 
 
 def api_response(data: Any = None, message: str = "操作成功") -> dict:
@@ -17,7 +17,7 @@ def api_error(message: str, data: Any = None) -> dict:
     }
 
 
-def paginated_response(total: int, items: List[Any]) -> dict:
+def paginated_response(total: int, items: list[Any]) -> dict:
     return {
         "total": total,
         "items": items

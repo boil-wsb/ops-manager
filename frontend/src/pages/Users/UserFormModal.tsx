@@ -115,7 +115,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ open, onClose, user }) =>
       confirmLoading={isLoading}
       width={600}
       destroyOnHidden
-      mask={{ closable: false }}
+      mask={false}
       keyboard={false}
     >
       <Form form={form} layout="vertical" preserve={false} initialValues={initialValues}>

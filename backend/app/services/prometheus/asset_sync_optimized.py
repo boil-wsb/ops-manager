@@ -7,18 +7,17 @@
 3. 批量导入支持
 """
 
-import logging
 import asyncio
-from typing import Dict, List, Any, Optional
-from datetime import datetime, timedelta
+import logging
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.asset import Asset, AssetSource, AssetStatus, AssetType, SyncStatus
 from app.services.prometheus.client import PrometheusClient
-from app.models.asset import Asset, AssetStatus, AssetType, AssetSource, SyncStatus
-from app.crud.crud_asset import crud_asset
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +25,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class NodeCache:
     """节点缓存"""
-    nodes: List[Dict[str, Any]]
+    nodes: list[dict[str, Any]]
     timestamp: datetime
     ttl: timedelta = timedelta(minutes=5)  # 缓存5分钟
 
@@ -38,13 +37,13 @@ class OptimizedAssetSyncService:
     """优化的资产同步服务类"""
 
     # 类级别的缓存
-    _node_cache: Optional[NodeCache] = None
+    _node_cache: NodeCache | None = None
 
-    def __init__(self, db: AsyncSession, prometheus_client: Optional[PrometheusClient] = None):
+    def __init__(self, db: AsyncSession, prometheus_client: PrometheusClient | None = None):
         self.db = db
         self.prometheus_client = prometheus_client or PrometheusClient()
 
-    async def _get_cached_nodes(self, force_refresh: bool = False) -> List[Dict[str, Any]]:
+    async def _get_cached_nodes(self, force_refresh: bool = False) -> list[dict[str, Any]]:
         """
         获取缓存的节点列表
 
@@ -64,7 +63,7 @@ class OptimizedAssetSyncService:
         logger.info(f"Cached {len(nodes)} nodes from Prometheus")
         return nodes
 
-    async def _get_node_details(self, instance: str, node: Dict[str, Any]) -> Dict[str, Any]:
+    async def _get_node_details(self, instance: str, node: dict[str, Any]) -> dict[str, Any]:
         """
         获取节点详细信息（并行查询）
 
@@ -85,7 +84,7 @@ class OptimizedAssetSyncService:
         node.update(metrics)
         return node
 
-    async def sync_single_asset(self, instance: str, force_refresh: bool = False) -> Dict[str, Any]:
+    async def sync_single_asset(self, instance: str, force_refresh: bool = False) -> dict[str, Any]:
         """
         同步单个节点（优化版）
 
@@ -150,7 +149,7 @@ class OptimizedAssetSyncService:
 
         return result
 
-    async def batch_sync_assets(self, instances: List[str]) -> Dict[str, Any]:
+    async def batch_sync_assets(self, instances: list[str]) -> dict[str, Any]:
         """
         批量同步多个节点
 
@@ -194,7 +193,7 @@ class OptimizedAssetSyncService:
         logger.info(f"Batch sync completed: {results}")
         return results
 
-    async def sync_all_assets(self) -> Dict[str, Any]:
+    async def sync_all_assets(self) -> dict[str, Any]:
         """
         从 Prometheus 获取所有节点并同步到数据库
 
@@ -324,7 +323,7 @@ class OptimizedAssetSyncService:
             return nodename.strip()
         return ip_address
 
-    def _map_prometheus_node_to_asset_data(self, node: Dict[str, Any]) -> Dict[str, Any]:
+    def _map_prometheus_node_to_asset_data(self, node: dict[str, Any]) -> dict[str, Any]:
         """将 Prometheus 节点数据映射为 Asset 模型字段"""
         instance = node.get("instance", "")
         ip_address = self._extract_ip_from_instance(instance)
@@ -360,7 +359,7 @@ class OptimizedAssetSyncService:
 
         return asset_data
 
-    async def _get_asset_by_ip(self, ip_address: str) -> Optional[Asset]:
+    async def _get_asset_by_ip(self, ip_address: str) -> Asset | None:
         """根据 IP 地址查找资产"""
         if not ip_address:
             return None
@@ -370,8 +369,8 @@ class OptimizedAssetSyncService:
         )
         return result.scalar_one_or_none()
 
-    async def _update_asset(self, existing_asset: Asset, asset_data: Dict[str, Any],
-                           node: Dict[str, Any], instance: str) -> None:
+    async def _update_asset(self, existing_asset: Asset, asset_data: dict[str, Any],
+                           node: dict[str, Any], instance: str) -> None:
         """更新现有资产"""
         update_data = {
             "name": asset_data["name"],
@@ -396,8 +395,8 @@ class OptimizedAssetSyncService:
         await self.db.refresh(existing_asset)
         logger.info(f"Updated asset: {existing_asset.asset_id}")
 
-    async def _create_asset(self, asset_data: Dict[str, Any],
-                           node: Dict[str, Any], instance: str) -> Asset:
+    async def _create_asset(self, asset_data: dict[str, Any],
+                           node: dict[str, Any], instance: str) -> Asset:
         """创建新资产"""
         new_asset = Asset(
             asset_id=asset_data["asset_id"],

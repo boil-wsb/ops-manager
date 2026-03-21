@@ -66,6 +66,7 @@ ignore = [
 
 [tool.ruff.per-file-ignores]
 "__init__.py" = ["F401"]
+"app/models/*.py" = ["F821"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"

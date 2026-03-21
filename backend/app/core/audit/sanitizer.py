@@ -2,7 +2,7 @@
 Data sanitizer for removing sensitive information from audit logs.
 """
 import re
-from typing import Any, Dict, List, Union
+from typing import Any
 
 # Sensitive fields that should be masked
 SENSITIVE_FIELDS = {
@@ -23,10 +23,10 @@ SENSITIVE_PATTERNS = [
 def sanitize_sensitive_data(data: Any) -> Any:
     """
     Recursively sanitize sensitive data from a dictionary or list.
-    
+
     Args:
         data: Data to sanitize (dict, list, or primitive)
-        
+
     Returns:
         Sanitized data with sensitive fields masked
     """
@@ -40,24 +40,24 @@ def sanitize_sensitive_data(data: Any) -> Any:
         return data
 
 
-def _sanitize_dict(data: Dict[str, Any]) -> Dict[str, Any]:
+def _sanitize_dict(data: dict[str, Any]) -> dict[str, Any]:
     """Sanitize a dictionary."""
     result = {}
     for key, value in data.items():
         # Check if key contains sensitive field name
         key_lower = key.lower()
         is_sensitive = any(
-            sensitive in key_lower 
+            sensitive in key_lower
             for sensitive in SENSITIVE_FIELDS
         )
-        
+
         if is_sensitive:
             # Mask sensitive values
             result[key] = _mask_value(value)
         else:
             # Recursively sanitize non-sensitive values
             result[key] = _sanitize_value(value)
-    
+
     return result
 
 
@@ -85,28 +85,26 @@ def _mask_value(value: Any) -> str:
     """Mask a sensitive value."""
     if value is None:
         return None
-    
+
     if isinstance(value, str):
         if len(value) <= 4:
             return '*' * len(value)
         else:
             # Show first 2 and last 2 characters
             return value[:2] + '*' * (len(value) - 4) + value[-2:]
-    elif isinstance(value, (int, float)):
-        return '[MASKED]'
-    elif isinstance(value, bool):
+    elif isinstance(value, (int, float, bool)):
         return '[MASKED]'
     else:
         return '[MASKED]'
 
 
-def sanitize_headers(headers: Dict[str, str]) -> Dict[str, str]:
+def sanitize_headers(headers: dict[str, str]) -> dict[str, str]:
     """
     Sanitize HTTP headers by removing sensitive information.
-    
+
     Args:
         headers: HTTP headers dictionary
-        
+
     Returns:
         Sanitized headers
     """
@@ -114,7 +112,7 @@ def sanitize_headers(headers: Dict[str, str]) -> Dict[str, str]:
         'authorization', 'cookie', 'x-api-key', 'x-auth-token',
         'proxy-authorization', 'www-authenticate'
     }
-    
+
     result = {}
     for key, value in headers.items():
         key_lower = key.lower()
@@ -122,5 +120,5 @@ def sanitize_headers(headers: Dict[str, str]) -> Dict[str, str]:
             result[key] = '[MASKED]'
         else:
             result[key] = value
-    
+
     return result

@@ -2,7 +2,6 @@
 Operations management API routes.
 """
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy import and_, func, select
@@ -51,9 +50,9 @@ crud_dns = CRUDBase(DNSRecord)
 async def list_deployments(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
-    project: Optional[str] = Query(None),
-    environment: Optional[str] = Query(None),
-    status: Optional[str] = Query(None),
+    project: str | None = Query(None),
+    environment: str | None = Query(None),
+    status: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user=require_permissions(["ops:read"]),
 ):
@@ -206,7 +205,7 @@ async def delete_inspection_task(
 
 @router.get("/inspections/reports", response_model=list[InspectionReportResponse])
 async def list_inspection_reports(
-    task_id: Optional[int] = Query(None),
+    task_id: int | None = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -240,8 +239,8 @@ async def get_inspection_report(
 async def list_certificates(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
-    status: Optional[str] = Query(None),
-    expiring_soon: Optional[bool] = Query(None),
+    status: str | None = Query(None),
+    expiring_soon: bool | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user=require_permissions(["ops:read"]),
 ):
@@ -422,7 +421,7 @@ async def sync_certificates_from_prometheus(
 async def list_dns_records(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
-    domain: Optional[str] = Query(None),
+    domain: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user=require_permissions(["ops:read"]),
 ):

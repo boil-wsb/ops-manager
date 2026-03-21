@@ -2,9 +2,8 @@
 Audit log CRUD operations.
 """
 from datetime import datetime
-from typing import List, Optional, Tuple
 
-from sqlalchemy import select, and_, or_, func
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.base import CRUDBase
@@ -21,15 +20,15 @@ class CRUDAuditLog(CRUDBase[AuditLog, AuditLogCreate, AuditLogResponse]):
         *,
         skip: int = 0,
         limit: int = 20,
-        operator_id: Optional[int] = None,
-        operation_type: Optional[str] = None,
-        operation_module: Optional[str] = None,
-        object_type: Optional[str] = None,
-        status: Optional[str] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
-        keyword: Optional[str] = None,
-    ) -> Tuple[List[AuditLog], int]:
+        operator_id: int | None = None,
+        operation_type: str | None = None,
+        operation_module: str | None = None,
+        object_type: str | None = None,
+        status: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+        keyword: str | None = None,
+    ) -> tuple[list[AuditLog], int]:
         """Get audit logs with filters and pagination.
 
         Args:
@@ -108,7 +107,7 @@ class CRUDAuditLog(CRUDBase[AuditLog, AuditLogCreate, AuditLogResponse]):
         db: AsyncSession,
         *,
         log_id: int
-    ) -> Optional[AuditLog]:
+    ) -> AuditLog | None:
         """Get audit log by ID.
 
         Args:

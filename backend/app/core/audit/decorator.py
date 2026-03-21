@@ -5,7 +5,8 @@ import functools
 import inspect
 import time
 import uuid
-from typing import Any, Callable, Dict, Optional, TypeVar, Union
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 from fastapi import Request
 
@@ -17,9 +18,9 @@ F = TypeVar("F", bound=Callable[..., Any])
 def audit_log(
     operation_type: str,
     module: str,
-    object_type: Optional[str] = None,
+    object_type: str | None = None,
     record_before_after: bool = True,
-    description: Optional[str] = None,
+    description: str | None = None,
 ) -> Callable[[F], F]:
     """
     Decorator for automatically logging FastAPI route operations to audit log.
@@ -83,9 +84,9 @@ async def _execute_with_audit(
     func: Callable[..., Any],
     operation_type: str,
     module: str,
-    object_type: Optional[str],
+    object_type: str | None,
     record_before_after: bool,
-    description: Optional[str],
+    description: str | None,
     args: tuple,
     kwargs: dict,
 ) -> Any:
@@ -163,9 +164,9 @@ def _execute_with_audit_sync(
     func: Callable[..., Any],
     operation_type: str,
     module: str,
-    object_type: Optional[str],
+    object_type: str | None,
     record_before_after: bool,
-    description: Optional[str],
+    description: str | None,
     args: tuple,
     kwargs: dict,
 ) -> Any:
@@ -202,7 +203,6 @@ def _execute_with_audit_sync(
         # The file logging is synchronous
         if audit_logger._file_logger:
             import json
-            import asyncio
 
             # Extract object info from result or parameters
             object_id, object_name = _extract_object_info(
@@ -229,7 +229,7 @@ def _execute_with_audit_sync(
             )
 
 
-def _extract_request(args: tuple, kwargs: dict) -> Optional[Request]:
+def _extract_request(args: tuple, kwargs: dict) -> Request | None:
     """
     Extract FastAPI Request object from function arguments.
     """
@@ -246,7 +246,7 @@ def _extract_request(args: tuple, kwargs: dict) -> Optional[Request]:
     return None
 
 
-def _extract_operator_info(request: Optional[Request], kwargs: dict = None) -> Dict[str, Any]:
+def _extract_operator_info(request: Request | None, kwargs: dict = None) -> dict[str, Any]:
     """
     Extract operator information from request and kwargs.
     """
@@ -284,7 +284,7 @@ def _extract_operator_info(request: Optional[Request], kwargs: dict = None) -> D
                 else:
                     info["operator_id"] = getattr(user, 'id', None)
                     info["operator_name"] = getattr(user, 'username', None) or getattr(user, 'name', None)
-    
+
     # Try to extract username from credentials for login operations
     if kwargs and not info["operator_name"]:
         credentials = kwargs.get('credentials') or kwargs.get('user_login') or kwargs.get('login_data')
@@ -300,7 +300,7 @@ async def _capture_before_data(
     func: Callable,
     args: tuple,
     kwargs: dict,
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """
     Capture data before operation for UPDATE/DELETE operations.
     This attempts to fetch the existing object data.
@@ -333,7 +333,7 @@ async def _capture_before_data(
     return None
 
 
-def _extract_result_data(result: Any) -> Optional[Dict[str, Any]]:
+def _extract_result_data(result: Any) -> dict[str, Any] | None:
     """
     Extract data from function result for audit logging.
     """
@@ -365,8 +365,8 @@ def _serialize_dict(data: Any) -> Any:
 def _extract_object_info(
     result: Any,
     kwargs: dict,
-    object_type: Optional[str],
-) -> tuple[Optional[str], Optional[str]]:
+    object_type: str | None,
+) -> tuple[str | None, str | None]:
     """
     Extract object ID and name from result or kwargs.
     """
@@ -433,10 +433,10 @@ def _object_to_dict(obj: Any) -> Any:
 
 def _serialize_value(value: Any) -> Any:
     """Serialize a value to JSON-compatible format."""
-    from datetime import datetime, date
+    from datetime import date, datetime
     from decimal import Decimal
     from uuid import UUID
-    
+
     if value is None:
         return None
     if isinstance(value, (str, int, float, bool)):
@@ -456,7 +456,7 @@ def _serialize_value(value: Any) -> Any:
     return str(value)
 
 
-def get_current_user_info(request: Request) -> Dict[str, Any]:
+def get_current_user_info(request: Request) -> dict[str, Any]:
     """
     Utility function to get current user info from request.
     Can be used outside of the decorator.

@@ -5,9 +5,8 @@ import json
 import logging
 import os
 import uuid
-from datetime import datetime
 from logging.handlers import RotatingFileHandler
-from typing import Any, Dict, Optional
+from typing import Any
 
 from app.config import settings
 from app.core.audit.sanitizer import sanitize_sensitive_data
@@ -19,37 +18,37 @@ class AuditLogger:
     """
     Audit logger that writes to both database and file.
     """
-    
+
     _instance = None
     _file_logger = None
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialized = False
         return cls._instance
-    
+
     def __init__(self):
         if self._initialized:
             return
-        
+
         self._initialized = True
         self.enabled = settings.audit_log_enabled
         self._init_file_logger()
-    
+
     def _init_file_logger(self):
         """Initialize file logger for audit logs."""
         if not self.enabled:
             return
-        
+
         # Ensure logs directory exists
         log_dir = os.path.dirname(settings.audit_log_file_path)
         if log_dir and not os.path.exists(log_dir):
             os.makedirs(log_dir, exist_ok=True)
-        
+
         # Parse max file size
         max_bytes = self._parse_file_size(settings.audit_log_max_file_size)
-        
+
         # Create rotating file handler
         file_handler = RotatingFileHandler(
             filename=settings.audit_log_file_path,
@@ -57,21 +56,21 @@ class AuditLogger:
             backupCount=settings.audit_log_backup_count,
             encoding='utf-8'
         )
-        
+
         # Set formatter
         formatter = logging.Formatter(
             fmt='%(asctime)s | AUDIT | %(message)s',
             datefmt='%Y-%m-%d %H:%M:%S'
         )
         file_handler.setFormatter(formatter)
-        
+
         # Create logger
         self._file_logger = logging.getLogger('audit_logger')
         self._file_logger.setLevel(logging.INFO)
         self._file_logger.handlers = []  # Clear existing handlers
         self._file_logger.addHandler(file_handler)
         self._file_logger.propagate = False  # Don't propagate to root logger
-    
+
     def _parse_file_size(self, size_str: str) -> int:
         """Parse file size string to bytes."""
         size_str = size_str.upper().strip()
@@ -81,50 +80,50 @@ class AuditLogger:
             'KB': 1024,
             'B': 1,
         }
-        
+
         for suffix, multiplier in multipliers.items():
             if size_str.endswith(suffix):
                 number_part = size_str[:-len(suffix)].strip()
                 return int(number_part) * multiplier
-        
+
         # Default to bytes if no suffix
         return int(size_str)
-    
+
     async def log(
         self,
         operation_type: str,
         operation_module: str,
-        object_type: Optional[str] = None,
-        object_id: Optional[str] = None,
-        object_name: Optional[str] = None,
-        before_data: Optional[Dict[str, Any]] = None,
-        after_data: Optional[Dict[str, Any]] = None,
-        operator_id: Optional[int] = None,
-        operator_name: Optional[str] = None,
-        operator_ip: Optional[str] = None,
-        user_agent: Optional[str] = None,
+        object_type: str | None = None,
+        object_id: str | None = None,
+        object_name: str | None = None,
+        before_data: dict[str, Any] | None = None,
+        after_data: dict[str, Any] | None = None,
+        operator_id: int | None = None,
+        operator_name: str | None = None,
+        operator_ip: str | None = None,
+        user_agent: str | None = None,
         status: str = "SUCCESS",
-        error_message: Optional[str] = None,
-        request_id: Optional[str] = None,
-        duration_ms: Optional[int] = None,
-    ) -> Optional[AuditLog]:
+        error_message: str | None = None,
+        request_id: str | None = None,
+        duration_ms: int | None = None,
+    ) -> AuditLog | None:
         """
         Log an audit event to both database and file.
-        
+
         Returns:
             AuditLog instance if database logging succeeded, None otherwise
         """
         if not self.enabled:
             return None
-        
+
         # Generate request ID if not provided
         if not request_id:
             request_id = str(uuid.uuid4())
-        
+
         # Sanitize data
         before_data_sanitized = sanitize_sensitive_data(before_data) if before_data else None
         after_data_sanitized = sanitize_sensitive_data(after_data) if after_data else None
-        
+
         # Log to file (always synchronous)
         self._log_to_file(
             operation_type=operation_type,
@@ -142,7 +141,7 @@ class AuditLogger:
             before_data=before_data_sanitized,
             after_data=after_data_sanitized,
         )
-        
+
         # Log to database
         try:
             audit_log = await self._log_to_database(
@@ -167,28 +166,28 @@ class AuditLogger:
             # Log error but don't fail the operation
             logging.error(f"Failed to write audit log to database: {e}")
             return None
-    
+
     def _log_to_file(
         self,
         operation_type: str,
         operation_module: str,
-        object_type: Optional[str],
-        object_id: Optional[str],
-        object_name: Optional[str],
-        operator_id: Optional[int],
-        operator_name: Optional[str],
-        operator_ip: Optional[str],
+        object_type: str | None,
+        object_id: str | None,
+        object_name: str | None,
+        operator_id: int | None,
+        operator_name: str | None,
+        operator_ip: str | None,
         status: str,
-        error_message: Optional[str],
+        error_message: str | None,
         request_id: str,
-        duration_ms: Optional[int],
-        before_data: Optional[Dict],
-        after_data: Optional[Dict],
+        duration_ms: int | None,
+        before_data: dict | None,
+        after_data: dict | None,
     ):
         """Log to file."""
         if not self._file_logger:
             return
-        
+
         # Build log message
         log_data = {
             'request_id': request_id,
@@ -202,25 +201,25 @@ class AuditLogger:
             'duration_ms': duration_ms,
             'error': error_message,
         }
-        
+
         # Add data changes summary
         if before_data or after_data:
             log_data['changes'] = self._summarize_changes(before_data, after_data)
-        
+
         # Convert to JSON string
         log_message = json.dumps(log_data, ensure_ascii=False, default=str)
-        
+
         # Write to file
         self._file_logger.info(log_message)
-    
+
     def _summarize_changes(
         self,
-        before_data: Optional[Dict],
-        after_data: Optional[Dict]
-    ) -> Dict[str, Any]:
+        before_data: dict | None,
+        after_data: dict | None
+    ) -> dict[str, Any]:
         """Summarize changes between before and after data."""
         summary = {}
-        
+
         if before_data and after_data:
             # Find changed fields
             changed = {}
@@ -235,26 +234,26 @@ class AuditLogger:
             summary['created'] = list(after_data.keys())
         elif before_data:
             summary['deleted'] = list(before_data.keys())
-        
+
         return summary
-    
+
     async def _log_to_database(
         self,
         operation_type: str,
         operation_module: str,
-        object_type: Optional[str],
-        object_id: Optional[str],
-        object_name: Optional[str],
-        before_data: Optional[Dict],
-        after_data: Optional[Dict],
-        operator_id: Optional[int],
-        operator_name: Optional[str],
-        operator_ip: Optional[str],
-        user_agent: Optional[str],
+        object_type: str | None,
+        object_id: str | None,
+        object_name: str | None,
+        before_data: dict | None,
+        after_data: dict | None,
+        operator_id: int | None,
+        operator_name: str | None,
+        operator_ip: str | None,
+        user_agent: str | None,
         status: str,
-        error_message: Optional[str],
+        error_message: str | None,
         request_id: str,
-        duration_ms: Optional[int],
+        duration_ms: int | None,
     ) -> AuditLog:
         """Log to database."""
         async with AsyncSessionLocal() as db:
@@ -275,11 +274,11 @@ class AuditLogger:
                 request_id=request_id,
                 duration_ms=duration_ms,
             )
-            
+
             db.add(audit_log)
             await db.commit()
             await db.refresh(audit_log)
-            
+
             return audit_log
 
 

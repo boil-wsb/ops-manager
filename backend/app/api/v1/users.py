@@ -2,7 +2,6 @@
 User management API routes.
 """
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select
@@ -12,7 +11,6 @@ from app.api.deps import get_db, require_permissions
 from app.core.audit import audit_log
 from app.crud.crud_role import crud_role
 from app.crud.crud_user import crud_user
-from app.models.permission import Role
 from app.models.user import User
 from app.schemas.user import UserCreate, UserResponse, UserUpdate
 
@@ -24,8 +22,8 @@ logger = logging.getLogger(__name__)
 async def list_users(
     page: int = 1,
     page_size: int = 20,
-    keyword: Optional[str] = None,
-    is_active: Optional[bool] = None,
+    keyword: str | None = None,
+    is_active: bool | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permissions(["user:read"])),
 ):
@@ -154,7 +152,7 @@ async def update_user(
             )
 
     if user_in.is_superuser is not None and not current_user.is_superuser:
-        logger.warning(f"[用户管理] 非超级管理员无权修改超级管理员权限")
+        logger.warning("[用户管理] 非超级管理员无权修改超级管理员权限")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="只有超级管理员才能修改超级管理员权限",

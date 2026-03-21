@@ -1,7 +1,6 @@
 """
 Permission management API routes.
 """
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,8 +27,8 @@ MODULE_NAMES = {
 
 @router.get("", response_model=dict)
 async def list_permissions(
-    module: Optional[str] = Query(None, description="Filter by module"),
-    is_active: Optional[bool] = Query(None, description="Filter by active status"),
+    module: str | None = Query(None, description="Filter by module"),
+    is_active: bool | None = Query(None, description="Filter by active status"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=1000, description="Page size"),
     db: AsyncSession = Depends(get_db),

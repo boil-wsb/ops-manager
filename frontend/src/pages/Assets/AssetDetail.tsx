@@ -189,11 +189,9 @@ const AssetDetail = () => {
                             value={metrics.metrics.cpu.usagePercent}
                             suffix="%"
                             precision={1}
-                            styles={{
-                              content: {
-                                color: metrics.metrics.cpu.usagePercent > 80 ? '#cf1322' :
-                                       metrics.metrics.cpu.usagePercent > 60 ? '#faad14' : '#3f8600'
-                              }
+                            style={{
+                              color: metrics.metrics.cpu.usagePercent > 80 ? '#cf1322' :
+                                     metrics.metrics.cpu.usagePercent > 60 ? '#faad14' : '#3f8600'
                             }}
                           />
                           <div style={{ fontSize: 12, color: '#999', marginTop: 8 }}>
@@ -210,11 +208,9 @@ const AssetDetail = () => {
                             value={metrics.metrics.memory.usagePercent}
                             suffix="%"
                             precision={1}
-                            styles={{
-                              content: {
-                                color: metrics.metrics.memory.usagePercent > 80 ? '#cf1322' :
-                                       metrics.metrics.memory.usagePercent > 60 ? '#faad14' : '#3f8600'
-                              }
+                            style={{
+                              color: metrics.metrics.memory.usagePercent > 80 ? '#cf1322' :
+                                     metrics.metrics.memory.usagePercent > 60 ? '#faad14' : '#3f8600'
                             }}
                           />
                           <div style={{ fontSize: 12, color: '#999', marginTop: 8 }}>
@@ -231,11 +227,9 @@ const AssetDetail = () => {
                             value={metrics.metrics.disk.usagePercent}
                             suffix="%"
                             precision={1}
-                            styles={{
-                              content: {
-                                color: metrics.metrics.disk.usagePercent > 80 ? '#cf1322' :
-                                       metrics.metrics.disk.usagePercent > 60 ? '#faad14' : '#3f8600'
-                              }
+                            style={{
+                              color: metrics.metrics.disk.usagePercent > 80 ? '#cf1322' :
+                                     metrics.metrics.disk.usagePercent > 60 ? '#faad14' : '#3f8600'
                             }}
                           />
                           <div style={{ fontSize: 12, color: '#999', marginTop: 8 }}>

@@ -1,16 +1,15 @@
 """
 Models package.
 """
-from app.models.base import BaseModel
-
-from app.models.user import User, user_roles
-from app.models.permission import Permission, Role, role_permissions
 from app.models.asset import Asset, Label, asset_labels
-from app.models.monitor import Monitor, Alert, AlertRule, NotificationChannel
 from app.models.audit_log import AuditLog
-from app.models.navigation import NavigationLink, navigation_link_roles
+from app.models.base import BaseModel
 from app.models.it_feedback import ITFeedback
-from app.models.ops import Deployment, InspectionTask, InspectionReport, Certificate, DNSRecord
+from app.models.monitor import Alert, AlertRule, Monitor, NotificationChannel
+from app.models.navigation import NavigationLink, navigation_link_roles
+from app.models.ops import Certificate, Deployment, DNSRecord, InspectionReport, InspectionTask
+from app.models.permission import Permission, Role, role_permissions
+from app.models.user import User, user_roles
 
 __all__ = [
     "BaseModel",

@@ -1,10 +1,8 @@
 """
 Navigation link schemas.
 """
-from typing import Optional, List
-from datetime import datetime
 
-from app.schemas.base import BaseSchema, BaseResponse
+from app.schemas.base import BaseResponse, BaseSchema
 
 
 class NavigationLinkCreate(BaseSchema):
@@ -12,8 +10,8 @@ class NavigationLinkCreate(BaseSchema):
     category: str
     name: str
     url: str
-    icon: Optional[str] = None
-    description: Optional[str] = None
+    icon: str | None = None
+    description: str | None = None
     sort_order: int = 0
     is_active: bool = True
     restrict_to_current_role: bool = True
@@ -21,14 +19,14 @@ class NavigationLinkCreate(BaseSchema):
 
 class NavigationLinkUpdate(BaseSchema):
     """Schema for updating a navigation link."""
-    category: Optional[str] = None
-    name: Optional[str] = None
-    url: Optional[str] = None
-    icon: Optional[str] = None
-    description: Optional[str] = None
-    sort_order: Optional[int] = None
-    is_active: Optional[bool] = None
-    restrict_to_current_role: Optional[bool] = None
+    category: str | None = None
+    name: str | None = None
+    url: str | None = None
+    icon: str | None = None
+    description: str | None = None
+    sort_order: int | None = None
+    is_active: bool | None = None
+    restrict_to_current_role: bool | None = None
 
 
 class RoleBrief(BaseSchema):
@@ -42,20 +40,20 @@ class NavigationLinkResponse(BaseResponse):
     category: str
     name: str
     url: str
-    icon: Optional[str] = None
-    description: Optional[str] = None
+    icon: str | None = None
+    description: str | None = None
     sort_order: int
     is_active: bool
-    roles: List[RoleBrief] = []
+    roles: list[RoleBrief] = []
 
 
 class NavigationLinkListResponse(BaseSchema):
     """Schema for navigation link list response."""
-    items: List[NavigationLinkResponse]
+    items: list[NavigationLinkResponse]
     total: int
 
 
 class NavigationLinkGrouped(BaseSchema):
     """Schema for navigation links grouped by category."""
     category: str
-    links: List[NavigationLinkResponse]
+    links: list[NavigationLinkResponse]

@@ -146,7 +146,6 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ open, onClose, asset })
     >
       {isPrometheusSource && (
         <Alert
-          title="Prometheus 同步资产"
           description="此资产从 Prometheus 自动同步，基础信息字段不可编辑。您只能修改负责人、标签和描述等扩展信息。"
           type="info"
           showIcon

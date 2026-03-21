@@ -2,9 +2,8 @@
 Navigation link model for external quick links.
 """
 from datetime import datetime
-from typing import Optional, List
 
-from sqlalchemy import String, Boolean, Integer, Table, Column, ForeignKey, DateTime
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Table
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
@@ -26,12 +25,12 @@ class NavigationLink(BaseModel):
     category: Mapped[str] = mapped_column(String(50), index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     url: Mapped[str] = mapped_column(String(500), nullable=False)
-    icon: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    icon: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    description: Mapped[str | None] = mapped_column(String(255), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
-    roles: Mapped[List["Role"]] = relationship(
+    roles: Mapped[list["Role"]] = relationship(
         "Role",
         secondary=navigation_link_roles,
         backref="navigation_links",

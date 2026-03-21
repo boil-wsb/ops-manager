@@ -1,21 +1,19 @@
 """
 User schemas.
 """
-from datetime import datetime
-from typing import Optional, List
-from pydantic import BaseModel, ConfigDict, Field, field_validator
 import re
+from datetime import datetime
 
-from app.schemas.base import BaseResponse
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class UserBase(BaseModel):
     """Base user schema."""
     username: str = Field(..., min_length=3, max_length=50)
-    email: Optional[str] = None
-    full_name: Optional[str] = Field(None, max_length=100)
+    email: str | None = None
+    full_name: str | None = Field(None, max_length=100)
     is_active: bool = True
-    
+
     @field_validator('email')
     @classmethod
     def validate_email(cls, v):
@@ -30,18 +28,18 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     """User creation schema."""
     password: str = Field(..., min_length=8, max_length=100)
-    role_ids: List[int] = []
+    role_ids: list[int] = []
 
 
 class UserUpdate(BaseModel):
     """User update schema."""
-    email: Optional[str] = None
-    full_name: Optional[str] = Field(None, max_length=100)
-    is_active: Optional[bool] = None
-    is_superuser: Optional[bool] = None
-    password: Optional[str] = Field(None, min_length=8, max_length=100)
-    role_ids: Optional[List[int]] = None
-    
+    email: str | None = None
+    full_name: str | None = Field(None, max_length=100)
+    is_active: bool | None = None
+    is_superuser: bool | None = None
+    password: str | None = Field(None, min_length=8, max_length=100)
+    role_ids: list[int] | None = None
+
     @field_validator('email')
     @classmethod
     def validate_email(cls, v):
@@ -56,7 +54,7 @@ class UserInDB(UserBase):
     """User in database schema."""
     id: int
     is_superuser: bool
-    last_login: Optional[datetime] = None
+    last_login: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -70,10 +68,10 @@ class UserResponse(UserBase):
 
     id: int
     is_superuser: bool
-    last_login: Optional[datetime] = None
+    last_login: datetime | None = None
     created_at: datetime
     updated_at: datetime
-    permissions: List[str] = []
+    permissions: list[str] = []
 
 
 class UserLogin(BaseModel):
@@ -94,23 +92,23 @@ class TokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     expires_in: int
-    permissions: List[str] = []
-    user: Optional[UserResponse] = None
+    permissions: list[str] = []
+    user: UserResponse | None = None
 
 
 class RoleBase(BaseModel):
     """Base role schema."""
     name: str = Field(..., min_length=1, max_length=50)
-    description: Optional[str] = Field(None, max_length=255)
+    description: str | None = Field(None, max_length=255)
 
 
 class RoleCreate(RoleBase):
     """Role creation schema."""
-    permissions: List[str] = []
+    permissions: list[str] = []
 
 
 class RoleResponse(RoleBase):
     """Role response schema."""
     id: int
-    permissions: List[str]
+    permissions: list[str]
     created_at: datetime

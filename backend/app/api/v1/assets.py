@@ -93,7 +93,7 @@ async def trigger_asset_sync(
             "task_id": task.id,
             "status": "pending",
         }
-    except Exception as e:
+    except Exception:
         from app.services.prometheus.asset_sync import sync_assets_from_prometheus
 
         result = await sync_assets_from_prometheus(db)
@@ -113,6 +113,7 @@ async def sync_terminals_from_pc_info(
 ):
     """从 Prometheus pc_info 指标同步终端资产"""
     import logging
+
     from sqlalchemy import select
 
     from app.models.asset import Asset, AssetSource, AssetStatus, AssetType, SyncStatus

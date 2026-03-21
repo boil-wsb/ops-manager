@@ -1,12 +1,11 @@
 """
 Authentication API routes.
 """
-from datetime import datetime
-from typing import Optional
-
 import logging
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
@@ -41,11 +40,11 @@ def extract_user_permissions(user: User) -> list[str]:
                 if permission.is_active:
                     permissions.add(permission.code)
 
-    return sorted(list(permissions))
+    return sorted(permissions)
 
 
 async def get_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """Get current user from JWT token."""

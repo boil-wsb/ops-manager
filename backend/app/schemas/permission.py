@@ -2,7 +2,7 @@
 Permission and Role schemas.
 """
 from datetime import datetime
-from typing import Optional, List
+
 from pydantic import BaseModel, Field
 
 
@@ -13,7 +13,7 @@ class PermissionBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     module: str = Field(..., min_length=1, max_length=50)
     action: str = Field(..., min_length=1, max_length=50)
-    description: Optional[str] = Field(None, max_length=255)
+    description: str | None = Field(None, max_length=255)
     is_active: bool = True
 
 
@@ -24,9 +24,9 @@ class PermissionCreate(PermissionBase):
 
 class PermissionUpdate(BaseModel):
     """Permission update schema."""
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    description: Optional[str] = Field(None, max_length=255)
-    is_active: Optional[bool] = None
+    name: str | None = Field(None, min_length=1, max_length=100)
+    description: str | None = Field(None, max_length=255)
+    is_active: bool | None = None
 
 
 class PermissionResponse(PermissionBase):
@@ -49,20 +49,20 @@ class PermissionModule(BaseModel):
 class RoleBase(BaseModel):
     """Base role schema."""
     name: str = Field(..., min_length=1, max_length=50)
-    description: Optional[str] = Field(None, max_length=255)
+    description: str | None = Field(None, max_length=255)
     is_active: bool = True
 
 
 class RoleCreate(RoleBase):
     """Role creation schema."""
-    permission_ids: List[int] = []
+    permission_ids: list[int] = []
 
 
 class RoleUpdate(BaseModel):
     """Role update schema."""
-    name: Optional[str] = Field(None, min_length=1, max_length=50)
-    description: Optional[str] = Field(None, max_length=255)
-    is_active: Optional[bool] = None
+    name: str | None = Field(None, min_length=1, max_length=50)
+    description: str | None = Field(None, max_length=255)
+    is_active: bool | None = None
 
 
 class RoleResponse(RoleBase):
@@ -82,7 +82,7 @@ class RoleDetailResponse(RoleBase):
     """Role detail response schema with permissions."""
     id: int
     is_system: bool
-    permissions: List[PermissionResponse]
+    permissions: list[PermissionResponse]
     created_at: datetime
     updated_at: datetime
 
@@ -92,30 +92,30 @@ class RoleDetailResponse(RoleBase):
 
 class RolePermissionUpdate(BaseModel):
     """Role permission update schema."""
-    permission_ids: List[int]
+    permission_ids: list[int]
 
 
 class RolePermissionResponse(BaseModel):
     """Role permission response schema."""
     role_id: int
-    permissions: List[PermissionResponse]
+    permissions: list[PermissionResponse]
     permission_count: int
 
 
 # User Role Schemas
 class UserRoleUpdate(BaseModel):
     """User role update schema."""
-    role_ids: List[int]
+    role_ids: list[int]
 
 
 class UserRoleResponse(BaseModel):
     """User role response schema."""
     user_id: int
-    roles: List[RoleResponse]
+    roles: list[RoleResponse]
 
 
 class UserPermissionsResponse(BaseModel):
     """User permissions response schema."""
     user_id: int
-    permissions: List[str]
+    permissions: list[str]
     permission_tree: dict

@@ -2,7 +2,6 @@
 Monitoring and alerting API routes.
 """
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy import and_, func, select
@@ -41,9 +40,9 @@ crud_notification_channel = CRUDBase(NotificationChannel)
 async def list_monitors(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
-    monitor_type: Optional[str] = Query(None),
-    status: Optional[str] = Query(None),
-    is_enabled: Optional[bool] = Query(None),
+    monitor_type: str | None = Query(None),
+    status: str | None = Query(None),
+    is_enabled: bool | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user=require_permissions(["monitor:read"]),
 ):
@@ -155,9 +154,9 @@ async def toggle_monitor(
 async def list_alerts(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
-    status: Optional[str] = Query(None),
-    severity: Optional[str] = Query(None),
-    monitor_id: Optional[int] = Query(None),
+    status: str | None = Query(None),
+    severity: str | None = Query(None),
+    monitor_id: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user=require_permissions(["monitor:read"]),
 ):
@@ -235,7 +234,7 @@ async def alert_action(
 async def list_alert_rules(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
-    is_enabled: Optional[bool] = Query(None),
+    is_enabled: bool | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user=require_permissions(["monitor:read"]),
 ):

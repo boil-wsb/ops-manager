@@ -2,17 +2,18 @@
 FastAPI application entry point.
 """
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
+from app.api.router import api_router
 from app.config import settings
-from app.core.logging import configure_logging, get_logger
-from app.core.redis import init_redis, close_redis
+from app.core.logging import get_logger
 from app.core.middleware import RequestLoggingMiddleware
 from app.core.rate_limit import limiter
-from app.api.router import api_router
+from app.core.redis import close_redis, init_redis
 from app.db.init_db import init_db
 
 logger = get_logger(__name__)

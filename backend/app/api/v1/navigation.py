@@ -2,7 +2,6 @@
 Navigation link management API routes.
 """
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
@@ -27,7 +26,7 @@ logger = logging.getLogger(__name__)
 @router.get("/public", response_model=dict)
 async def get_public_navigation_links(
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
     """Get active navigation links grouped by category, filtered by user roles."""
     if current_user and not current_user.is_superuser:
@@ -47,8 +46,8 @@ async def get_public_navigation_links(
 
 @router.get("", response_model=dict)
 async def list_navigation_links(
-    category: Optional[str] = Query(None, description="Filter by category"),
-    is_active: Optional[bool] = Query(None, description="Filter by active status"),
+    category: str | None = Query(None, description="Filter by category"),
+    is_active: bool | None = Query(None, description="Filter by active status"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Page size"),
     db: AsyncSession = Depends(get_db),

@@ -6,7 +6,7 @@ from fastapi import HTTPException, status
 
 class AppException(HTTPException):
     """Base application exception."""
-    
+
     def __init__(
         self,
         status_code: int,
@@ -20,7 +20,7 @@ class AppException(HTTPException):
 
 class AuthenticationError(AppException):
     """Authentication error."""
-    
+
     def __init__(self, detail: str = "Authentication failed"):
         super().__init__(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -32,7 +32,7 @@ class AuthenticationError(AppException):
 
 class PermissionDeniedError(AppException):
     """Permission denied error."""
-    
+
     def __init__(self, detail: str = "Permission denied"):
         super().__init__(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -43,7 +43,7 @@ class PermissionDeniedError(AppException):
 
 class NotFoundError(AppException):
     """Resource not found error."""
-    
+
     def __init__(self, detail: str = "Resource not found"):
         super().__init__(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -54,7 +54,7 @@ class NotFoundError(AppException):
 
 class ValidationError(AppException):
     """Validation error."""
-    
+
     def __init__(self, detail: str = "Validation error"):
         super().__init__(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -65,7 +65,7 @@ class ValidationError(AppException):
 
 class ConflictError(AppException):
     """Resource conflict error."""
-    
+
     def __init__(self, detail: str = "Resource conflict"):
         super().__init__(
             status_code=status.HTTP_409_CONFLICT,

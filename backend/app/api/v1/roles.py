@@ -2,10 +2,8 @@
 Role management API routes.
 """
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
@@ -13,7 +11,6 @@ from app.core.audit import audit_log
 from app.core.permissions import require_permissions
 from app.crud.crud_permission import crud_permission
 from app.crud.crud_role import crud_role
-from app.models.permission import Role
 from app.models.user import User
 from app.schemas.permission import (
     PermissionResponse,
@@ -31,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 @router.get("", response_model=dict)
 async def list_roles(
-    is_active: Optional[bool] = Query(None, description="Filter by active status"),
+    is_active: bool | None = Query(None, description="Filter by active status"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Page size"),
     db: AsyncSession = Depends(get_db),
