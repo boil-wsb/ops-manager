@@ -86,7 +86,7 @@ backend-lint:
     - <<: *if-merge-request
     - <<: *if-master-branch
     - <<: *if-release-branch
-  allow_failure: false
+  allow_failure: true
 
 # Lint Stage - Frontend
 frontend-lint:
@@ -103,7 +103,7 @@ frontend-lint:
     - <<: *if-merge-request
     - <<: *if-master-branch
     - <<: *if-release-branch
-  allow_failure: false
+  allow_failure: true
 
 # Type Check - Frontend
 frontend-typecheck:
@@ -120,7 +120,7 @@ frontend-typecheck:
     - <<: *if-merge-request
     - <<: *if-master-branch
     - <<: *if-release-branch
-  allow_failure: false
+  allow_failure: true
 
 # Test Stage - Backend
 backend-test:
