@@ -3,22 +3,17 @@ Permission management API routes.
 """
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_db, get_current_user
-from app.crud.crud_permission import crud_permission
-from app.schemas.permission import (
-    PermissionResponse,
-    PermissionModule,
-)
+from app.api.deps import get_current_user, get_db
 from app.core.permissions import require_permissions
+from app.crud.crud_permission import crud_permission
 from app.models.user import User
+from app.schemas.permission import PermissionModule, PermissionResponse
 
 router = APIRouter(prefix="/permissions")
 
-
-# Module name mapping
 MODULE_NAMES = {
     "user": "用户管理",
     "role": "角色管理",
@@ -41,11 +36,10 @@ async def list_permissions(
     current_user: User = Depends(get_current_user),
 ):
     """Get permission list with filters."""
-    # Check permission
     require_permissions(["role:read"])(current_user)
-    
+
     skip = (page - 1) * page_size
-    
+
     permissions, total = await crud_permission.get_multi_with_filters(
         db,
         module=module,
@@ -53,8 +47,7 @@ async def list_permissions(
         skip=skip,
         limit=page_size,
     )
-    
-    # Group permissions by module
+
     module_groups = {}
     for perm in permissions:
         if perm.module not in module_groups:
@@ -66,7 +59,7 @@ async def list_permissions(
         module_groups[perm.module]["permissions"].append(
             PermissionResponse.model_validate(perm)
         )
-    
+
     return {
         "items": list(module_groups.values()),
         "total": total,
@@ -81,15 +74,14 @@ async def get_permission_modules(
     current_user: User = Depends(get_current_user),
 ):
     """Get all permission modules."""
-    # Check permission
     require_permissions(["role:read"])(current_user)
-    
+
     modules = await crud_permission.get_modules(db)
-    
+
     return [
         PermissionModule(
             code=module,
-            name=MODULE_NAMES.get(module, module)
+            name=MODULE_NAMES.get(module, module),
         )
         for module in modules
     ]
@@ -102,15 +94,14 @@ async def get_permission(
     current_user: User = Depends(get_current_user),
 ):
     """Get permission by ID."""
-    # Check permission
     require_permissions(["role:read"])(current_user)
-    
+
     permission = await crud_permission.get(db, id=permission_id)
-    
+
     if not permission:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="权限不存在",
         )
-    
+
     return permission

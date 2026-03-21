@@ -4,24 +4,21 @@ Navigation link management API routes.
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
-from app.api.deps import get_db, get_current_user, get_current_user_optional
+from app.api.deps import get_current_user, get_current_user_optional, get_db
+from app.core.audit import audit_log
+from app.core.permissions import require_permissions
 from app.crud.crud_navigation import navigation_link
+from app.models.permission import Role
+from app.models.user import User
 from app.schemas.navigation import (
     NavigationLinkCreate,
-    NavigationLinkUpdate,
     NavigationLinkResponse,
-    NavigationLinkListResponse,
-    NavigationLinkGrouped,
+    NavigationLinkUpdate,
 )
-from app.core.permissions import require_permissions
-from app.core.audit import audit_log
-from app.models.user import User
-from app.models.permission import Role
 
 router = APIRouter(prefix="/navigation")
 logger = logging.getLogger(__name__)
@@ -38,7 +35,7 @@ async def get_public_navigation_links(
         grouped = await navigation_link.get_grouped_links_for_user(db, user_role_ids)
     else:
         grouped = await navigation_link.get_grouped_links(db)
-    
+
     result = []
     for category, links in grouped.items():
         result.append({
@@ -59,9 +56,9 @@ async def list_navigation_links(
 ):
     """Get navigation link list with filters."""
     require_permissions(["navigation:read"])(current_user)
-    
+
     skip = (page - 1) * page_size
-    
+
     links = await navigation_link.get_multi_with_filter(
         db,
         category=category,
@@ -69,13 +66,13 @@ async def list_navigation_links(
         skip=skip,
         limit=page_size,
     )
-    
+
     total = await navigation_link.count_with_filter(
         db,
         category=category,
         is_active=is_active,
     )
-    
+
     return {
         "items": [NavigationLinkResponse.model_validate(link) for link in links],
         "total": total,
@@ -95,14 +92,14 @@ async def create_navigation_link(
     """Create a new navigation link."""
     require_permissions(["navigation:create"])(current_user)
     logger.info(f"[导航管理] 创建导航链接 '{link_in.name}'")
-    
+
     role_ids = None
     if link_in.restrict_to_current_role and current_user.roles:
         role_ids = [role.id for role in current_user.roles]
-    
+
     link = await navigation_link.create_with_roles(db, obj_in=link_in, role_ids=role_ids)
     logger.info(f"[导航管理] 导航链接 '{link.name}' 创建成功，ID: {link.id}")
-    
+
     return NavigationLinkResponse.model_validate(link)
 
 
@@ -114,15 +111,15 @@ async def get_navigation_link(
 ):
     """Get navigation link by ID."""
     require_permissions(["navigation:read"])(current_user)
-    
+
     link = await navigation_link.get_with_roles(db, id=link_id)
-    
+
     if not link:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="导航链接不存在",
         )
-    
+
     return NavigationLinkResponse.model_validate(link)
 
 
@@ -137,15 +134,15 @@ async def update_navigation_link(
 ):
     """Update a navigation link."""
     require_permissions(["navigation:update"])(current_user)
-    
+
     link = await navigation_link.get_with_roles(db, id=link_id)
-    
+
     if not link:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="导航链接不存在",
         )
-    
+
     role_ids = None
     if link_in.restrict_to_current_role is not None:
         if link_in.restrict_to_current_role:
@@ -154,10 +151,7 @@ async def update_navigation_link(
                     select(Role).where(Role.name == "superadmin")
                 )
                 superadmin_role = role_result.scalar_one_or_none()
-                if superadmin_role:
-                    role_ids = [superadmin_role.id]
-                else:
-                    role_ids = []
+                role_ids = [superadmin_role.id] if superadmin_role else []
             elif not current_user.roles:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -167,10 +161,10 @@ async def update_navigation_link(
                 role_ids = [role.id for role in current_user.roles]
         else:
             role_ids = []
-    
+
     link = await navigation_link.update_with_roles(db, db_obj=link, obj_in=link_in, role_ids=role_ids)
     logger.info(f"[导航管理] 导航链接 '{link.name}' 更新成功")
-    
+
     return NavigationLinkResponse.model_validate(link)
 
 
@@ -184,16 +178,16 @@ async def delete_navigation_link(
 ):
     """Delete a navigation link."""
     require_permissions(["navigation:delete"])(current_user)
-    
+
     link = await navigation_link.get(db, id=link_id)
-    
+
     if not link:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="导航链接不存在",
         )
-    
+
     await navigation_link.delete(db, id=link_id)
     logger.info(f"[导航管理] 导航链接 ID={link_id} 删除成功")
-    
+
     return None

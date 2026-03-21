@@ -6,7 +6,6 @@ from celery.schedules import crontab
 
 from app.config import settings
 
-# Create Celery app
 celery_app = Celery(
     "opsmanager",
     broker=settings.celery_broker_url,
@@ -18,80 +17,62 @@ celery_app = Celery(
         "app.tasks.audit_log_cleanup",
         "app.tasks.asset_sync_tasks",
         "app.tasks.certificate_sync_tasks",
-    ]
+    ],
 )
 
-# Celery configuration
 celery_app.conf.update(
-    # Task serialization
     task_serializer="json",
     accept_content=["json"],
     result_serializer="json",
-    
-    # Timezone - Use Asia/Shanghai for local time
     timezone="Asia/Shanghai",
     enable_utc=False,
-    
-    # Task settings
     task_track_started=True,
-    task_time_limit=3600,  # 1 hour
-    task_soft_time_limit=3000,  # 50 minutes
-    
-    # Worker settings
+    task_time_limit=3600,
+    task_soft_time_limit=3000,
     worker_prefetch_multiplier=1,
     worker_max_tasks_per_child=1000,
-    
-    # Result settings
-    result_expires=3600 * 24,  # 24 hours
+    result_expires=3600 * 24,
     result_backend=settings.celery_result_backend,
-    
-    # Beat schedule (will be populated dynamically)
     beat_schedule={},
 )
 
 
 def setup_periodic_tasks(sender, **kwargs):
     """Setup periodic tasks."""
-    # Import here to avoid circular imports
-    from app.tasks.monitor_tasks import check_all_monitors
+    from app.tasks.asset_sync_tasks import get_sync_interval, sync_assets_from_prometheus_task
     from app.tasks.audit_log_cleanup import cleanup_audit_logs_db, cleanup_audit_logs_file
-    from app.tasks.asset_sync_tasks import sync_assets_from_prometheus_task, get_sync_interval
     from app.tasks.certificate_sync_tasks import sync_certificates_from_prometheus_task
+    from app.tasks.monitor_tasks import check_all_monitors
 
-    # Add periodic task for checking monitors every minute
     sender.add_periodic_task(
-        60.0,  # Every 60 seconds
+        60.0,
         check_all_monitors.s(),
-        name="check-all-monitors"
+        name="check-all-monitors",
     )
 
-    # Add periodic task for audit log database cleanup - daily at 03:00 (Asia/Shanghai)
     sender.add_periodic_task(
         crontab(hour=3, minute=0),
         cleanup_audit_logs_db.s(),
-        name="cleanup-audit-logs-db"
+        name="cleanup-audit-logs-db",
     )
 
-    # Add periodic task for audit log file cleanup - daily at 03:30 (Asia/Shanghai)
     sender.add_periodic_task(
         crontab(hour=3, minute=30),
         cleanup_audit_logs_file.s(),
-        name="cleanup-audit-logs-file"
+        name="cleanup-audit-logs-file",
     )
 
-    # Add periodic task for asset sync from Prometheus (default: every 30 minutes)
     sync_interval = get_sync_interval()
     sender.add_periodic_task(
         sync_interval,
         sync_assets_from_prometheus_task.s(),
-        name="sync-assets-from-prometheus"
+        name="sync-assets-from-prometheus",
     )
 
-    # Add periodic task for certificate sync from Prometheus - daily at 03:00 (Asia/Shanghai)
     sender.add_periodic_task(
         crontab(hour=3, minute=0),
         sync_certificates_from_prometheus_task.s(),
-        name="sync-certificates-from-prometheus"
+        name="sync-certificates-from-prometheus",
     )
 
 

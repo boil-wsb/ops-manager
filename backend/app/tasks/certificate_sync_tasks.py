@@ -6,13 +6,13 @@
 import asyncio
 import logging
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any
 
 from celery import shared_task
 
 from app.config import settings
-from app.tasks.utils import get_celery_async_session
 from app.services.prometheus import PrometheusClient
+from app.tasks.utils import get_celery_async_session
 
 logger = logging.getLogger(__name__)
 
@@ -23,13 +23,12 @@ logger = logging.getLogger(__name__)
     max_retries=3,
     default_retry_delay=60,
 )
-def sync_certificates_from_prometheus_task(self) -> Dict[str, Any]:
-    """
-    从 Prometheus 同步 SSL 证书的 Celery 任务
+def sync_certificates_from_prometheus_task(self) -> dict[str, Any]:
+    """从 Prometheus 同步 SSL 证书的 Celery 任务
 
     每日执行一次，自动同步所有监控的 SSL 证书信息
     """
-    if not getattr(settings, 'PROMETHEUS_SYNC_ENABLED', True):
+    if not getattr(settings, "PROMETHEUS_SYNC_ENABLED", True):
         logger.info("Certificate sync from Prometheus is disabled")
         return {"status": "skipped", "reason": "sync_disabled"}
 
@@ -37,11 +36,12 @@ def sync_certificates_from_prometheus_task(self) -> Dict[str, Any]:
     start_time = datetime.utcnow()
 
     async def _sync():
-        SessionLocal = get_celery_async_session()
+        session_local = get_celery_async_session()
 
-        async with SessionLocal() as db:
+        async with session_local() as db:
             try:
                 from sqlalchemy import select
+
                 from app.models.ops import Certificate
 
                 prometheus_client = PrometheusClient()
@@ -123,6 +123,6 @@ def sync_certificates_from_prometheus_task(self) -> Dict[str, Any]:
 
             except Exception as exc:
                 logger.error(f"Certificate sync failed: {exc}")
-                raise self.retry(exc=exc)
+                raise self.retry(exc=exc) from exc
 
     return asyncio.run(_sync())

@@ -6,13 +6,13 @@
 import asyncio
 import logging
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any
 
 from celery import shared_task
 
 from app.config import settings
-from app.tasks.utils import get_celery_async_session
 from app.services.prometheus.asset_sync_optimized import OptimizedAssetSyncService
+from app.tasks.utils import get_celery_async_session
 
 logger = logging.getLogger(__name__)
 
@@ -23,13 +23,12 @@ logger = logging.getLogger(__name__)
     max_retries=3,
     default_retry_delay=60,
 )
-def sync_assets_from_prometheus_task(self) -> Dict[str, Any]:
-    """
-    从 Prometheus 同步资产的 Celery 任务
+def sync_assets_from_prometheus_task(self) -> dict[str, Any]:
+    """从 Prometheus 同步资产的 Celery 任务
 
     每 30 分钟执行一次，自动发现和同步所有监控节点
     """
-    if not getattr(settings, 'PROMETHEUS_SYNC_ENABLED', True):
+    if not getattr(settings, "PROMETHEUS_SYNC_ENABLED", True):
         logger.info("Asset sync from Prometheus is disabled")
         return {"status": "skipped", "reason": "sync_disabled"}
 
@@ -37,9 +36,9 @@ def sync_assets_from_prometheus_task(self) -> Dict[str, Any]:
     start_time = datetime.utcnow()
 
     async def _sync():
-        SessionLocal = get_celery_async_session()
+        session_local = get_celery_async_session()
 
-        async with SessionLocal() as db:
+        async with session_local() as db:
             try:
                 service = OptimizedAssetSyncService(db)
                 result = await service.sync_all_assets()
@@ -71,7 +70,7 @@ def sync_assets_from_prometheus_task(self) -> Dict[str, Any]:
 
             except Exception as e:
                 await db.rollback()
-                raise e
+                raise e from e
 
     try:
         return asyncio.run(_sync())
@@ -79,8 +78,10 @@ def sync_assets_from_prometheus_task(self) -> Dict[str, Any]:
         logger.error(f"Asset sync task failed: {exc}")
 
         if self.request.retries < self.max_retries:
-            logger.info(f"Retrying asset sync task (attempt {self.request.retries + 1}/{self.max_retries})")
-            raise self.retry(exc=exc)
+            logger.info(
+                f"Retrying asset sync task (attempt {self.request.retries + 1}/{self.max_retries})"
+            )
+            raise self.retry(exc=exc) from exc
 
         return {
             "status": "failed",
@@ -97,9 +98,8 @@ def sync_assets_from_prometheus_task(self) -> Dict[str, Any]:
     max_retries=2,
     default_retry_delay=30,
 )
-def sync_single_asset_task(self, instance: str) -> Dict[str, Any]:
-    """
-    同步单个资产的 Celery 任务
+def sync_single_asset_task(self, instance: str) -> dict[str, Any]:
+    """同步单个资产的 Celery 任务
 
     Args:
         instance: Prometheus 实例标识 (IP:Port)
@@ -107,9 +107,9 @@ def sync_single_asset_task(self, instance: str) -> Dict[str, Any]:
     logger.info(f"Starting single asset sync for instance: {instance}")
 
     async def _sync():
-        SessionLocal = get_celery_async_session()
-        
-        async with SessionLocal() as db:
+        session_local = get_celery_async_session()
+
+        async with session_local() as db:
             try:
                 service = OptimizedAssetSyncService(db)
                 result = await service.sync_single_asset(instance)
@@ -133,7 +133,7 @@ def sync_single_asset_task(self, instance: str) -> Dict[str, Any]:
 
             except Exception as e:
                 await db.rollback()
-                raise e
+                raise e from e
 
     try:
         return asyncio.run(_sync())
@@ -141,7 +141,7 @@ def sync_single_asset_task(self, instance: str) -> Dict[str, Any]:
         logger.error(f"Single asset sync task failed for {instance}: {exc}")
 
         if self.request.retries < self.max_retries:
-            raise self.retry(exc=exc)
+            raise self.retry(exc=exc) from exc
 
         return {
             "status": "failed",
@@ -152,10 +152,9 @@ def sync_single_asset_task(self, instance: str) -> Dict[str, Any]:
 
 
 def get_sync_interval() -> float:
-    """
-    获取同步间隔（秒）
+    """获取同步间隔（秒）
 
     从配置中读取，默认 30 分钟
     """
-    interval_minutes = getattr(settings, 'PROMETHEUS_SYNC_INTERVAL', 30)
+    interval_minutes = getattr(settings, "PROMETHEUS_SYNC_INTERVAL", 30)
     return float(interval_minutes * 60)

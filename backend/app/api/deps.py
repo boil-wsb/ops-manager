@@ -1,89 +1,88 @@
 """
 API dependencies.
 """
-from typing import Optional, List
-from fastapi import Depends, HTTPException, status, Request
+from fastapi import Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Optional
 
-from app.db.session import get_db
-from app.core.security import verify_token
 from app.core.exceptions import AuthenticationError, PermissionDeniedError
+from app.core.security import verify_token
 from app.crud.crud_user import crud_user
+from app.db.session import get_db
 
-# Security scheme
 security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Get current user from JWT token."""
     if not credentials:
         raise AuthenticationError(detail="Not authenticated")
-    
+
     token = credentials.credentials
     payload = verify_token(token)
-    
+
     if payload is None:
         raise AuthenticationError(detail="Invalid or expired token")
-    
+
     if payload.get("type") != "access":
         raise AuthenticationError(detail="Invalid token type")
-    
+
     user_id = payload.get("sub")
     if user_id is None:
         raise AuthenticationError(detail="Invalid token payload")
-    
+
     user = await crud_user.get(db, id=int(user_id))
-    
+
     if not user:
         raise AuthenticationError(detail="User not found")
-    
+
     if not user.is_active:
         raise AuthenticationError(detail="User is inactive")
-    
+
     request.state.user = user
-    
+
     return user
 
 
 async def get_current_user_optional(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> Optional[dict]:
     """Get current user from JWT token, returns None if not authenticated."""
     if not credentials:
         return None
-    
+
     token = credentials.credentials
     payload = verify_token(token)
-    
+
     if payload is None:
         return None
-    
+
     if payload.get("type") != "access":
         return None
-    
+
     user_id = payload.get("sub")
     if user_id is None:
         return None
-    
+
     user = await crud_user.get(db, id=int(user_id))
-    
+
     if not user or not user.is_active:
         return None
-    
+
     request.state.user = user
-    
+
     return user
 
 
 async def get_current_active_user(
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ) -> dict:
     """Get current active user."""
     return current_user
@@ -91,41 +90,37 @@ async def get_current_active_user(
 
 class PermissionChecker:
     """Permission checker dependency."""
-    
-    def __init__(self, required_permissions: List[str]):
+
+    def __init__(self, required_permissions: list[str]):
         self.required_permissions = required_permissions
-    
+
     async def __call__(
         self,
-        current_user = Depends(get_current_user)
+        current_user=Depends(get_current_user),
     ) -> dict:
         """Check if user has required permissions."""
-        # Get user permissions from roles
         user_permissions = []
         for role in current_user.roles:
             user_permissions.extend(role.permissions or [])
-        
-        # Check if user has any of the required permissions
+
         has_permission = any(
-            perm in user_permissions 
-            for perm in self.required_permissions
+            perm in user_permissions for perm in self.required_permissions
         )
-        
-        # Superuser has all permissions
+
         if current_user.is_superuser:
             has_permission = True
-        
+
         if not has_permission:
             raise PermissionDeniedError(
                 detail=f"Missing required permissions: {self.required_permissions}"
             )
-        
+
         return current_user
 
 
-def require_permissions(permissions: List[str]):
+def require_permissions(permissions: list[str]):
     """Create a permission checker dependency.
-    
+
     Usage:
         @router.get("/items")
         async def list_items(

@@ -3,7 +3,18 @@ API router configuration.
 """
 from fastapi import APIRouter
 
-from app.api.v1 import auth, users, assets, ops, monitor, permissions, roles, audit_logs, navigation, it_feedback
+from app.api.v1 import (
+    assets,
+    audit_logs,
+    auth,
+    it_feedback,
+    monitor,
+    navigation,
+    ops,
+    permissions,
+    roles,
+    users,
+)
 
 api_router = APIRouter()
 

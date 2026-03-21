@@ -4,26 +4,26 @@ Role management API routes.
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_db, get_current_user
-from app.crud.crud_role import crud_role
-from app.crud.crud_permission import crud_permission
-from app.schemas.permission import (
-    RoleCreate,
-    RoleUpdate,
-    RoleResponse,
-    RoleDetailResponse,
-    RolePermissionUpdate,
-    RolePermissionResponse,
-    PermissionResponse,
-)
-from app.core.permissions import require_permissions
+from app.api.deps import get_current_user, get_db
 from app.core.audit import audit_log
+from app.core.permissions import require_permissions
+from app.crud.crud_permission import crud_permission
+from app.crud.crud_role import crud_role
 from app.models.permission import Role
 from app.models.user import User
+from app.schemas.permission import (
+    PermissionResponse,
+    RoleCreate,
+    RoleDetailResponse,
+    RolePermissionResponse,
+    RolePermissionUpdate,
+    RoleResponse,
+    RoleUpdate,
+)
 
 router = APIRouter(prefix="/roles")
 logger = logging.getLogger(__name__)
@@ -38,19 +38,17 @@ async def list_roles(
     current_user: User = Depends(get_current_user),
 ):
     """Get role list with filters."""
-    # Check permission
     require_permissions(["role:read"])(current_user)
-    
+
     skip = (page - 1) * page_size
-    
+
     roles, total = await crud_role.get_multi_with_filters(
         db,
         is_active=is_active,
         skip=skip,
         limit=page_size,
     )
-    
-    # Build response with counts
+
     items = []
     for role in roles:
         role_dict = {
@@ -65,7 +63,7 @@ async def list_roles(
             "updated_at": role.updated_at,
         }
         items.append(role_dict)
-    
+
     return {
         "items": items,
         "total": total,
@@ -85,7 +83,7 @@ async def create_role(
     """创建新角色"""
     require_permissions(["role:create"])(current_user)
     logger.info(f"[角色管理] 创建角色 '{role_in.name}'")
-    
+
     existing_role = await crud_role.get_by_name(db, name=role_in.name)
     if existing_role:
         logger.warning(f"[角色管理] 角色名称 '{role_in.name}' 已存在")
@@ -93,7 +91,7 @@ async def create_role(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="角色名称已存在",
         )
-    
+
     if role_in.permission_ids:
         for perm_id in role_in.permission_ids:
             perm = await crud_permission.get(db, id=perm_id)
@@ -102,10 +100,10 @@ async def create_role(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"权限ID {perm_id} 不存在",
                 )
-    
+
     role = await crud_role.create_with_permissions(db, obj_in=role_in)
     logger.info(f"[角色管理] 角色 '{role.name}' 创建成功，ID: {role.id}")
-    
+
     return {
         "id": role.id,
         "name": role.name,
@@ -126,17 +124,16 @@ async def get_role(
     current_user: User = Depends(get_current_user),
 ):
     """Get role by ID with permissions."""
-    # Check permission
     require_permissions(["role:read"])(current_user)
-    
+
     role = await crud_role.get(db, id=role_id)
-    
+
     if not role:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="角色不存在",
         )
-    
+
     return {
         "id": role.id,
         "name": role.name,
@@ -161,25 +158,22 @@ async def update_role(
     current_user: User = Depends(get_current_user),
 ):
     """Update a role."""
-    # Check permission
     require_permissions(["role:update"])(current_user)
-    
+
     role = await crud_role.get(db, id=role_id)
-    
+
     if not role:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="角色不存在",
         )
-    
-    # Prevent updating system roles
+
     if role.is_system:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="系统预设角色不能修改",
         )
-    
-    # Check name uniqueness if name is being updated
+
     if role_in.name and role_in.name != role.name:
         existing_role = await crud_role.get_by_name(db, name=role_in.name)
         if existing_role:
@@ -187,9 +181,9 @@ async def update_role(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="角色名称已存在",
             )
-    
+
     role = await crud_role.update(db, db_obj=role, obj_in=role_in)
-    
+
     return {
         "id": role.id,
         "name": role.name,
@@ -212,31 +206,28 @@ async def delete_role(
     current_user: User = Depends(get_current_user),
 ):
     """Delete a role."""
-    # Check permission
     require_permissions(["role:delete"])(current_user)
-    
+
     role = await crud_role.get(db, id=role_id)
-    
+
     if not role:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="角色不存在",
         )
-    
-    # Prevent deleting system roles
+
     if role.is_system:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="系统预设角色不能删除",
         )
-    
-    # Check if role has users
+
     if role.users:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="该角色下还有用户，不能删除",
         )
-    
+
     await crud_role.delete(db, id=role_id)
     return None
 
@@ -248,17 +239,16 @@ async def get_role_permissions(
     current_user: User = Depends(get_current_user),
 ):
     """Get role permissions."""
-    # Check permission
     require_permissions(["role:read"])(current_user)
-    
+
     role = await crud_role.get(db, id=role_id)
-    
+
     if not role:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="角色不存在",
         )
-    
+
     return {
         "role_id": role.id,
         "permissions": [
@@ -280,18 +270,18 @@ async def update_role_permissions(
     """更新角色权限"""
     require_permissions(["role:update"])(current_user)
     logger.info(f"[角色管理] 更新角色 ID={role_id} 的权限")
-    
+
     role = await crud_role.get(db, id=role_id)
-    
+
     if not role:
         logger.warning(f"[角色管理] 角色 ID={role_id} 不存在")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="角色不存在",
         )
-    
+
     old_perm_count = len(role.permissions)
-    
+
     if perm_update.permission_ids:
         for perm_id in perm_update.permission_ids:
             perm = await crud_permission.get(db, id=perm_id)
@@ -300,13 +290,13 @@ async def update_role_permissions(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"权限ID {perm_id} 不存在",
                 )
-    
+
     role = await crud_role.update_permissions(
         db, role=role, permission_ids=perm_update.permission_ids
     )
-    
+
     logger.info(f"[角色管理] 角色 '{role.name}' 权限更新成功: {old_perm_count} -> {len(role.permissions)} 个权限")
-    
+
     return {
         "role_id": role.id,
         "permissions": [

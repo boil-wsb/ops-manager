@@ -2,18 +2,19 @@
 User management API routes.
 """
 import logging
-from typing import List, Optional, Any
-from fastapi import APIRouter, Request, Depends, HTTPException, status
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
 
 from app.api.deps import get_db, require_permissions
 from app.core.audit import audit_log
-from app.crud.crud_user import crud_user
 from app.crud.crud_role import crud_role
-from app.schemas.user import UserCreate, UserUpdate, UserResponse
-from app.models.user import User
+from app.crud.crud_user import crud_user
 from app.models.permission import Role
+from app.models.user import User
+from app.schemas.user import UserCreate, UserResponse, UserUpdate
 
 router = APIRouter(prefix="/users")
 logger = logging.getLogger(__name__)
@@ -30,44 +31,43 @@ async def list_users(
 ):
     """Get user list with filters."""
     skip = (page - 1) * page_size
-    
-    # Build query
+
     query = select(User)
-    
-    # Apply filters
+
     if keyword:
         query = query.where(
-            (User.username.ilike(f"%{keyword}%")) |
-            (User.email.ilike(f"%{keyword}%")) |
-            (User.full_name.ilike(f"%{keyword}%"))
+            (User.username.ilike(f"%{keyword}%"))
+            | (User.email.ilike(f"%{keyword}%"))
+            | (User.full_name.ilike(f"%{keyword}%"))
         )
-    
+
     if is_active is not None:
         query = query.where(User.is_active == is_active)
-    
-    # Get total count
+
     count_query = select(func.count()).select_from(query.subquery())
     total_result = await db.execute(count_query)
     total = total_result.scalar()
-    
-    # Apply pagination
+
     query = query.offset(skip).limit(page_size)
     result = await db.execute(query)
     users = result.scalars().all()
-    
+
     return {
-        "items": [UserResponse.model_validate({
-            "id": u.id,
-            "username": u.username,
-            "email": u.email,
-            "full_name": u.full_name,
-            "is_active": u.is_active,
-            "is_superuser": u.is_superuser,
-            "last_login": u.last_login,
-            "created_at": u.created_at,
-            "updated_at": u.updated_at,
-            "permissions": [],
-        }) for u in users],
+        "items": [
+            UserResponse.model_validate({
+                "id": u.id,
+                "username": u.username,
+                "email": u.email,
+                "full_name": u.full_name,
+                "is_active": u.is_active,
+                "is_superuser": u.is_superuser,
+                "last_login": u.last_login,
+                "created_at": u.created_at,
+                "updated_at": u.updated_at,
+                "permissions": [],
+            })
+            for u in users
+        ],
         "total": total,
         "page": page,
         "page_size": page_size,
@@ -84,7 +84,7 @@ async def create_user(
 ):
     """创建新用户"""
     logger.info(f"[用户管理] 创建用户 '{user_in.username}'")
-    
+
     existing_user = await crud_user.get_by_username(db, username=user_in.username)
     if existing_user:
         logger.warning(f"[用户管理] 用户名 '{user_in.username}' 已存在")
@@ -92,7 +92,7 @@ async def create_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="用户名已存在",
         )
-    
+
     if user_in.email:
         existing_email = await crud_user.get_by_email(db, email=user_in.email)
         if existing_email:
@@ -101,7 +101,7 @@ async def create_user(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="邮箱已存在",
             )
-    
+
     user = await crud_user.create(db, obj_in=user_in)
     logger.info(f"[用户管理] 用户 '{user_in.username}' 创建成功，ID: {user.id}")
 
@@ -135,7 +135,7 @@ async def update_user(
 ):
     """更新用户"""
     logger.info(f"[用户管理] 更新用户 ID={user_id}")
-    
+
     user = await crud_user.get(db, id=user_id)
     if not user:
         logger.warning(f"[用户管理] 用户 ID={user_id} 不存在")
@@ -143,7 +143,7 @@ async def update_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="用户不存在",
         )
-    
+
     if user_in.email and user_in.email != user.email:
         existing_email = await crud_user.get_by_email(db, email=user_in.email)
         if existing_email:
@@ -152,14 +152,14 @@ async def update_user(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="邮箱已存在",
             )
-    
+
     if user_in.is_superuser is not None and not current_user.is_superuser:
         logger.warning(f"[用户管理] 非超级管理员无权修改超级管理员权限")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="只有超级管理员才能修改超级管理员权限",
         )
-    
+
     user = await crud_user.update(db, db_obj=user, obj_in=user_in)
     logger.info(f"[用户管理] 用户 '{user.username}' 更新成功")
 
@@ -176,7 +176,7 @@ async def delete_user(
 ):
     """删除用户"""
     logger.info(f"[用户管理] 删除用户 ID={user_id}")
-    
+
     user = await crud_user.get(db, id=user_id)
     if not user:
         logger.warning(f"[用户管理] 用户 ID={user_id} 不存在")
@@ -184,7 +184,7 @@ async def delete_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="用户不存在",
         )
-    
+
     username = user.username
     await crud_user.delete(db, id=user_id)
     logger.info(f"[用户管理] 用户 '{username}' 删除成功")
@@ -197,7 +197,7 @@ async def delete_user(
 async def assign_user_roles(
     request: Request,
     user_id: int,
-    role_ids: List[int],
+    role_ids: list[int],
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permissions(["user:update"])),
 ):
@@ -208,8 +208,7 @@ async def assign_user_roles(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="用户不存在",
         )
-    
-    # Validate role IDs
+
     roles = []
     for role_id in role_ids:
         role = await crud_role.get(db, id=role_id)
@@ -219,11 +218,9 @@ async def assign_user_roles(
                 detail=f"角色ID {role_id} 不存在",
             )
         roles.append(role)
-    
-    # Get old role IDs for audit
+
     old_role_ids = [r.id for r in user.roles]
 
-    # Update user roles
     user.roles = roles
     await db.commit()
 
@@ -249,7 +246,7 @@ async def revoke_user_roles(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="用户不存在",
         )
-    
+
     user.roles = []
     await db.commit()
 
@@ -260,14 +257,14 @@ async def revoke_user_roles(
 @audit_log(operation_type="BATCH_DELETE", module="user", object_type="User")
 async def batch_delete_users(
     request: Request,
-    user_ids: List[int],
+    user_ids: list[int],
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permissions(["user:delete"])),
 ):
     """Batch delete users."""
     deleted_ids = []
     failed_ids = []
-    
+
     for user_id in user_ids:
         user = await crud_user.get(db, id=user_id)
         if user:

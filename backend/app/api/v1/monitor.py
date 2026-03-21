@@ -1,35 +1,42 @@
 """
 Monitoring and alerting API routes.
 """
-from typing import List, Optional
 from datetime import datetime
+from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, status, Request
-from sqlalchemy import select, and_, func
+from fastapi import APIRouter, Depends, Query, Request, status
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db, require_permissions
-from app.crud.base import CRUDBase
-from app.models.monitor import Monitor, Alert, AlertRule, NotificationChannel
-from app.schemas.monitor import (
-    MonitorCreate, MonitorUpdate, MonitorResponse, MonitorListResponse,
-    AlertCreate, AlertResponse, AlertAction, AlertListResponse,
-    AlertRuleCreate, AlertRuleUpdate, AlertRuleResponse,
-    NotificationChannelCreate, NotificationChannelUpdate, NotificationChannelResponse
-)
-from app.core.exceptions import NotFoundError
 from app.core.audit import audit_log
+from app.core.exceptions import NotFoundError
+from app.crud.base import CRUDBase
+from app.models.monitor import Alert, AlertRule, Monitor, NotificationChannel
+from app.schemas.monitor import (
+    AlertAction,
+    AlertListResponse,
+    AlertResponse,
+    AlertRuleCreate,
+    AlertRuleResponse,
+    AlertRuleUpdate,
+    MonitorCreate,
+    MonitorListResponse,
+    MonitorResponse,
+    MonitorUpdate,
+    NotificationChannelCreate,
+    NotificationChannelResponse,
+    NotificationChannelUpdate,
+)
 
 router = APIRouter(prefix="/monitor")
 
-# CRUD instances
 crud_monitor = CRUDBase(Monitor)
 crud_alert = CRUDBase(Alert)
 crud_alert_rule = CRUDBase(AlertRule)
 crud_notification_channel = CRUDBase(NotificationChannel)
 
 
-# Monitor routes
 @router.get("/monitors", response_model=MonitorListResponse)
 async def list_monitors(
     skip: int = Query(0, ge=0),
@@ -38,12 +45,11 @@ async def list_monitors(
     status: Optional[str] = Query(None),
     is_enabled: Optional[bool] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user = require_permissions(["monitor:read"])
+    current_user=require_permissions(["monitor:read"]),
 ):
     """List all monitors with filters."""
     query = select(Monitor)
-    
-    # Apply filters
+
     filters = []
     if monitor_type:
         filters.append(Monitor.monitor_type == monitor_type)
@@ -51,19 +57,17 @@ async def list_monitors(
         filters.append(Monitor.current_status == status)
     if is_enabled is not None:
         filters.append(Monitor.is_enabled == is_enabled)
-    
+
     if filters:
         query = query.where(and_(*filters))
-    
-    # Get total count
+
     count_query = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_query)).scalar()
-    
-    # Apply pagination
+
     query = query.offset(skip).limit(limit)
     result = await db.execute(query)
     items = result.scalars().all()
-    
+
     return {"total": total, "items": items}
 
 
@@ -73,7 +77,7 @@ async def create_monitor(
     request: Request,
     obj_in: MonitorCreate,
     db: AsyncSession = Depends(get_db),
-    current_user = require_permissions(["monitor:write"])
+    current_user=require_permissions(["monitor:write"]),
 ):
     """Create a new monitor."""
     monitor = await crud_monitor.create(db, obj_in=obj_in)
@@ -84,7 +88,7 @@ async def create_monitor(
 async def get_monitor(
     monitor_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user = require_permissions(["monitor:read"])
+    current_user=require_permissions(["monitor:read"]),
 ):
     """Get monitor by ID."""
     monitor = await crud_monitor.get(db, id=monitor_id)
@@ -100,13 +104,13 @@ async def update_monitor(
     monitor_id: int,
     obj_in: MonitorUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user = require_permissions(["monitor:write"])
+    current_user=require_permissions(["monitor:write"]),
 ):
     """Update monitor."""
     monitor = await crud_monitor.get(db, id=monitor_id)
     if not monitor:
         raise NotFoundError(detail=f"Monitor with ID {monitor_id} not found")
-    
+
     monitor = await crud_monitor.update(db, db_obj=monitor, obj_in=obj_in)
     return monitor
 
@@ -117,13 +121,13 @@ async def delete_monitor(
     request: Request,
     monitor_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user = require_permissions(["monitor:delete"])
+    current_user=require_permissions(["monitor:delete"]),
 ):
     """Delete monitor."""
     monitor = await crud_monitor.get(db, id=monitor_id)
     if not monitor:
         raise NotFoundError(detail=f"Monitor with ID {monitor_id} not found")
-    
+
     await crud_monitor.delete(db, id=monitor_id)
     return None
 
@@ -134,20 +138,19 @@ async def toggle_monitor(
     request: Request,
     monitor_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user = require_permissions(["monitor:write"])
+    current_user=require_permissions(["monitor:write"]),
 ):
     """Toggle monitor enabled status."""
     monitor = await crud_monitor.get(db, id=monitor_id)
     if not monitor:
         raise NotFoundError(detail=f"Monitor with ID {monitor_id} not found")
-    
+
     monitor.is_enabled = not monitor.is_enabled
     await db.commit()
     await db.refresh(monitor)
     return {"id": monitor_id, "is_enabled": monitor.is_enabled}
 
 
-# Alert routes
 @router.get("/alerts", response_model=AlertListResponse)
 async def list_alerts(
     skip: int = Query(0, ge=0),
@@ -156,12 +159,11 @@ async def list_alerts(
     severity: Optional[str] = Query(None),
     monitor_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user = require_permissions(["monitor:read"])
+    current_user=require_permissions(["monitor:read"]),
 ):
     """List all alerts with filters."""
     query = select(Alert)
-    
-    # Apply filters
+
     filters = []
     if status:
         filters.append(Alert.status == status)
@@ -169,20 +171,18 @@ async def list_alerts(
         filters.append(Alert.severity == severity)
     if monitor_id:
         filters.append(Alert.monitor_id == monitor_id)
-    
+
     if filters:
         query = query.where(and_(*filters))
-    
-    # Get total count
+
     count_query = select(func.count()).select_from(query.subquery())
     total_result = await db.execute(count_query)
     total = total_result.scalar()
-    
-    # Apply pagination
+
     query = query.offset(skip).limit(limit).order_by(Alert.started_at.desc())
     result = await db.execute(query)
     alerts = result.scalars().all()
-    
+
     return {"total": total, "items": alerts}
 
 
@@ -190,7 +190,7 @@ async def list_alerts(
 async def get_alert(
     alert_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user = require_permissions(["monitor:read"])
+    current_user=require_permissions(["monitor:read"]),
 ):
     """Get alert by ID."""
     alert = await crud_alert.get(db, id=alert_id)
@@ -206,15 +206,15 @@ async def alert_action(
     alert_id: int,
     action: AlertAction,
     db: AsyncSession = Depends(get_db),
-    current_user = require_permissions(["monitor:write"])
+    current_user=require_permissions(["monitor:write"]),
 ):
     """Perform action on alert (acknowledge, resolve, suppress)."""
     alert = await crud_alert.get(db, id=alert_id)
     if not alert:
         raise NotFoundError(detail=f"Alert with ID {alert_id} not found")
-    
+
     now = datetime.utcnow()
-    
+
     if action.action == "acknowledge":
         alert.status = "acknowledged"
         alert.acknowledged_at = now
@@ -225,27 +225,26 @@ async def alert_action(
         alert.resolved_by = current_user.id
     elif action.action == "suppress":
         alert.status = "suppressed"
-    
+
     await db.commit()
     await db.refresh(alert)
     return alert
 
 
-# Alert rule routes
-@router.get("/alert-rules", response_model=List[AlertRuleResponse])
+@router.get("/alert-rules", response_model=list[AlertRuleResponse])
 async def list_alert_rules(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     is_enabled: Optional[bool] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user = require_permissions(["monitor:read"])
+    current_user=require_permissions(["monitor:read"]),
 ):
     """List all alert rules."""
     query = select(AlertRule)
-    
+
     if is_enabled is not None:
         query = query.where(AlertRule.is_enabled == is_enabled)
-    
+
     query = query.offset(skip).limit(limit)
     result = await db.execute(query)
     rules = result.scalars().all()
@@ -258,7 +257,7 @@ async def create_alert_rule(
     request: Request,
     obj_in: AlertRuleCreate,
     db: AsyncSession = Depends(get_db),
-    current_user = require_permissions(["monitor:write"])
+    current_user=require_permissions(["monitor:write"]),
 ):
     """Create a new alert rule."""
     rule = await crud_alert_rule.create(db, obj_in=obj_in)
@@ -269,7 +268,7 @@ async def create_alert_rule(
 async def get_alert_rule(
     rule_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user = require_permissions(["monitor:read"])
+    current_user=require_permissions(["monitor:read"]),
 ):
     """Get alert rule by ID."""
     rule = await crud_alert_rule.get(db, id=rule_id)
@@ -285,13 +284,13 @@ async def update_alert_rule(
     rule_id: int,
     obj_in: AlertRuleUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user = require_permissions(["monitor:write"])
+    current_user=require_permissions(["monitor:write"]),
 ):
     """Update alert rule."""
     rule = await crud_alert_rule.get(db, id=rule_id)
     if not rule:
         raise NotFoundError(detail=f"Alert rule with ID {rule_id} not found")
-    
+
     rule = await crud_alert_rule.update(db, db_obj=rule, obj_in=obj_in)
     return rule
 
@@ -302,24 +301,23 @@ async def delete_alert_rule(
     request: Request,
     rule_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user = require_permissions(["monitor:delete"])
+    current_user=require_permissions(["monitor:delete"]),
 ):
     """Delete alert rule."""
     rule = await crud_alert_rule.get(db, id=rule_id)
     if not rule:
         raise NotFoundError(detail=f"Alert rule with ID {rule_id} not found")
-    
+
     await crud_alert_rule.delete(db, id=rule_id)
     return None
 
 
-# Notification channel routes
-@router.get("/notification-channels", response_model=List[NotificationChannelResponse])
+@router.get("/notification-channels", response_model=list[NotificationChannelResponse])
 async def list_notification_channels(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user = require_permissions(["monitor:read"])
+    current_user=require_permissions(["monitor:read"]),
 ):
     """List all notification channels."""
     channels = await crud_notification_channel.get_multi(db, skip=skip, limit=limit)
@@ -332,7 +330,7 @@ async def create_notification_channel(
     request: Request,
     obj_in: NotificationChannelCreate,
     db: AsyncSession = Depends(get_db),
-    current_user = require_permissions(["monitor:write"])
+    current_user=require_permissions(["monitor:write"]),
 ):
     """Create a new notification channel."""
     channel = await crud_notification_channel.create(db, obj_in=obj_in)
@@ -343,7 +341,7 @@ async def create_notification_channel(
 async def get_notification_channel(
     channel_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user = require_permissions(["monitor:read"])
+    current_user=require_permissions(["monitor:read"]),
 ):
     """Get notification channel by ID."""
     channel = await crud_notification_channel.get(db, id=channel_id)
@@ -359,13 +357,13 @@ async def update_notification_channel(
     channel_id: int,
     obj_in: NotificationChannelUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user = require_permissions(["monitor:write"])
+    current_user=require_permissions(["monitor:write"]),
 ):
     """Update notification channel."""
     channel = await crud_notification_channel.get(db, id=channel_id)
     if not channel:
         raise NotFoundError(detail=f"Notification channel with ID {channel_id} not found")
-    
+
     channel = await crud_notification_channel.update(db, db_obj=channel, obj_in=obj_in)
     return channel
 
@@ -376,13 +374,13 @@ async def delete_notification_channel(
     request: Request,
     channel_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user = require_permissions(["monitor:delete"])
+    current_user=require_permissions(["monitor:delete"]),
 ):
     """Delete notification channel."""
     channel = await crud_notification_channel.get(db, id=channel_id)
     if not channel:
         raise NotFoundError(detail=f"Notification channel with ID {channel_id} not found")
-    
+
     await crud_notification_channel.delete(db, id=channel_id)
     return None
 
@@ -393,17 +391,16 @@ async def test_notification_channel(
     request: Request,
     channel_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user = require_permissions(["monitor:write"])
+    current_user=require_permissions(["monitor:write"]),
 ):
     """Test notification channel."""
     channel = await crud_notification_channel.get(db, id=channel_id)
     if not channel:
         raise NotFoundError(detail=f"Notification channel with ID {channel_id} not found")
-    
-    # TODO: Implement actual test logic
+
     channel.last_test_at = datetime.utcnow()
-    channel.last_test_status = "success"  # or "failed"
+    channel.last_test_status = "success"
     await db.commit()
     await db.refresh(channel)
-    
+
     return {"id": channel_id, "test_status": channel.last_test_status}

@@ -3,16 +3,17 @@ IT Feedback API endpoints.
 """
 from datetime import datetime
 from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
 
 from app.api.deps import get_db
 from app.models.it_feedback import ITFeedback
 from app.schemas.it_feedback import (
     ITFeedbackCreate,
-    ITFeedbackResponse,
     ITFeedbackListResponse,
+    ITFeedbackResponse,
 )
 
 
@@ -51,7 +52,7 @@ async def create_feedback(
     db.add(feedback)
     await db.commit()
     await db.refresh(feedback)
-    
+
     return ITFeedbackResponse.model_validate(feedback)
 
 
@@ -64,20 +65,20 @@ async def list_feedback(
     db: AsyncSession = Depends(get_db),
 ):
     query = select(ITFeedback)
-    
+
     if status:
         query = query.where(ITFeedback.status == status)
     if lag_level:
         query = query.where(ITFeedback.lag_level == lag_level)
-    
+
     query = query.order_by(ITFeedback.created_at.desc())
     query = query.offset((page - 1) * page_size).limit(page_size)
-    
+
     total_query = select(func.count()).select_from(query.subquery())
     total = (await db.execute(total_query)).scalar() or 0
-    
+
     items = (await db.execute(query)).scalars().all()
-    
+
     return ITFeedbackListResponse(
         total=total,
         items=[ITFeedbackResponse.model_validate(item) for item in items],
@@ -93,10 +94,10 @@ async def get_feedback(
         select(ITFeedback).where(ITFeedback.id == feedback_id)
     )
     feedback = result.scalar_one_or_none()
-    
+
     if not feedback:
         raise HTTPException(status_code=404, detail="Feedback not found")
-    
+
     return ITFeedbackResponse.model_validate(feedback)
 
 
@@ -111,19 +112,19 @@ async def resolve_feedback(
         select(ITFeedback).where(ITFeedback.id == feedback_id)
     )
     feedback = result.scalar_one_or_none()
-    
+
     if not feedback:
         raise HTTPException(status_code=404, detail="Feedback not found")
-    
+
     feedback.status = "resolved"
     feedback.resolved_at = datetime.utcnow()
     feedback.resolved_by = resolved_by
     if notes:
         feedback.notes = notes
-    
+
     await db.commit()
     await db.refresh(feedback)
-    
+
     return ITFeedbackResponse.model_validate(feedback)
 
 
@@ -136,11 +137,11 @@ async def delete_feedback(
         select(ITFeedback).where(ITFeedback.id == feedback_id)
     )
     feedback = result.scalar_one_or_none()
-    
+
     if not feedback:
         raise HTTPException(status_code=404, detail="Feedback not found")
-    
+
     await db.delete(feedback)
     await db.commit()
-    
+
     return {"message": "Feedback deleted successfully"}
