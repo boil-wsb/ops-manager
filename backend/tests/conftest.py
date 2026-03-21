@@ -37,27 +37,36 @@ def event_loop() -> Generator:
     loop.close()
 
 
+@pytest.fixture(scope="session", autouse=True)
+async def setup_and_teardown_db(event_loop):
+    """Setup database tables once at session start, teardown at session end."""
+    async def setup():
+        async with test_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+    async def teardown():
+        async with test_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+
+    await setup()
+    yield
+    await teardown()
+
+
 @pytest.fixture(scope="function", autouse=True)
 def reset_rate_limiter():
     """Reset rate limiter storage before each test."""
     if settings.disable_rate_limit:
         limiter._storage.reset()
     yield
-    if settings.disable_rate_limit:
-        limiter._storage.reset()
 
 
 @pytest.fixture(scope="function")
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    """Create database session for tests."""
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
+    """Create database session for tests with transaction rollback."""
     async with TestSessionLocal() as session:
         yield session
-
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        await session.rollback()
 
 
 @pytest.fixture(scope="function")
