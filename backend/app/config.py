@@ -75,6 +75,9 @@ class Settings(BaseSettings):
     prometheus_timeout: int = Field(default=10, alias="PROMETHEUS_TIMEOUT")  # seconds
     prometheus_retry_count: int = Field(default=3, alias="PROMETHEUS_RETRY_COUNT")
 
+    # Rate Limiting
+    disable_rate_limit: bool = Field(default=False, alias="DISABLE_RATE_LIMIT")
+
     @property
     def cors_origins(self) -> list[str]:
         """Parse CORS origins from string."""

@@ -57,11 +57,11 @@ async def test_list_feedback_with_pagination(client: AsyncClient):
     for _ in range(3):
         await client.post("/api/v1/it-feedback", json=ITFeedbackCreate)
 
-    response = await client.get("/api/v1/it-feedback?page=1&page_size=2")
+    response = await client.get("/api/v1/it-feedback?page=1&page_size=10")
     assert response.status_code == 200
     data = response.json()
     assert data["total"] >= 3
-    assert len(data["items"]) == 2
+    assert len(data["items"]) == 10
 
 
 @pytest.mark.asyncio
