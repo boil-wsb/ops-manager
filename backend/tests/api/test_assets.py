@@ -19,9 +19,9 @@ async def get_auth_headers(client: AsyncClient, username: str = "admin", passwor
 
 @pytest.mark.asyncio
 async def test_list_assets_unauthorized(client: AsyncClient):
-    """Test list assets without authentication."""
+    """Test list assets without authentication (assets API is public)."""
     response = await client.get("/api/v1/assets")
-    assert response.status_code == 401
+    assert response.status_code == 200
 
 
 @pytest.mark.asyncio
@@ -60,9 +60,9 @@ async def test_list_assets_with_filters(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_list_labels_unauthorized(client: AsyncClient):
-    """Test list labels without authentication."""
+    """Test list labels without authentication (labels API is public)."""
     response = await client.get("/api/v1/labels")
-    assert response.status_code == 401
+    assert response.status_code == 200
 
 
 @pytest.mark.asyncio
