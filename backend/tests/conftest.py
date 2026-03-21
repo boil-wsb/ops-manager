@@ -2,6 +2,7 @@
 Pytest configuration and fixtures.
 """
 import asyncio
+import os
 import pytest
 from typing import AsyncGenerator, Generator
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
@@ -12,9 +13,7 @@ from app.db.base_class import Base
 from app.config import settings
 
 
-TEST_DATABASE_URL = settings.async_database_url.replace(
-    "/opsmanager", "/opsmanager_test"
-)
+TEST_DATABASE_URL = os.environ.get("DATABASE_URL", settings.async_database_url)
 
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 TestSessionLocal = async_sessionmaker(
