@@ -133,7 +133,6 @@ backend-test:
     - cd backend
     - export PYTHONPATH=$PWD:$PYTHONPATH
     - pip install -r requirements/dev.txt -q
-    - pip install -e . -q
   script:
     - pytest tests/ -v --cov=app --cov-report=xml --cov-report=html --cov-fail-under=$COVERAGE_MIN
   coverage: '/(?i)TOTAL.*\s+(\d+\.\d+\%)/'
