@@ -3,6 +3,9 @@ Pytest configuration and fixtures.
 """
 import asyncio
 import os
+
+os.environ.setdefault("DISABLE_RATE_LIMIT", "true")
+
 import pytest
 from typing import AsyncGenerator, Generator
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
@@ -11,6 +14,7 @@ from httpx import AsyncClient, ASGITransport
 from app.main import app
 from app.db.base_class import Base
 from app.config import settings
+from app.core.rate_limit import limiter
 
 
 TEST_DATABASE_URL = os.environ.get("DATABASE_URL", settings.async_database_url)
@@ -31,6 +35,16 @@ def event_loop() -> Generator:
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
+
+
+@pytest.fixture(scope="function", autouse=True)
+def reset_rate_limiter():
+    """Reset rate limiter storage before each test."""
+    if settings.disable_rate_limit:
+        limiter._storage.reset()
+    yield
+    if settings.disable_rate_limit:
+        limiter._storage.reset()
 
 
 @pytest.fixture(scope="function")
