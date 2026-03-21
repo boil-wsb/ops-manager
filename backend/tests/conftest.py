@@ -44,13 +44,8 @@ async def setup_and_teardown_db(event_loop):
         async with test_engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
-    async def teardown():
-        async with test_engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
-
     await setup()
     yield
-    await teardown()
 
 
 @pytest.fixture(scope="function", autouse=True)
