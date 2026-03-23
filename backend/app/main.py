@@ -15,6 +15,8 @@ from app.core.middleware import RequestLoggingMiddleware
 from app.core.rate_limit import limiter
 from app.core.redis import close_redis, init_redis
 from app.db.init_db import init_db
+from app.startup.pc_versions import sync_pc_versions_on_startup
+from app.db.session import AsyncSessionLocal
 
 logger = get_logger(__name__)
 
@@ -36,6 +38,16 @@ async def lifespan(app: FastAPI):
         logger.info("Redis connection initialized")
     except Exception as e:
         logger.error(f"Redis initialization failed: {e}")
+
+    try:
+        async with AsyncSessionLocal() as db:
+            synced = await sync_pc_versions_on_startup(db)
+            if synced:
+                logger.info(f"PC client versions synced: {synced}")
+            else:
+                logger.info("No new PC client versions to sync")
+    except Exception as e:
+        logger.error(f"PC versions sync failed: {e}")
 
     yield
 
