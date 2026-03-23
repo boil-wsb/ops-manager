@@ -170,7 +170,7 @@ Function CheckForUpdate()
     On Error Resume Next
     Set CheckForUpdate = Nothing
     
-    url = "http://" & g_updateServer & ":" & g_updatePort & "/api/version"
+    url = "http://" & g_updateServer & ":" & g_updatePort & "/api/v1/version"
     
     WScript.Echo "Checking for updates..."
     WScript.Echo "  URL: " & url
