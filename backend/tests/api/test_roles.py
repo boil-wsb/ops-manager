@@ -1,8 +1,14 @@
 """
 Tests for roles API.
 """
+import uuid
 import pytest
 from httpx import AsyncClient
+
+
+def unique_name(prefix: str = "Test") -> str:
+    """Generate unique name for tests."""
+    return f"{prefix}_{uuid.uuid4().hex[:8]}"
 
 
 async def get_auth_headers(client: AsyncClient, username: str = "admin", password: str = "admin123") -> dict:
@@ -77,17 +83,18 @@ async def test_create_role_unauthorized(client: AsyncClient):
 async def test_create_role(client: AsyncClient):
     """Test create role with valid data."""
     headers = await get_auth_headers(client)
+    role_name = unique_name("Role")
     response = await client.post(
         "/api/v1/roles",
         headers=headers,
         json={
-            "name": "Test Role",
+            "name": role_name,
             "description": "Test role description"
         }
     )
     assert response.status_code == 201
     data = response.json()
-    assert data["name"] == "Test Role"
+    assert data["name"] == role_name
     assert data["description"] == "Test role description"
     assert data["is_system"] is False
     assert data["is_active"] is True
