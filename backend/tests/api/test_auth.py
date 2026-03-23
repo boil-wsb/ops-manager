@@ -109,6 +109,14 @@ async def test_change_password(client: AsyncClient):
     )
     if response.status_code == 200:
         assert response.json()["message"] == "密码修改成功"
+        await client.post(
+            "/api/v1/auth/change-password",
+            headers=headers,
+            json={
+                "old_password": "newpassword123",
+                "new_password": "admin123"
+            }
+        )
 
 
 @pytest.mark.asyncio
