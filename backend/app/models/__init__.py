@@ -8,6 +8,7 @@ from app.models.it_feedback import ITFeedback
 from app.models.monitor import Alert, AlertRule, Monitor, NotificationChannel
 from app.models.navigation import NavigationLink, navigation_link_roles
 from app.models.ops import Certificate, Deployment, DNSRecord, InspectionReport, InspectionTask
+from app.models.pc_client_version import PCClientVersion
 from app.models.permission import Permission, Role, role_permissions
 from app.models.user import User, user_roles
 
@@ -30,6 +31,7 @@ __all__ = [
     "InspectionReport",
     "Certificate",
     "DNSRecord",
+    "PCClientVersion",
     "user_roles",
     "role_permissions",
     "asset_labels",

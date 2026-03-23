@@ -1,0 +1,125 @@
+"""
+PC Client version management API.
+"""
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api import deps
+from app.crud import crud_pc_client_version
+from app.schemas.pc_client_version import (
+    PCClientVersionCheckResponse,
+    PCClientVersionCreate,
+    PCClientVersionResponse,
+    PCClientVersionUpdate,
+)
+
+router = APIRouter()
+
+
+@router.get("/version", response_model=PCClientVersionCheckResponse)
+async def check_version(
+    db: AsyncSession = Depends(deps.get_db),
+) -> PCClientVersionCheckResponse:
+    """
+    Check for PC Client version updates.
+    This endpoint is called by the VBS update script.
+    Returns the latest active version information.
+    """
+    version = await crud_pc_client_version.get_active_version(db)
+    if not version:
+        return PCClientVersionCheckResponse(version="")
+
+    return PCClientVersionCheckResponse(
+        version=version.version,
+        releaseNotes=version.release_notes,
+        downloadUrl=version.download_url,
+        files=[],
+    )
+
+
+@router.get("/versions", response_model=list[PCClientVersionResponse])
+async def list_versions(
+    skip: int = 0,
+    limit: int = 100,
+    db: AsyncSession = Depends(deps.get_db),
+) -> list[PCClientVersionResponse]:
+    """
+    List all PC Client versions with pagination.
+    """
+    versions = await crud_pc_client_version.get_all_versions(db, skip=skip, limit=limit)
+    return versions
+
+
+@router.post(
+    "/versions",
+    response_model=PCClientVersionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_version(
+    version_in: PCClientVersionCreate,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user=Depends(deps.get_current_user),
+) -> PCClientVersionResponse:
+    """
+    Create a new PC Client version.
+    Requires authentication.
+    """
+    version = await crud_pc_client_version.create(db, obj_in=version_in)
+    return version
+
+
+@router.get("/versions/{version_id}", response_model=PCClientVersionResponse)
+async def get_version(
+    version_id: int,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user=Depends(deps.get_current_user),
+) -> PCClientVersionResponse:
+    """
+    Get a specific PC Client version by ID.
+    Requires authentication.
+    """
+    version = await crud_pc_client_version.get(db, id=version_id)
+    if not version:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Version not found")
+    return version
+
+
+@router.put("/versions/{version_id}", response_model=PCClientVersionResponse)
+async def update_version(
+    version_id: int,
+    version_in: PCClientVersionUpdate,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user=Depends(deps.get_current_user),
+) -> PCClientVersionResponse:
+    """
+    Update a PC Client version.
+    Requires authentication.
+    """
+    version = await crud_pc_client_version.get(db, id=version_id)
+    if not version:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Version not found")
+    version = await crud_pc_client_version.update(
+        db, db_obj=version, obj_in=version_in
+    )
+    return version
+
+
+@router.delete("/versions/{version_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_version(
+    version_id: int,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user=Depends(deps.get_current_user),
+):
+    """
+    Delete a PC Client version.
+    Requires authentication.
+    """
+    version = await crud_pc_client_version.get(db, id=version_id)
+    if not version:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Version not found")
+    await crud_pc_client_version.remove(db, id=version_id)

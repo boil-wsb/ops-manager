@@ -46,15 +46,17 @@ echo   [2] Install to C:\Program Files\PCInfoCollector ^(requires Admin^)
 echo   [3] Uninstall scheduled tasks ^(requires Admin^)
 echo   [4] Check task status
 echo   [5] View current configuration
+echo   [6] Check for updates
 echo   [0] Exit
 echo.
-set /p choice="Enter your choice (0-5): "
+set /p choice="Enter your choice (0-6): "
 
 if "%choice%"=="1" goto RUN_NOW
 if "%choice%"=="2" goto INSTALL_TO_PROGRAMFILES
 if "%choice%"=="3" goto UNINSTALL_TASKS
 if "%choice%"=="4" goto CHECK_STATUS
 if "%choice%"=="5" goto VIEW_CONFIG
+if "%choice%"=="6" goto CHECK_UPDATE
 if "%choice%"=="0" goto EXIT
 
 echo Invalid choice!
@@ -144,6 +146,9 @@ echo Copying files...
 copy /y "%SCRIPT_DIR%\PC_5.0.0_modular.vbs" "%InstallPath%\" >nul
 copy /y "%SCRIPT_DIR%\Conf.json" "%InstallPath%\" >nul
 copy /y "%SCRIPT_DIR%\PC_Info_Collector.bat" "%InstallPath%\" >nul
+if exist "%SCRIPT_DIR%\Update_Manager.vbs" (
+    copy /y "%SCRIPT_DIR%\Update_Manager.vbs" "%InstallPath%\" >nul
+)
 
 if not exist "%InstallPath%\PC_5.0.0_modular.vbs" (
     echo [ERROR] Failed to copy files!
@@ -314,7 +319,30 @@ echo ==========================================
 echo Current Configuration
 echo ==========================================
 echo.
-powershell -Command "try { $config = Get-Content 'Conf.json' -Raw | ConvertFrom-Json; Write-Host 'Customer ID: ' -NoNewline; Write-Host $config.CustInfo.id -ForegroundColor Green; Write-Host ''; Write-Host 'Http Report: ' -NoNewline; if ($config.HttpReport.Enabled) { Write-Host 'Enabled' -ForegroundColor Green } else { Write-Host 'Disabled' -ForegroundColor Red }; Write-Host '  Endpoint: ' -NoNewline; Write-Host $config.HttpReport.Endpoint; Write-Host '  Format: ' -NoNewline; Write-Host $config.HttpReport.Format; Write-Host ''; Write-Host 'Modules:'; $config.Modules.PSObject.Properties | ForEach-Object { Write-Host ('  ' + $_.Name + ': ') -NoNewline; if ($_.Value) { Write-Host 'Enabled' -ForegroundColor Green } else { Write-Host 'Disabled' -ForegroundColor Red } }; Write-Host ''; Write-Host 'Data Retention: ' -NoNewline; if ($config.DataRetention.Enabled) { Write-Host ('Enabled (' + $config.DataRetention.KeepDays + ' days)') -ForegroundColor Green } else { Write-Host 'Disabled' -ForegroundColor Red } } catch { Write-Host 'Failed to read configuration file.' -ForegroundColor Red }"
+powershell -Command "try { $config = Get-Content 'Conf.json' -Raw | ConvertFrom-Json; Write-Host 'Customer ID: ' -NoNewline; Write-Host $config.CustInfo.id -ForegroundColor Green; Write-Host ''; Write-Host 'Http Report: ' -NoNewline; if ($config.HttpReport.Enabled) { Write-Host 'Enabled' -ForegroundColor Green } else { Write-Host 'Disabled' -ForegroundColor Red }; Write-Host '  Endpoint: ' -NoNewline; Write-Host $config.HttpReport.Endpoint; Write-Host '  Format: ' -NoNewline; Write-Host $config.HttpReport.Format; Write-Host ''; Write-Host 'Update Server: ' -NoNewline; if ($config.UpdateServer.Host) { Write-Host ($config.UpdateServer.Host + ':' + $config.UpdateServer.Port) -ForegroundColor Green } else { Write-Host 'Not configured' -ForegroundColor Yellow }; Write-Host ''; Write-Host 'Modules:'; $config.Modules.PSObject.Properties | ForEach-Object { Write-Host ('  ' + $_.Name + ': ') -NoNewline; if ($_.Value) { Write-Host 'Enabled' -ForegroundColor Green } else { Write-Host 'Disabled' -ForegroundColor Red } }; Write-Host ''; Write-Host 'Data Retention: ' -NoNewline; if ($config.DataRetention.Enabled) { Write-Host ('Enabled (' + $config.DataRetention.KeepDays + ' days)') -ForegroundColor Green } else { Write-Host 'Disabled' -ForegroundColor Red } } catch { Write-Host 'Failed to read configuration file.' -ForegroundColor Red }"
+echo.
+pause
+goto EXIT
+
+:CHECK_UPDATE
+echo.
+echo ==========================================
+echo Check for Updates
+echo ==========================================
+echo.
+
+:: Check if Update_Manager.vbs exists
+if not exist "Update_Manager.vbs" (
+    echo [ERROR] Update_Manager.vbs not found!
+    echo Please ensure the update manager script exists.
+    pause
+    goto EXIT
+)
+
+echo Starting update manager...
+echo.
+cscript //NoLogo "Update_Manager.vbs"
+
 echo.
 pause
 goto EXIT

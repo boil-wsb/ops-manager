@@ -11,6 +11,7 @@ from app.api.v1 import (
     monitor,
     navigation,
     ops,
+    pc_client_version,
     permissions,
     roles,
     users,
@@ -28,3 +29,4 @@ api_router.include_router(monitor.router, prefix="/v1", tags=["监控"])
 api_router.include_router(audit_logs.router, prefix="/v1", tags=["审计日志"])
 api_router.include_router(navigation.router, prefix="/v1", tags=["导航管理"])
 api_router.include_router(it_feedback.router, prefix="/v1", tags=["IT反馈"])
+api_router.include_router(pc_client_version.router, prefix="/api", tags=["PC客户端版本"])

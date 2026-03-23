@@ -1,4 +1,4 @@
-﻿{
+{
   "CustInfo":  {
     "id":  "boil"
   },
@@ -20,6 +20,10 @@
     "RetryCount":  3,
     "Timeout":  30000,
     "Format":  "prometheus"
+  },
+  "UpdateServer":  {
+    "Host":  "192.168.23.36",
+    "Port":  "8000"
   },
   "DataRetention":  {
     "KeepDays":  30,
