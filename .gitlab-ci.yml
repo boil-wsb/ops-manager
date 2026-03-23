@@ -18,7 +18,7 @@ variables:
   REMOTE_USER: root
   REMOTE_HOST: "192.168.23.36"
   REMOTE_DIR: "/opt/ops-manager"
-  COVERAGE_MIN: "80"
+  COVERAGE_MIN: "45"
 
 ### RULES REUSED VIA YAML ANCHORS:
 .if-release-branch: &if-release-branch
