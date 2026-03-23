@@ -136,7 +136,7 @@ const Dashboard = () => {
               title="监控总数"
               value={monitorStats?.total || 0}
               suffix="个"
-              styles={{ content: { color: '#1890ff' } }}
+              style={{ color: '#1890ff' }}
             />
             <div style={{ marginTop: 8 }}>
               <Tag color="green">正常: {monitorStats?.up || 0}</Tag>
@@ -151,7 +151,7 @@ const Dashboard = () => {
               title="活跃告警"
               value={alertStats?.firing || 0}
               suffix="个"
-              styles={{ content: { color: alertStats?.firing > 0 ? '#ff4d4f' : '#52c41a' } }}
+              style={{ color: alertStats?.firing > 0 ? '#ff4d4f' : '#52c41a' }}
             />
             <div style={{ marginTop: 8 }}>
               <Tag color="orange">待处理: {alertStats?.firing || 0}</Tag>
@@ -166,7 +166,7 @@ const Dashboard = () => {
               title="证书总数"
               value={certStats?.total || 0}
               suffix="个"
-              styles={{ content: { color: '#722ed1' } }}
+              style={{ color: '#722ed1' }}
             />
             <div style={{ marginTop: 8 }}>
               <Tag color="green">有效: {certStats?.valid || 0}</Tag>
@@ -182,7 +182,7 @@ const Dashboard = () => {
               title="资产总数"
               value={assetStats?.total || 0}
               suffix="个"
-              styles={{ content: { color: '#13c2c2' } }}
+              style={{ color: '#13c2c2' }}
             />
             <div style={{ marginTop: 8 }}>
               <Tag color="blue">服务器: {assetStats?.servers || 0}</Tag>
