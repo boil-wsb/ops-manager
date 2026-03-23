@@ -7,7 +7,7 @@ import os
 os.environ.setdefault("DISABLE_RATE_LIMIT", "true")
 
 import pytest
-from typing import AsyncGenerator, Generator
+from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from httpx import AsyncClient, ASGITransport
 
@@ -30,21 +30,19 @@ TestSessionLocal = async_sessionmaker(
 
 
 @pytest.fixture(scope="session")
-def event_loop() -> Generator:
+def event_loop():
     """Create event loop for async tests."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
+    policy = asyncio.get_event_loop_policy()
+    loop = policy.new_event_loop()
     yield loop
     loop.close()
 
 
 @pytest.fixture(scope="session", autouse=True)
-async def setup_and_teardown_db(event_loop):
-    """Setup database tables once at session start, teardown at session end."""
-    async def setup():
-        async with test_engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-
-    await setup()
+async def setup_and_teardown_db():
+    """Setup database tables once at session start."""
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     yield
 
 
@@ -60,8 +58,10 @@ def reset_rate_limiter():
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Create database session for tests with transaction rollback."""
     async with TestSessionLocal() as session:
-        yield session
-        await session.rollback()
+        try:
+            yield session
+        finally:
+            await session.rollback()
 
 
 @pytest.fixture(scope="function")
