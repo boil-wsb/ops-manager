@@ -166,53 +166,63 @@ End Function
 Function CheckForUpdate()
     Dim http, url, response
     Dim updateInfo
-    
+
     On Error Resume Next
     Set CheckForUpdate = Nothing
-    
+
     url = "http://" & g_updateServer & ":" & g_updatePort & "/api/v1/version"
-    
+
     WScript.Echo "Checking for updates..."
     WScript.Echo "  URL: " & url
-    
-    Set http = CreateObject("Microsoft.XMLHTTP")
+
+    Set http = CreateObject("MSXML2.ServerXMLHTTP.6.0")
+    http.SetTimeouts 5000, 5000, 5000, 5000
     http.Open "GET", url, False
     http.SetRequestHeader "Content-Type", "application/json"
     http.Send
-    
+
     If http.Status <> 200 Then
         WScript.Echo "[ERROR] Server returned HTTP " & http.Status
+        If http.Status = 0 Then
+            WScript.Echo "[ERROR] Could not connect to update server!"
+        End If
         Set http = Nothing
         Exit Function
     End If
-    
+
     response = http.responseText
     Set http = Nothing
-    
-    ' Parse version info
-    Set updateInfo = CreateObject("Scripting.Dictionary")
-    
-    ' Try to parse JSON response
-    Dim jsonObj
-    Set jsonObj = ParseJSON(response)
-    
+
     If Err.Number <> 0 Then
-        WScript.Echo "[ERROR] Failed to parse server response!"
+        WScript.Echo "[ERROR] HTTP request failed: " & Err.Description
         Err.Clear
         Exit Function
     End If
-    
+
+    Set updateInfo = CreateObject("Scripting.Dictionary")
+
+    Dim jsonObj
+    Set jsonObj = ParseJSON(response)
+
+    If Err.Number <> 0 Then
+        WScript.Echo "[ERROR] Failed to parse server response!"
+        WScript.Echo "Response: " & Left(response, 200)
+        Err.Clear
+        Exit Function
+    End If
+
     On Error Resume Next
     updateInfo.Add "NewVersion", jsonObj.version
     updateInfo.Add "ReleaseNotes", jsonObj.releaseNotes
     updateInfo.Add "DownloadUrl", jsonObj.downloadUrl
     updateInfo.Add "Files", jsonObj.files
     Err.Clear
-    
-    If updateInfo("NewVersion") = "" Then
+
+    If updateInfo("NewVersion") = "" Or updateInfo("NewVersion") = Null Then
         updateInfo("NewVersion") = ""
     End If
-    
+
+    WScript.Echo "[DEBUG] Parsed version: " & updateInfo("NewVersion")
     Set CheckForUpdate = updateInfo
 End Function
 
