@@ -17,7 +17,6 @@ from app.config import settings
 from app.core.rate_limit import limiter
 from app.core.security import get_password_hash
 from app.models.user import User
-from app.models.permission import Role, Permission
 
 
 TEST_DATABASE_URL = os.environ.get("DATABASE_URL", settings.async_database_url)
@@ -50,24 +49,28 @@ async def setup_and_teardown_db():
 
 
 @pytest.fixture(scope="session", autouse=True)
-async def create_test_admin_user():
-    """Create admin user for testing."""
+async def create_test_users():
+    """Create test users for authentication tests."""
     async with TestSessionLocal() as session:
         from sqlalchemy import select
         result = await session.execute(select(User).where(User.username == "admin"))
-        existing_admin = result.scalar_one_or_none()
+        existing = result.scalar_one_or_none()
 
-        if not existing_admin:
+        admin_hash = get_password_hash("admin123")
+        if existing:
+            existing.hashed_password = admin_hash
+            existing.is_superuser = True
+            existing.is_active = True
+        else:
             admin_user = User(
                 username="admin",
-                email="admin@example.com",
-                hashed_password=get_password_hash("admin123"),
-                full_name="Admin User",
-                is_active=True,
+                email="admin@opsmanager.local",
+                hashed_password=admin_hash,
                 is_superuser=True,
+                is_active=True,
             )
             session.add(admin_user)
-            await session.commit()
+        await session.commit()
     yield
 
 
