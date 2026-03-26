@@ -36,10 +36,6 @@ structlog==25.1.0
 python-dateutil==2.9.0
 pytz==2025.1
 
-# Testing
-pytest==8.3.5
-pytest-asyncio==0.25.2
-
 # Rate Limiting
 slowapi==0.1.9
 
