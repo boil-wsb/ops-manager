@@ -1,43 +1,23 @@
 import { useState } from 'react';
-import { Table, Button, Select, Space, Card, Switch, App } from 'antd';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlusOutlined, PlayCircleOutlined, PauseCircleOutlined } from '@ant-design/icons';
+import { Table, Button, Space, Card } from 'antd';
+import { useQuery } from '@tanstack/react-query';
+import { PlusOutlined } from '@ant-design/icons';
 import { monitorApi } from '../../services/monitor';
 import StatusTag from '../../components/StatusTag';
-import type { Monitor } from '../../types';
 
 const MonitorList = () => {
-  const queryClient = useQueryClient();
-  const { message } = App.useApp();
-  const [filter, setFilter] = useState({
-    monitorType: undefined as string | undefined,
-    status: undefined as string | undefined,
-  });
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 10,
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ['monitors', filter, pagination],
+    queryKey: ['my-terminals', pagination],
     queryFn: () =>
-      monitorApi.getMonitors({
+      monitorApi.getMyTerminals({
         skip: (pagination.current - 1) * pagination.pageSize,
         limit: pagination.pageSize,
-        monitor_type: filter.monitorType,
-        status: filter.status,
       }),
-  });
-
-  const toggleMutation = useMutation({
-    mutationFn: (id: number) => monitorApi.toggleMonitor(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['monitors'] });
-      message.success('状态已更新');
-    },
-    onError: () => {
-      message.error('操作失败');
-    },
   });
 
   const columns = [
@@ -47,15 +27,27 @@ const MonitorList = () => {
       key: 'name',
     },
     {
-      title: '类型',
-      dataIndex: 'monitorType',
-      key: 'monitorType',
-      render: (type: string) => type?.toUpperCase() || '-',
+      title: '资产ID',
+      dataIndex: 'assetId',
+      key: 'assetId',
     },
     {
-      title: '目标',
-      dataIndex: 'target',
-      key: 'target',
+      title: 'IP地址',
+      dataIndex: 'ipAddress',
+      key: 'ipAddress',
+      render: (ip: string | null) => ip || '-',
+    },
+    {
+      title: '主机名',
+      dataIndex: 'hostname',
+      key: 'hostname',
+      render: (hostname: string | null) => hostname || '-',
+    },
+    {
+      title: '负责人',
+      dataIndex: 'ownerName',
+      key: 'ownerName',
+      render: (name: string | null) => name || '-',
     },
     {
       title: '状态',
@@ -64,28 +56,16 @@ const MonitorList = () => {
       render: (status: string) => <StatusTag status={status} type="monitor" />,
     },
     {
-      title: '响应时间',
-      dataIndex: 'lastCheckDurationMs',
-      key: 'lastCheckDurationMs',
-      render: (ms: number) => (ms ? `${ms}ms` : '-'),
+      title: '监控项',
+      dataIndex: 'monitorName',
+      key: 'monitorName',
+      render: (name: string | null) => name || '-',
     },
     {
       title: '最后检查',
       dataIndex: 'lastCheckAt',
       key: 'lastCheckAt',
-      render: (time: string) => (time ? new Date(time).toLocaleString() : '-'),
-    },
-    {
-      title: '启用',
-      key: 'isEnabled',
-      render: (_: unknown, record: Monitor) => (
-        <Switch
-          checked={record.isEnabled}
-          onChange={() => toggleMutation.mutate(record.id)}
-          checkedChildren={<PlayCircleOutlined />}
-          unCheckedChildren={<PauseCircleOutlined />}
-        />
-      ),
+      render: (time: string | null) => (time ? new Date(time).toLocaleString() : '-'),
     },
   ];
 
@@ -93,28 +73,6 @@ const MonitorList = () => {
     <div>
       <Card style={{ marginBottom: 24 }}>
         <Space wrap>
-          <Select
-            placeholder="监控类型"
-            value={filter.monitorType}
-            onChange={(value) => setFilter({ ...filter, monitorType: value })}
-            style={{ width: 120 }}
-            allowClear
-          >
-            <Select.Option value="ping">PING</Select.Option>
-            <Select.Option value="http">HTTP</Select.Option>
-            <Select.Option value="tcp">TCP</Select.Option>
-            <Select.Option value="udp">UDP</Select.Option>
-          </Select>
-          <Select
-            placeholder="状态"
-            value={filter.status}
-            onChange={(value) => setFilter({ ...filter, status: value })}
-            style={{ width: 120 }}
-            allowClear
-          >
-            <Select.Option value="up">正常</Select.Option>
-            <Select.Option value="down">故障</Select.Option>
-          </Select>
           <Button type="primary" icon={<PlusOutlined />}>
             新增监控
           </Button>

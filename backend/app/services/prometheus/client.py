@@ -20,11 +20,19 @@ class PrometheusClient:
     def __init__(self, base_url: str = None, timeout: int = None):
         self.base_url = base_url or settings.prometheus_url
         self.timeout = timeout or settings.prometheus_timeout
-        self.client = httpx.AsyncClient(timeout=timeout)
+        self._client: httpx.AsyncClient | None = None
+
+    @property
+    def client(self) -> httpx.AsyncClient:
+        if self._client is None:
+            import httpx
+            self._client = httpx.AsyncClient(timeout=self.timeout)
+        return self._client
 
     async def close(self):
         """关闭 HTTP 客户端"""
-        await self.client.aclose()
+        if self._client:
+            await self._client.aclose()
 
     async def query(self, query: str) -> dict[str, Any]:
         """
@@ -458,35 +466,27 @@ class PrometheusClient:
         metrics = {}
 
         queries = {
-            "cpu_usage": f'pc_cpu_usage{{hostname="{hostname}"}}',
-            "memory_usage": f'pc_memory_usage{{hostname="{hostname}"}}',
-            "memory_total": f'pc_memory_total{{hostname="{hostname}"}}',
-            "memory_used": f'pc_memory_used{{hostname="{hostname}"}}',
             "disk_total": f'pc_disk_total{{hostname="{hostname}"}}',
-            "disk_used": f'pc_disk_used{{hostname="{hostname}"}}',
             "disk_usage": f'pc_disk_usage{{hostname="{hostname}"}}',
-            "os_info": f'pc_os_info{{hostname="{hostname}"}}',
-            "cpu_cores": f'pc_cpu_cores{{hostname="{hostname}"}}',
-            "uptime": f'pc_uptime{{hostname="{hostname}"}}',
+            "memory_total": f'pc_memory_total{{hostname="{hostname}"}}',
+            "memory_usage": f'pc_memory_usage{{hostname="{hostname}"}}',
         }
 
-        for key, query in queries.items():
-            data = await self.query(query)
+        results = await asyncio.gather(*[self.query(q) for q in queries.values()], return_exceptions=True)
+
+        for (key, _), data in zip(queries.items(), results, strict=True):
+            if isinstance(data, Exception):
+                logger.error(f"Failed to query {key} for {hostname}: {data}")
+                continue
             if data.get("status") == "success":
-                results = data.get("data", {}).get("result", [])
-                if results:
-                    value = results[0].get("value", [])
+                result_list = data.get("data", {}).get("result", [])
+                if result_list:
+                    value = result_list[0].get("value", [])
                     if len(value) >= 2:
-                        metric = results[0].get("metric", {})
-                        if key == "os_info":
-                            metrics["os_type"] = metric.get("os", "")
-                            metrics["os_version"] = metric.get("version", "")
-                            metrics["arch"] = metric.get("arch", "")
-                        else:
-                            try:
-                                metrics[key] = float(value[1])
-                            except (ValueError, TypeError):
-                                metrics[key] = value[1]
+                        try:
+                            metrics[key] = float(value[1])
+                        except (ValueError, TypeError):
+                            metrics[key] = value[1]
 
         return metrics
 
@@ -524,4 +524,10 @@ def get_prometheus_client() -> PrometheusClient:
     Returns:
         PrometheusClient 实例
     """
+    global prometheus_client
+    if prometheus_client is None:
+        prometheus_client = PrometheusClient()
     return prometheus_client
+
+
+prometheus_client: "PrometheusClient | None" = None

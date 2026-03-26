@@ -143,19 +143,35 @@ async def sync_terminals_from_pc_info(
                 )
                 existing_asset = existing_result.scalar_one_or_none()
 
+                pc_info_labels = terminal.get("pc_info_labels", {})
+                customer_name = pc_info_labels.get("customer", "")
+
+                owner_id = None
+                if customer_name:
+                    user_result = await db.execute(
+                        select(User).where(User.username == customer_name)
+                    )
+                    user = user_result.scalar_one_or_none()
+                    if user:
+                        owner_id = user.id
+
                 terminal_data = {
                     "asset_id": asset_id,
                     "name": hostname,
                     "asset_type": AssetType.TERMINAL,
                     "hostname": hostname,
-                    "serial_number": terminal.get("serial_number"),
-                    "uuid": terminal.get("uuid"),
-                    "customer": terminal.get("customer"),
+                    "serial_number": pc_info_labels.get("serial"),
+                    "uuid": pc_info_labels.get("uuid"),
+                    "customer": customer_name,
                     "source": AssetSource.PROMETHEUS.value,
                     "sync_status": SyncStatus.SYNCED.value,
                     "last_sync_time": datetime.utcnow(),
                     "status": AssetStatus.ACTIVE,
-                    "labels_data": terminal.get("pc_info_labels", {}),
+                    "labels_data": pc_info_labels,
+                    "ip_address": pc_info_labels.get("ipAddress"),
+                    "os_type": pc_info_labels.get("osCaption"),
+                    "os_version": pc_info_labels.get("osVersion"),
+                    "owner_id": owner_id,
                 }
 
                 if terminal.get("cpu_cores"):

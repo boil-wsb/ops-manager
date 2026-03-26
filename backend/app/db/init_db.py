@@ -10,7 +10,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import get_password_hash
-from app.db.session import async_session, engine
+from app.db.session import get_async_session_local, get_engine
 from app.models.permission import Permission, Role
 from app.models.user import User
 
@@ -117,13 +117,20 @@ DEFAULT_ROLES = {
 }
 
 
-async def create_tables():
-    """Create all database tables."""
+async def create_tables_if_not_exist():
+    """Create tables only if they don't exist."""
+    from sqlalchemy import inspect
+
     from app.db.base_class import Base
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    logger.info("Database tables created successfully")
+    async with get_engine().begin() as conn:
+        inspector = inspect(conn.sync_connection)
+        existing_tables = await conn.run_sync(lambda conn: inspector.get_table_names())
+        if not existing_tables:
+            await conn.run_sync(Base.metadata.create_all)
+            logger.info("Database tables created successfully")
+        else:
+            logger.info("Database tables already exist, skipping creation")
 
 
 async def init_permissions(db: AsyncSession) -> dict:
@@ -242,32 +249,36 @@ async def check_db_initialized(db: AsyncSession) -> bool:
     """Check if database has been initialized with default data."""
     try:
         result = await db.execute(
-            select(User).where(User.username == DEFAULT_ADMIN_USERNAME)
+            text("""
+                SELECT
+                    (SELECT COUNT(*) FROM users WHERE username = :admin_username) as admin_exists,
+                    (SELECT COUNT(*) FROM roles) as role_count,
+                    (SELECT COUNT(*) FROM permissions) as perm_count
+            """),
+            {"admin_username": DEFAULT_ADMIN_USERNAME}
         )
-        admin_user = result.scalar_one_or_none()
+        row = result.one()
 
-        if not admin_user:
+        admin_exists = row.admin_exists > 0
+        role_count = row.role_count
+        perm_count = row.perm_count
+
+        if not admin_exists:
             logger.info("Admin user not found, database needs initialization")
             return False
 
-        result = await db.execute(select(Role))
-        roles = result.scalars().all()
-
-        if len(roles) < len(DEFAULT_ROLES):
-            logger.info(f"Only {len(roles)} roles found, expected {len(DEFAULT_ROLES)}")
+        if role_count < len(DEFAULT_ROLES):
+            logger.info(f"Only {role_count} roles found, expected {len(DEFAULT_ROLES)}")
             return False
 
-        result = await db.execute(select(Permission))
-        permissions = result.scalars().all()
-
-        if len(permissions) < len(DEFAULT_PERMISSIONS):
-            logger.info(f"Only {len(permissions)} permissions found, expected {len(DEFAULT_PERMISSIONS)}")
+        if perm_count < len(DEFAULT_PERMISSIONS):
+            logger.info(f"Only {perm_count} permissions found, expected {len(DEFAULT_PERMISSIONS)}")
             return False
 
         logger.info("Database already initialized with default data")
         logger.info("  - Users: 1 (admin)")
-        logger.info(f"  - Roles: {len(roles)}")
-        logger.info(f"  - Permissions: {len(permissions)}")
+        logger.info(f"  - Roles: {role_count}")
+        logger.info(f"  - Permissions: {perm_count}")
         return True
 
     except Exception as e:
@@ -280,11 +291,11 @@ async def init_db() -> None:
     logger.info("Checking database initialization...")
 
     try:
-        await create_tables()
+        await create_tables_if_not_exist()
     except Exception as e:
         logger.warning(f"Error creating tables (may already exist): {e}")
 
-    async with async_session() as db:
+    async with await get_async_session_local() as db:
         try:
             if await check_db_initialized(db):
                 logger.info("Database already initialized, skipping initialization")

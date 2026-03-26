@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Form, Input, Button, Card, Typography, Space, App, Modal, Select } from 'antd';
 import { UserOutlined, LockOutlined, DatabaseOutlined, DownloadOutlined, MessageOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -23,8 +23,49 @@ const Login = () => {
   const { setAuth } = useAuthStore();
   const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [feedbackVisible, setFeedbackVisible] = useState(false);
+  const [loginVisible, setLoginVisible] = useState(false);
   const [feedbackForm] = Form.useForm();
+  const pendingDownloadRef = useRef(false);
+
+  const handleDownload = async () => {
+    const { user, token } = useAuthStore.getState();
+
+    if (!user?.username || !token) {
+      setLoginVisible(true);
+      pendingDownloadRef.current = true;
+      return;
+    }
+
+    pendingDownloadRef.current = false;
+    setDownloading(true);
+    try {
+      const response = await fetch('/api/v1/pc-client-version/download', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('下载失败');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `pcinfo_${user.username}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch {
+      message.error('下载失败，请重试');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const onFinish = async (values: { username: string; password: string }) => {
     setLoading(true);
@@ -39,7 +80,16 @@ const Login = () => {
       }
       
       message.success('登录成功，欢迎回来！');
-      navigate('/');
+      
+      setLoginVisible(false);
+      if (pendingDownloadRef.current) {
+        pendingDownloadRef.current = false;
+        setTimeout(() => {
+          handleDownload();
+        }, 100);
+      } else {
+        navigate('/');
+      }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : '登录失败，请检查用户名和密码';
       message.error(errorMessage);
@@ -308,20 +358,22 @@ const Login = () => {
           >
             <Space direction="vertical" size={8}>
               <Space size={16}>
-                <a
-                  href="/pcinfo.zip"
-                  download
+                <Button
+                  type="link"
+                  loading={downloading}
+                  onClick={handleDownload}
                   style={{
                     color: 'var(--primary-400)',
                     fontSize: 13,
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 6,
+                    padding: 0,
                   }}
                 >
                   <DownloadOutlined />
                   下载 PC 信息采集工具
-                </a>
+                </Button>
                 <a
                   onClick={() => setFeedbackVisible(true)}
                   style={{
@@ -357,6 +409,10 @@ const Login = () => {
         onCancel={() => setFeedbackVisible(false)}
         footer={null}
         width={500}
+        styles={{
+          body: { paddingTop: 16 },
+          mask: { backdropFilter: 'blur(4px)' }
+        }}
       >
         <Form
           form={feedbackForm}
@@ -443,6 +499,80 @@ const Login = () => {
               </Button>
               <Button type="primary" htmlType="submit">
                 提交反馈
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Login Modal for Download */}
+      <Modal
+        title={
+          <Space>
+            <UserOutlined />
+            <span>请先登录</span>
+          </Space>
+        }
+        open={loginVisible}
+        onCancel={() => {
+          setLoginVisible(false);
+          pendingDownloadRef.current = false;
+        }}
+        footer={null}
+        width={400}
+        styles={{
+          body: { paddingTop: 16 },
+          mask: { backdropFilter: 'blur(4px)' }
+        }}
+      >
+        <Form
+          name="login-modal"
+          initialValues={{ remember: true }}
+          onFinish={onFinish}
+          autoComplete="off"
+          layout="vertical"
+          size="large"
+          style={{ marginTop: 16 }}
+        >
+          <Form.Item
+            name="username"
+            rules={[{ required: true, message: '请输入用户名' }]}
+          >
+            <Input
+              prefix={<UserOutlined style={{ color: 'var(--text-tertiary)' }} />}
+              placeholder="用户名"
+              style={{
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--text-primary)',
+              }}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="password"
+            rules={[{ required: true, message: '请输入密码' }]}
+          >
+            <Input.Password
+              prefix={<LockOutlined style={{ color: 'var(--text-tertiary)' }} />}
+              placeholder="密码"
+              style={{
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--text-primary)',
+              }}
+            />
+          </Form.Item>
+
+          <Form.Item style={{ marginBottom: 0, marginTop: 24 }}>
+            <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+              <Button onClick={() => setLoginVisible(false)}>
+                取消
+              </Button>
+              <Button type="primary" htmlType="submit" loading={loading}>
+                登录并下载
               </Button>
             </Space>
           </Form.Item>

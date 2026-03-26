@@ -183,3 +183,23 @@ class NotificationChannelResponse(NotificationChannelBase):
     last_test_status: str | None
     created_at: datetime
     updated_at: datetime
+
+
+class MonitorTerminalResponse(BaseModel):
+    """Monitor terminal response schema for user's terminals."""
+    id: int
+    name: str
+    asset_id: str
+    ip_address: str | None
+    hostname: str | None
+    owner_name: str | None
+    current_status: str
+    last_check_at: datetime | None
+    monitor_id: int | None = None
+    monitor_name: str | None = None
+
+
+class MonitorTerminalListResponse(BaseModel):
+    """Monitor terminal list response with pagination."""
+    total: int
+    items: list[MonitorTerminalResponse]

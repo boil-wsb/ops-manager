@@ -15,7 +15,7 @@ class CRUDPCClientVersion(CRUDBase):
         """Get the latest active version."""
         result = await db.execute(
             select(PCClientVersion)
-            .where(PCClientVersion.is_active == True)
+            .where(PCClientVersion.is_active)
             .order_by(PCClientVersion.created_at.desc())
             .limit(1)
         )

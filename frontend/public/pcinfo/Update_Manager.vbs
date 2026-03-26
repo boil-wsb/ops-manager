@@ -50,25 +50,34 @@ Sub Main()
     WScript.Echo ""
     
     ' Check for updates
+    WScript.Echo "[DEBUG] Calling CheckForUpdate()..."
     Dim updateInfo
     Set updateInfo = CheckForUpdate()
-    
+    WScript.Echo "[DEBUG] CheckForUpdate() returned."
+
     If updateInfo Is Nothing Then
         WScript.Echo "[ERROR] Failed to check for updates!"
         WScript.Echo "Please check your network connection and server configuration."
         WScript.Quit 1
     End If
-    
-    If updateInfo.NewVersion = "" Then
+
+    WScript.Echo "[DEBUG] updateInfo.NewVersion = """ & updateInfo.Item("NewVersion") & """"
+
+    If updateInfo.Item("NewVersion") = "" Then
         WScript.Echo "No update information available from server."
         WScript.Quit 0
     End If
-    
-    WScript.Echo "Server Version: " & updateInfo.NewVersion
+
+    WScript.Echo "Server Version: " & updateInfo.Item("NewVersion")
     WScript.Echo ""
-    
+    WScript.Echo "[DEBUG] Comparing versions: g_currentVersion=" & g_currentVersion & ", newVersion=" & updateInfo.Item("NewVersion")
+
     ' Compare versions
-    If CompareVersion(g_currentVersion, updateInfo.NewVersion) >= 0 Then
+    Dim cmpResult
+    cmpResult = CompareVersion(g_currentVersion, updateInfo.Item("NewVersion"))
+    WScript.Echo "[DEBUG] CompareVersion result: " & cmpResult
+
+    If cmpResult >= 0 Then
         WScript.Echo "[OK] You are running the latest version!"
         WScript.Echo ""
         WScript.Echo "No update needed."
@@ -697,14 +706,32 @@ Function ReadTextFile(filepath)
 End Function
 
 '==========================================================================
-' Parse JSON
+' Parse JSON string to Dictionary
 '==========================================================================
 Function ParseJSON(jsonStr)
-    Dim sc, window
+    Dim sc, window, obj, key, val
+    Dim result
+
+    On Error Resume Next
+
     Set sc = CreateObject("htmlfile")
     Set window = sc.parentWindow
+
     window.execScript "var json = " & jsonStr, "JScript"
-    Set ParseJSON = window.json
+
+    Set result = CreateObject("Scripting.Dictionary")
+
+    For Each key In window.json
+        val = window.json(key)
+        result.Add key, val
+    Next
+
+    Set ParseJSON = result
+
+    If Err.Number <> 0 Then
+        WScript.Echo "[DEBUG] ParseJSON error: " & Err.Description
+        Err.Clear
+    End If
 End Function
 
 '==========================================================================

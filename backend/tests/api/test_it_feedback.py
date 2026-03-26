@@ -80,3 +80,16 @@ async def test_get_feedback_not_found(client: AsyncClient):
     """Test get feedback with non-existent ID."""
     response = await client.get("/api/v1/it-feedback/99999")
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_create_feedback_with_client_ip(client: AsyncClient):
+    """Test create feedback captures client IP."""
+    response = await client.post(
+        "/api/v1/it-feedback",
+        json=ITFeedbackCreate,
+        headers={"X-Forwarded-For": "192.168.1.100"}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["clientIp"] == "192.168.1.100"

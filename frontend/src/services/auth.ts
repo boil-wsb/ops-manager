@@ -45,25 +45,32 @@ interface UserResponseBackend {
 export const authApi = {
   login: async (credentials: LoginCredentials): Promise<TokenResponse> => {
     const response = await api.post<TokenResponseBackend>('/auth/login', credentials);
-    const data = response.data;
+    const data = response.data as unknown as {
+      accessToken: string;
+      refreshToken: string;
+      tokenType: string;
+      expiresIn: number;
+      permissions: string[];
+      user?: {
+        id: number;
+        username: string;
+        email?: string;
+        fullName?: string;
+        isActive: boolean;
+        isSuperuser: boolean;
+        lastLogin?: string;
+        createdAt: string;
+        updatedAt: string;
+        permissions: string[];
+      };
+    };
     return {
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token,
-      tokenType: data.token_type,
-      expiresIn: data.expires_in,
+      accessToken: data.accessToken,
+      refreshToken: data.refreshToken,
+      tokenType: data.tokenType,
+      expiresIn: data.expiresIn,
       permissions: data.permissions || [],
-      user: data.user ? {
-        id: data.user.id,
-        username: data.user.username,
-        email: data.user.email,
-        fullName: data.user.full_name,
-        isActive: data.user.is_active,
-        isSuperuser: data.user.is_superuser,
-        lastLogin: data.user.last_login,
-        createdAt: data.user.created_at,
-        updatedAt: data.user.updated_at,
-        permissions: data.user.permissions || [],
-      } : undefined,
+      user: data.user,
     };
   },
 
@@ -87,17 +94,27 @@ export const authApi = {
 
   getCurrentUser: async (): Promise<User> => {
     const response = await api.get<UserResponseBackend>('/auth/me');
-    const data = response.data;
+    const data = response.data as unknown as {
+      id: number;
+      username: string;
+      email?: string;
+      fullName?: string;
+      isActive: boolean;
+      isSuperuser: boolean;
+      lastLogin?: string;
+      createdAt: string;
+      updatedAt: string;
+    };
     return {
       id: data.id,
       username: data.username,
       email: data.email,
-      fullName: data.full_name,
-      isActive: data.is_active,
-      isSuperuser: data.is_superuser,
-      lastLogin: data.last_login,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
+      fullName: data.fullName,
+      isActive: data.isActive,
+      isSuperuser: data.isSuperuser,
+      lastLogin: data.lastLogin,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
     };
   },
 };

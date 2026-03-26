@@ -1,5 +1,5 @@
 import api from './api';
-import type { Monitor, AlertRule, NotificationChannel } from '../types';
+import type { Monitor, AlertRule, NotificationChannel, MonitorTerminal } from '../types';
 
 export interface MonitorListParams {
   skip?: number;
@@ -7,6 +7,11 @@ export interface MonitorListParams {
   monitor_type?: string;
   status?: string;
   is_enabled?: boolean;
+}
+
+export interface MyTerminalsParams {
+  skip?: number;
+  limit?: number;
 }
 
 export interface AlertListParams {
@@ -20,6 +25,11 @@ export interface AlertListParams {
 export const monitorApi = {
   getMonitors: async (params: MonitorListParams = {}) => {
     const response = await api.get('/monitor/monitors', { params });
+    return response.data;
+  },
+
+  getMyTerminals: async (params: MyTerminalsParams = {}) => {
+    const response = await api.get<{ items: MonitorTerminal[]; total: number }>('/monitor/my-terminals', { params });
     return response.data;
   },
 

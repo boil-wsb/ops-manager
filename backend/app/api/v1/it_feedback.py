@@ -1,9 +1,10 @@
 """
 IT Feedback API endpoints.
 """
+from contextlib import suppress
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +15,12 @@ from app.schemas.it_feedback import (
     ITFeedbackListResponse,
     ITFeedbackResponse,
 )
+
+
+def get_feishu_service():
+    """Lazy import FeishuService."""
+    from app.integrations.feishu.service import get_feishu_service as _get
+    return _get()
 
 
 def get_client_ip(request: Request) -> str:
@@ -35,6 +42,7 @@ router = APIRouter(prefix="/it-feedback")
 async def create_feedback(
     feedback_in: ITFeedbackCreate,
     request: Request,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
     client_ip = get_client_ip(request)
@@ -51,6 +59,27 @@ async def create_feedback(
     db.add(feedback)
     await db.commit()
     await db.refresh(feedback)
+
+    from app.models.asset import Asset, AssetType
+
+    result = await db.execute(
+        select(Asset).where(
+            Asset.ip_address == client_ip,
+            Asset.asset_type == AssetType.TERMINAL
+        )
+    )
+    asset = result.scalar_one_or_none()
+
+    if asset:
+        background_tasks.add_task(
+            send_it_feedback_created_notification,
+            user_id="ou_e7e3a761a4bc2e3ae17402c67d7685ae",
+            feedback_id=feedback.id,
+            client_ip=client_ip,
+            asset_name=asset.name,
+            description=feedback_in.description,
+            contact=feedback_in.contact,
+        )
 
     return ITFeedbackResponse.model_validate(feedback)
 
@@ -100,9 +129,56 @@ async def get_feedback(
     return ITFeedbackResponse.model_validate(feedback)
 
 
+def send_it_feedback_created_notification(
+    user_id: str,
+    feedback_id: int,
+    client_ip: str,
+    asset_name: str | None,
+    description: str | None,
+    contact: str | None,
+) -> None:
+    """发送新IT反馈创建通知"""
+    try:
+        tags = [
+            {"label": "反馈ID", "value": str(feedback_id)},
+            {"label": "终端IP", "value": client_ip},
+            {"label": "终端名称", "value": asset_name or "未知"},
+            {"label": "反馈内容", "value": description or "无"},
+        ]
+        if contact:
+            tags.append({"label": "联系方式", "value": contact})
+
+        get_feishu_service().send_interactive_message(
+            user_id=user_id,
+            title="【IT反馈处理通知】",
+            content="**新IT反馈待处理**",
+            tags=tags,
+        )
+    except Exception:
+        pass
+
+
+def send_it_feedback_notification(
+    user_id: str,
+    feedback_id: int,
+    feedback_content: str,
+    resolved_by: str,
+    notes: str | None = None,
+) -> None:
+    with suppress(Exception):
+        get_feishu_service().send_it_feedback_resolved(
+            user_id=user_id,
+            feedback_id=feedback_id,
+            feedback_content=feedback_content,
+            resolved_by=resolved_by,
+            notes=notes,
+        )
+
+
 @router.put("/{feedback_id}/resolve")
 async def resolve_feedback(
     feedback_id: int,
+    background_tasks: BackgroundTasks,
     resolved_by: str,
     notes: str | None = None,
     db: AsyncSession = Depends(get_db),
@@ -123,6 +199,15 @@ async def resolve_feedback(
 
     await db.commit()
     await db.refresh(feedback)
+
+    background_tasks.add_task(
+        send_it_feedback_notification,
+        user_id="ou_e7e3a761a4bc2e3ae17402c67d7685ae",
+        feedback_id=feedback_id,
+        feedback_content=feedback.description or "",
+        resolved_by=resolved_by,
+        notes=notes,
+    )
 
     return ITFeedbackResponse.model_validate(feedback)
 

@@ -50,7 +50,7 @@ let failedQueue: Array<{
   reject: (reason?: unknown) => void;
 }> = [];
 
-function processQueue(error: AxiosError | null, token: string | null = null): void {
+function processQueue(error: Error | null, token: string | null = null): void {
   failedQueue.forEach((prom) => {
     if (error) {
       prom.reject(error);
@@ -62,9 +62,10 @@ function processQueue(error: AxiosError | null, token: string | null = null): vo
 }
 
 async function refreshAccessToken(): Promise<string | null> {
-  const { refreshToken, updateToken, clearAuth } = useAuthStore.getState();
+  const { refreshToken, updateToken } = useAuthStore.getState();
 
   if (!refreshToken) {
+    processQueue(new Error('No refresh token') as AxiosError, null);
     return null;
   }
 
@@ -77,11 +78,13 @@ async function refreshAccessToken(): Promise<string | null> {
       }
     );
 
-    const { access_token, refresh_token } = response.data;
-    updateToken(access_token, refresh_token);
-    return access_token;
-  } catch {
-    clearAuth();
+    const accessToken = response.data.access_token;
+    const newRefreshToken = response.data.refresh_token;
+    updateToken(accessToken, newRefreshToken);
+    processQueue(null, accessToken);
+    return accessToken;
+  } catch (err) {
+    processQueue(err as AxiosError, null);
     return null;
   }
 }
@@ -109,7 +112,18 @@ api.interceptors.request.use(
             isRefreshing = false;
           }
         } else {
-          config.headers.Authorization = `Bearer ${token}`;
+          return new Promise((resolve, reject) => {
+            failedQueue.push({ resolve, reject });
+          })
+            .then((token) => {
+              if (token) {
+                config.headers.Authorization = `Bearer ${token}`;
+              }
+              return config;
+            })
+            .catch(() => {
+              return config;
+            });
         }
       } else {
         config.headers.Authorization = `Bearer ${token}`;
@@ -166,17 +180,14 @@ api.interceptors.response.use(
         const newToken = await refreshAccessToken();
 
         if (newToken) {
-          processQueue(null, newToken);
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
           return api(originalRequest);
         } else {
-          processQueue(error, null);
           useAuthStore.getState().clearAuth();
           window.location.href = '/login';
           return Promise.reject(error);
         }
       } catch (refreshError) {
-        processQueue(error, null);
         useAuthStore.getState().clearAuth();
         window.location.href = '/login';
         return Promise.reject(refreshError);

@@ -1,7 +1,9 @@
 """
 FastAPI application entry point.
 """
+import asyncio
 from contextlib import asynccontextmanager
+from typing import Any, NamedTuple
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,15 +12,33 @@ from slowapi.errors import RateLimitExceeded
 
 from app.api.router import api_router
 from app.config import settings
-from app.core.logging import get_logger
+from app.core.logging import configure_logging, get_logger
 from app.core.middleware import RequestLoggingMiddleware
 from app.core.rate_limit import limiter
 from app.core.redis import close_redis, init_redis
 from app.db.init_db import init_db
 from app.startup.pc_versions import sync_pc_versions_on_startup
-from app.db.session import AsyncSessionLocal
 
 logger = get_logger(__name__)
+
+configure_logging()
+
+
+class TaskResult(NamedTuple):
+    name: str
+    success: bool
+    result: Any
+    error: Exception | None
+
+
+async def _run_task(name: str, coro: Any) -> TaskResult:
+    """Run a task with independent error handling."""
+    try:
+        result = await coro
+        return TaskResult(name, True, result, None)
+    except Exception as e:
+        logger.error(f"{name} failed: {e}")
+        return TaskResult(name, False, None, e)
 
 
 @asynccontextmanager
@@ -26,28 +46,33 @@ async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     logger.info(f"Starting up application: {settings.app_name} v{settings.app_version}")
 
-    try:
-        logger.info("Checking database initialization...")
+    async def _init_db_task():
         await init_db()
         logger.info("Database initialization check completed")
-    except Exception as e:
-        logger.error(f"Database initialization failed: {e}")
 
-    try:
+    async def _init_redis_task():
         await init_redis()
         logger.info("Redis connection initialized")
-    except Exception as e:
-        logger.error(f"Redis initialization failed: {e}")
 
-    try:
-        async with AsyncSessionLocal() as db:
+    async def _sync_pc_versions_task():
+        from app.db.session import get_async_session_local
+        async with await get_async_session_local() as db:
             synced = await sync_pc_versions_on_startup(db)
             if synced:
                 logger.info(f"PC client versions synced: {synced}")
             else:
                 logger.info("No new PC client versions to sync")
-    except Exception as e:
-        logger.error(f"PC versions sync failed: {e}")
+            return synced
+
+    results = await asyncio.gather(
+        _run_task("Database initialization", _init_db_task()),
+        _run_task("Redis initialization", _init_redis_task()),
+        _run_task("PC versions sync", _sync_pc_versions_task()),
+    )
+
+    for result in results:
+        if not result.success:
+            logger.warning(f"Task '{result.name}' failed, but continuing startup")
 
     yield
 

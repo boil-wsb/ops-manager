@@ -10,7 +10,6 @@ from typing import Any
 
 from app.config import settings
 from app.core.audit.sanitizer import sanitize_sensitive_data
-from app.db.session import AsyncSessionLocal
 from app.models.audit_log import AuditLog
 
 
@@ -256,7 +255,9 @@ class AuditLogger:
         duration_ms: int | None,
     ) -> AuditLog:
         """Log to database."""
-        async with AsyncSessionLocal() as db:
+        from app.db.session import get_session_maker
+        session_maker = get_session_maker()
+        async with session_maker() as db:
             audit_log = AuditLog(
                 operation_type=operation_type,
                 operation_module=operation_module,

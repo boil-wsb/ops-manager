@@ -7,11 +7,13 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_db, require_permissions
+from app.api.deps import get_current_user, get_db, require_permissions
 from app.core.audit import audit_log
 from app.core.exceptions import NotFoundError
 from app.crud.base import CRUDBase
+from app.models.asset import Asset, AssetType
 from app.models.monitor import Alert, AlertRule, Monitor, NotificationChannel
+from app.models.user import User
 from app.schemas.monitor import (
     AlertAction,
     AlertListResponse,
@@ -22,6 +24,8 @@ from app.schemas.monitor import (
     MonitorCreate,
     MonitorListResponse,
     MonitorResponse,
+    MonitorTerminalListResponse,
+    MonitorTerminalResponse,
     MonitorUpdate,
     NotificationChannelCreate,
     NotificationChannelResponse,
@@ -34,6 +38,71 @@ crud_monitor = CRUDBase(Monitor)
 crud_alert = CRUDBase(Alert)
 crud_alert_rule = CRUDBase(AlertRule)
 crud_notification_channel = CRUDBase(NotificationChannel)
+
+
+async def get_asset_owner_name(asset: Asset, db: AsyncSession) -> str | None:
+    """根据 labels_data 中的 CustInfo 标签获取负责人名称"""
+    labels_data = asset.labels_data or {}
+    cust_info_tag = labels_data.get("CustInfo")
+    if cust_info_tag:
+        result = await db.execute(select(User).where(User.username == cust_info_tag))
+        user = result.scalar_one_or_none()
+        if user:
+            return user.full_name
+    return asset.owner_name
+
+
+@router.get("/my-terminals", response_model=MonitorTerminalListResponse)
+async def get_my_terminals(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """获取当前用户负责的监控终端列表"""
+    query = select(Asset).where(Asset.asset_type == AssetType.TERMINAL)
+
+    count_query = select(func.count()).select_from(query.subquery())
+    (await db.execute(count_query)).scalar()
+
+    query = query.offset(skip).limit(limit)
+    result = await db.execute(query)
+    assets = result.scalars().all()
+
+    items = []
+    for asset in assets:
+        labels_data = asset.labels_data or {}
+        cust_info_tag = labels_data.get("CustInfo")
+
+        if cust_info_tag != current_user.username:
+            continue
+
+        owner_name = await get_asset_owner_name(asset, db)
+
+        monitor_info = {"monitor_id": None, "monitor_name": None, "current_status": "unknown", "last_check_at": None}
+        if asset.monitors:
+            monitor = asset.monitors[0]
+            monitor_info = {
+                "monitor_id": monitor.id,
+                "monitor_name": monitor.name,
+                "current_status": monitor.current_status.value if hasattr(monitor.current_status, 'value') else str(monitor.current_status),
+                "last_check_at": monitor.last_check_at,
+            }
+
+        items.append(MonitorTerminalResponse(
+            id=asset.id,
+            name=asset.name,
+            asset_id=asset.asset_id,
+            ip_address=asset.ip_address,
+            hostname=asset.hostname,
+            owner_name=owner_name,
+            current_status=monitor_info["current_status"],
+            last_check_at=monitor_info["last_check_at"],
+            monitor_id=monitor_info["monitor_id"],
+            monitor_name=monitor_info["monitor_name"],
+        ))
+
+    return MonitorTerminalListResponse(total=len(items), items=items)
 
 
 @router.get("/monitors", response_model=MonitorListResponse)

@@ -23,7 +23,6 @@ def extract_version_from_filename(filename: str) -> str | None:
 
 def get_frontend_pcinfo_dir() -> Path:
     """Get the frontend PC info directory path."""
-    import os
     backend_dir = Path(__file__).parent.parent.parent.parent
     frontend_pcinfo = backend_dir / "frontend" / "public" / "pcinfo"
     if frontend_pcinfo.exists():

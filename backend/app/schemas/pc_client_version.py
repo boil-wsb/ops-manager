@@ -51,6 +51,6 @@ class PCClientVersionCheckResponse(BaseModel):
     """Schema for version check response (used by VBS script)."""
 
     version: str
-    releaseNotes: str | None = None
-    downloadUrl: str | None = None
+    releaseNotes: str | None = None  # noqa: N815
+    downloadUrl: str | None = None  # noqa: N815
     files: list[dict] | None = None

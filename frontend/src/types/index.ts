@@ -128,6 +128,19 @@ export interface Monitor {
   updatedAt: string;
 }
 
+export interface MonitorTerminal {
+  id: number;
+  name: string;
+  assetId: string;
+  ipAddress: string | null;
+  hostname: string | null;
+  ownerName: string | null;
+  currentStatus: string;
+  lastCheckAt: string | null;
+  monitorId: number | null;
+  monitorName: string | null;
+}
+
 // Alert types
 export type AlertSeverity = 'info' | 'warning' | 'critical';
 export type AlertStatus = 'firing' | 'acknowledged' | 'resolved' | 'suppressed';

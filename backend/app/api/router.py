@@ -7,6 +7,7 @@ from app.api.v1 import (
     assets,
     audit_logs,
     auth,
+    feishu_sync,
     it_feedback,
     monitor,
     navigation,
@@ -30,3 +31,4 @@ api_router.include_router(audit_logs.router, prefix="/v1", tags=["审计日志"]
 api_router.include_router(navigation.router, prefix="/v1", tags=["导航管理"])
 api_router.include_router(it_feedback.router, prefix="/v1", tags=["IT反馈"])
 api_router.include_router(pc_client_version.router, prefix="/v1", tags=["PC客户端版本"])
+api_router.include_router(feishu_sync.router, prefix="/v1", tags=["飞书同步"])

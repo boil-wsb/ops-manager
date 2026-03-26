@@ -17,6 +17,7 @@ celery_app = Celery(
         "app.tasks.audit_log_cleanup",
         "app.tasks.asset_sync_tasks",
         "app.tasks.certificate_sync_tasks",
+        "app.tasks.feishu_sync_tasks",
     ],
 )
 
@@ -42,6 +43,7 @@ def setup_periodic_tasks(sender, **kwargs):
     from app.tasks.asset_sync_tasks import get_sync_interval, sync_assets_from_prometheus_task
     from app.tasks.audit_log_cleanup import cleanup_audit_logs_db, cleanup_audit_logs_file
     from app.tasks.certificate_sync_tasks import sync_certificates_from_prometheus_task
+    from app.tasks.feishu_sync_tasks import sync_feishu_users_task
     from app.tasks.monitor_tasks import check_all_monitors
 
     sender.add_periodic_task(
@@ -60,6 +62,12 @@ def setup_periodic_tasks(sender, **kwargs):
         crontab(hour=3, minute=30),
         cleanup_audit_logs_file.s(),
         name="cleanup-audit-logs-file",
+    )
+
+    sender.add_periodic_task(
+        crontab(hour=2, minute=0),
+        sync_feishu_users_task.s(),
+        name="sync-feishu-users",
     )
 
     sync_interval = get_sync_interval()

@@ -1,6 +1,8 @@
 """
 Application configuration using Pydantic Settings.
 """
+from pathlib import Path
+
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -9,7 +11,7 @@ class Settings(BaseSettings):
     """Application settings."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(Path(__file__).parent.parent.parent / ".env"),
         env_file_encoding="utf-8",
         case_sensitive=False,
     )
@@ -77,6 +79,11 @@ class Settings(BaseSettings):
 
     # Rate Limiting
     disable_rate_limit: bool = Field(default=False, alias="DISABLE_RATE_LIMIT")
+
+    # Feishu (Lark) Configuration
+    feishu_app_id: str | None = Field(default=None, alias="FEISHU_APP_ID")
+    feishu_app_secret: str | None = Field(default=None, alias="FEISHU_APP_SECRET")
+    feishu_enable: bool = Field(default=False, alias="FEISHU_ENABLE")
 
     @property
     def cors_origins(self) -> list[str]:

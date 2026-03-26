@@ -23,7 +23,7 @@
   },
   "UpdateServer":  {
     "Host":  "192.168.23.36",
-    "Port":  "8000"
+    "Port":  "8080"
   },
   "DataRetention":  {
     "KeepDays":  30,

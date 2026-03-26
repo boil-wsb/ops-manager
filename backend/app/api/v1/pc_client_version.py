@@ -15,7 +15,7 @@ from app.schemas.pc_client_version import (
     PCClientVersionUpdate,
 )
 
-router = APIRouter()
+router = APIRouter(prefix="/pc-client-version")
 
 
 @router.get("/version", response_model=PCClientVersionCheckResponse)
@@ -36,6 +36,61 @@ async def check_version(
         releaseNotes=version.release_notes,
         downloadUrl=version.download_url,
         files=[],
+    )
+
+
+@router.get("/download", name="download_pc_client")
+async def download_personalized_pc_client(
+    current_user: Annotated[dict, Depends(deps.get_current_user)],
+):
+    """
+    Download personalized PC info collector package.
+    Replaces CustInfo.id in Conf.json with current username.
+    """
+    import io
+    import json
+    import logging
+    import zipfile
+    from pathlib import Path
+
+    logger = logging.getLogger(__name__)
+    logger.info(f"Download endpoint called by user: {current_user.username}")
+
+    pcinfo_dir = (
+        Path(__file__).parent.parent.parent.parent.parent
+        / "frontend"
+        / "public"
+        / "pcinfo"
+    )
+
+    conf_path = pcinfo_dir / "Conf.json"
+    logger.info(f"Looking for Conf.json at: {conf_path}")
+    logger.info(f"Conf.json exists: {conf_path.exists()}")
+    with open(conf_path, encoding="utf-8") as f:
+        conf = json.load(f)
+
+    username = current_user.username
+    conf["CustInfo"]["id"] = username
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
+        for file_path in pcinfo_dir.iterdir():
+            if file_path.is_file() and file_path.name != "Conf.json":
+                zipf.write(file_path, file_path.name)
+
+        conf_json = json.dumps(conf, ensure_ascii=False, indent=2)
+        zipf.writestr("Conf.json", conf_json.encode("utf-8"))
+
+    zip_buffer.seek(0)
+
+    from fastapi.responses import StreamingResponse
+
+    return StreamingResponse(
+        iter([zip_buffer.getvalue()]),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f"attachment; filename=pcinfo_{username}.zip"
+        },
     )
 
 

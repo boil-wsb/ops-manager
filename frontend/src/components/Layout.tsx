@@ -51,7 +51,7 @@ const Layout = () => {
         return { total: 0 };
       }
     },
-    refetchInterval: 60000,
+    refetchInterval: 300000,
   });
 
   const firingAlertsCount = alertData?.total || 0;
