@@ -138,6 +138,17 @@ backend-test:
     - export REDIS_URL=redis://192.168.23.36:16379/0
     - export DISABLE_RATE_LIMIT=true
     - pip install -r requirements/dev.txt -q
+    - |
+      python -c "
+      import asyncio, asyncpg
+      async def clean():
+          conn = await asyncpg.connect('postgresql://opsmanager:opsmanager@192.168.23.36:15432/opsmanager_test')
+          await conn.execute('DROP SCHEMA public CASCADE')
+          await conn.execute('CREATE SCHEMA public')
+          await conn.close()
+          print('Database schema cleaned')
+      asyncio.run(clean())
+      "
     - alembic upgrade head
   script:
     - pytest tests/ -v --cov=app --cov-report=xml --cov-report=html --cov-fail-under=$COVERAGE_MIN
