@@ -1,6 +1,9 @@
 {
-  "CustInfo":  {
-    "id":  "boil"
+  "CustInfo": {
+    "id": "boil"
+  },
+  "Schedule": {
+    "IntervalMinutes": 10
   },
   "Modules":  {
     "Systeminfo":  true,

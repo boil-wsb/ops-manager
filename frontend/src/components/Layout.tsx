@@ -99,6 +99,7 @@ const Layout = () => {
           { key: '/system/users', label: '用户管理', permission: 'user:read' },
           { key: '/system/roles', label: '角色管理', permission: 'role:read' },
           { key: '/system/navigation', label: '导航管理', permission: 'navigation:read' },
+          { key: '/system/notification-groups', label: '通知组管理', permission: 'notification_group:read' },
         ],
       },
     ],

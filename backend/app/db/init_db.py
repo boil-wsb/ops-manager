@@ -72,6 +72,11 @@ DEFAULT_PERMISSIONS = [
     {"code": "navigation:create", "name": "创建导航", "module": "navigation", "action": "create", "description": "创建导航链接"},
     {"code": "navigation:update", "name": "编辑导航", "module": "navigation", "action": "update", "description": "修改导航链接"},
     {"code": "navigation:delete", "name": "删除导航", "module": "navigation", "action": "delete", "description": "删除导航链接"},
+
+    {"code": "notification_group:read", "name": "查看通知组", "module": "notification_group", "action": "read", "description": "查看通知组"},
+    {"code": "notification_group:create", "name": "创建通知组", "module": "notification_group", "action": "create", "description": "创建通知组"},
+    {"code": "notification_group:update", "name": "编辑通知组", "module": "notification_group", "action": "update", "description": "修改通知组"},
+    {"code": "notification_group:delete", "name": "删除通知组", "module": "notification_group", "action": "delete", "description": "删除通知组"},
 ]
 
 
@@ -92,6 +97,7 @@ DEFAULT_ROLES = {
             "certificate:read", "certificate:create", "certificate:update", "certificate:delete", "certificate:renew",
             "setting:read", "setting:update",
             "navigation:read", "navigation:create", "navigation:update", "navigation:delete",
+            "notification_group:read", "notification_group:create", "notification_group:update", "notification_group:delete",
         ],
     },
     "operator": {

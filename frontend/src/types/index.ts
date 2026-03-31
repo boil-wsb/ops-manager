@@ -26,6 +26,7 @@ export interface User {
   isActive: boolean;
   isSuperuser: boolean;
   lastLogin?: string;
+  feishuOpenId?: string;
   createdAt: string;
   updatedAt: string;
   permissions?: string[];

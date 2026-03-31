@@ -52,7 +52,7 @@ async def list_users(
 
     return {
         "items": [
-            UserResponse.model_validate({
+            {
                 "id": u.id,
                 "username": u.username,
                 "email": u.email,
@@ -62,8 +62,10 @@ async def list_users(
                 "last_login": u.last_login,
                 "created_at": u.created_at,
                 "updated_at": u.updated_at,
+                "feishu_open_id": u.feishu_open_id,
                 "permissions": [],
-            })
+                "roles": [],
+            }
             for u in users
         ],
         "total": total,

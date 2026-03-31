@@ -2,6 +2,7 @@
 FastAPI application entry point.
 """
 import asyncio
+import warnings
 from contextlib import asynccontextmanager
 from typing import Any, NamedTuple
 
@@ -18,10 +19,13 @@ from app.core.rate_limit import limiter
 from app.core.redis import close_redis, init_redis
 from app.db.init_db import init_db
 from app.startup.pc_versions import sync_pc_versions_on_startup
+from app.integrations.feishu.callback_handler import start_feishu_callback_client
 
 logger = get_logger(__name__)
 
 configure_logging()
+
+warnings.filterwarnings("ignore", message=".*alias.*Field.*")
 
 
 class TaskResult(NamedTuple):
@@ -73,6 +77,8 @@ async def lifespan(app: FastAPI):
     for result in results:
         if not result.success:
             logger.warning(f"Task '{result.name}' failed, but continuing startup")
+
+    start_feishu_callback_client()
 
     yield
 

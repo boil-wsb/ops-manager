@@ -151,6 +151,106 @@ class CRUDNavigationLink(CRUDBase[NavigationLink, NavigationLinkCreate, Navigati
         result = await db.execute(query)
         return result.scalar() or 0
 
+    async def get_multi_with_access_filter(
+        self,
+        db: AsyncSession,
+        *,
+        category: str | None = None,
+        is_active: bool | None = None,
+        skip: int = 0,
+        limit: int = 100,
+        is_superadmin: bool = False,
+        user_role_ids: list[int] | None = None,
+    ) -> list[NavigationLink]:
+        """Get multiple links with access control filters.
+
+        For superadmin: returns all records.
+        For non-superadmin: only returns records where roles is empty OR user has a matching role.
+        """
+        query = (
+            select(NavigationLink)
+            .options(selectinload(NavigationLink.roles))
+        )
+
+        conditions = []
+        if category is not None:
+            conditions.append(NavigationLink.category == category)
+        if is_active is not None:
+            conditions.append(NavigationLink.is_active == is_active)
+
+        if conditions:
+            query = query.where(and_(*conditions))
+
+        result = await db.execute(
+            query.order_by(NavigationLink.category, NavigationLink.sort_order)
+            .offset(skip)
+            .limit(limit)
+        )
+        all_links = result.scalars().all()
+
+        if is_superadmin:
+            return all_links
+
+        filtered_links = []
+        user_role_set = set(user_role_ids) if user_role_ids else set()
+        for link in all_links:
+            if not link.roles:
+                filtered_links.append(link)
+            else:
+                link_role_ids = {role.id for role in link.roles}
+                if user_role_set & link_role_ids:
+                    filtered_links.append(link)
+
+        return filtered_links
+
+    async def count_with_access_filter(
+        self,
+        db: AsyncSession,
+        *,
+        category: str | None = None,
+        is_active: bool | None = None,
+        is_superadmin: bool = False,
+        user_role_ids: list[int] | None = None,
+    ) -> int:
+        """Count links with access control filters.
+
+        For superadmin: counts all records.
+        For non-superadmin: only counts records where roles is empty OR user has a matching role.
+        """
+        from sqlalchemy import func
+
+        query = (
+            select(NavigationLink)
+            .options(selectinload(NavigationLink.roles))
+        )
+
+        conditions = []
+        if category is not None:
+            conditions.append(NavigationLink.category == category)
+        if is_active is not None:
+            conditions.append(NavigationLink.is_active == is_active)
+
+        if conditions:
+            query = query.where(and_(*conditions))
+
+        result = await db.execute(query)
+        all_links = result.scalars().all()
+
+        if is_superadmin:
+            return len(all_links)
+
+        user_role_set = set(user_role_ids) if user_role_ids else set()
+        count = 0
+        for link in all_links:
+            if not link.roles:
+                count += 1
+            else:
+                link_role_ids = {role.id for role in link.roles}
+                if user_role_set & link_role_ids:
+                    count += 1
+
+        return count
+
     async def get_with_roles(
         self,
         db: AsyncSession,

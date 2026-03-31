@@ -24,6 +24,7 @@ from app.models import (
     NavigationLink, navigation_link_roles,
     ITFeedback,
     Deployment, InspectionTask, InspectionReport, Certificate, DNSRecord,
+    NotificationGroup, notification_group_members,
 )
 
 # this is the Alembic Config object

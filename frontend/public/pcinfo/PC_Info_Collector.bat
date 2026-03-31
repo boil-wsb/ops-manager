@@ -158,6 +158,31 @@ if not exist "%InstallPath%\PC_5.0.0_modular.vbs" (
 
 echo Done
 
+:: Read schedule interval from Conf.json
+set "IntervalMinutes=10"
+powershell -NoProfile -Command "try { $config = Get-Content 'Conf.json' -Raw | ConvertFrom-Json; if ($config.Schedule.IntervalMinutes) { exit 0 } else { exit 1 } } catch { exit 1 }"
+if %errorlevel% equ 0 (
+    for /f "delims=" %%i in ('powershell -NoProfile -Command "(Get-Content 'Conf.json' -Raw | ConvertFrom-Json).Schedule.IntervalMinutes"') do set "IntervalMinutes=%%i"
+)
+
+:: Determine schedule type based on interval
+set "ScheduleType=MINUTE"
+set "ScheduleModifier="
+if %IntervalMinutes% geq 60 (
+    set /a "Hours=%IntervalMinutes% / 60"
+    if %IntervalMinutes% equ 60 (
+        set "ScheduleType=HOURLY"
+        set "ScheduleModifier="
+    ) else (
+        set "ScheduleType=HOURLY"
+        set "ScheduleModifier=/mo %Hours%"
+    )
+) else (
+    set "ScheduleModifier=/mo %IntervalMinutes%"
+)
+
+echo Schedule interval: %IntervalMinutes% minutes ^(%ScheduleType% %ScheduleModifier%^)
+
 echo Creating scheduled tasks...
 
 set "VbsPath=%InstallPath%\PC_5.0.0_modular.vbs"
@@ -165,16 +190,17 @@ set "VbsPath=%InstallPath%\PC_5.0.0_modular.vbs"
 :: Delete old tasks
 schtasks /delete /tn "PCInfoCollector_Startup" /f >nul 2>&1
 schtasks /delete /tn "PCInfoCollector_Hourly" /f >nul 2>&1
+schtasks /delete /tn "PCInfoCollector_Scheduled" /f >nul 2>&1
 schtasks /delete /tn "PC_Info_Collector_Startup" /f >nul 2>&1
 schtasks /delete /tn "PC_Info_Collector_Hourly" /f >nul 2>&1
 
 :: Create startup task - use wscript.exe to run hidden
 schtasks /create /tn "PCInfoCollector_Startup" /tr "wscript.exe //B \"!VbsPath!\"" /sc ONSTART /rl HIGHEST /f >nul 2>&1
-echo   Created: PCInfoCollector_Startup (Run at startup)
+echo   Created: PCInfoCollector_Startup ^(Run at startup^)
 
-:: Create hourly task - use wscript.exe to run hidden
-schtasks /create /tn "PCInfoCollector_Hourly" /tr "wscript.exe //B \"!VbsPath!\"" /sc HOURLY /rl HIGHEST /f >nul 2>&1
-echo   Created: PCInfoCollector_Hourly (Run every hour)
+:: Create scheduled task with configurable interval
+schtasks /create /tn "PCInfoCollector_Scheduled" /tr "wscript.exe //B \"!VbsPath!\"" /sc %ScheduleType% %ScheduleModifier% /rl HIGHEST /f >nul 2>&1
+echo   Created: PCInfoCollector_Scheduled ^(Run every %IntervalMinutes% minutes^)
 
 :: Create uninstall script
 (
@@ -199,11 +225,13 @@ echo ==========================================
 echo.
 echo Features:
 echo   1. Run at startup - Collect info when system starts
-echo   2. Run hourly - Collect and report info every hour
+echo   2. Run on schedule - Collect and report info at configured interval
 echo.
 echo Install path: %InstallPath%
 echo Config file: %InstallPath%\Conf.json
 echo Uninstall: %InstallPath%\Uninstall.bat
+echo.
+echo Current schedule interval: %IntervalMinutes% minutes
 echo.
 echo Run installed version: "%InstallPath%\PC_Info_Collector.bat"
 echo.
@@ -260,6 +288,7 @@ set "InstallPath=%ProgramFiles%\PCInfoCollector"
 if exist "%InstallPath%" (
     echo Uninstalling from %InstallPath%...
     schtasks /delete /tn "PCInfoCollector_Startup" /f >nul 2>&1
+    schtasks /delete /tn "PCInfoCollector_Scheduled" /f >nul 2>&1
     schtasks /delete /tn "PCInfoCollector_Hourly" /f >nul 2>&1
     rmdir /s /q "%InstallPath%" >nul 2>&1
     echo Done
@@ -319,7 +348,7 @@ echo ==========================================
 echo Current Configuration
 echo ==========================================
 echo.
-powershell -Command "try { $config = Get-Content 'Conf.json' -Raw | ConvertFrom-Json; Write-Host 'Customer ID: ' -NoNewline; Write-Host $config.CustInfo.id -ForegroundColor Green; Write-Host ''; Write-Host 'Http Report: ' -NoNewline; if ($config.HttpReport.Enabled) { Write-Host 'Enabled' -ForegroundColor Green } else { Write-Host 'Disabled' -ForegroundColor Red }; Write-Host '  Endpoint: ' -NoNewline; Write-Host $config.HttpReport.Endpoint; Write-Host '  Format: ' -NoNewline; Write-Host $config.HttpReport.Format; Write-Host ''; Write-Host 'Update Server: ' -NoNewline; if ($config.UpdateServer.Host) { Write-Host ($config.UpdateServer.Host + ':' + $config.UpdateServer.Port) -ForegroundColor Green } else { Write-Host 'Not configured' -ForegroundColor Yellow }; Write-Host ''; Write-Host 'Modules:'; $config.Modules.PSObject.Properties | ForEach-Object { Write-Host ('  ' + $_.Name + ': ') -NoNewline; if ($_.Value) { Write-Host 'Enabled' -ForegroundColor Green } else { Write-Host 'Disabled' -ForegroundColor Red } }; Write-Host ''; Write-Host 'Data Retention: ' -NoNewline; if ($config.DataRetention.Enabled) { Write-Host ('Enabled (' + $config.DataRetention.KeepDays + ' days)') -ForegroundColor Green } else { Write-Host 'Disabled' -ForegroundColor Red } } catch { Write-Host 'Failed to read configuration file.' -ForegroundColor Red }"
+powershell -Command "try { $config = Get-Content 'Conf.json' -Raw | ConvertFrom-Json; Write-Host 'Customer ID: ' -NoNewline; Write-Host $config.CustInfo.id -ForegroundColor Green; Write-Host ''; Write-Host 'Schedule Interval: ' -NoNewline; Write-Host ($config.Schedule.IntervalMinutes.ToString() + ' minutes') -ForegroundColor Green; Write-Host ''; Write-Host 'Http Report: ' -NoNewline; if ($config.HttpReport.Enabled) { Write-Host 'Enabled' -ForegroundColor Green } else { Write-Host 'Disabled' -ForegroundColor Red }; Write-Host '  Endpoint: '; Write-Host $config.HttpReport.Endpoint; Write-Host '  Format: '; Write-Host $config.HttpReport.Format; Write-Host ''; Write-Host 'Update Server: ' -NoNewline; if ($config.UpdateServer.Host) { Write-Host ($config.UpdateServer.Host + ':' + $config.UpdateServer.Port) -ForegroundColor Green } else { Write-Host 'Not configured' -ForegroundColor Yellow }; Write-Host ''; Write-Host 'Modules:'; $config.Modules.PSObject.Properties | ForEach-Object { Write-Host ('  ' + $_.Name + ': ') -NoNewline; if ($_.Value) { Write-Host 'Enabled' -ForegroundColor Green } else { Write-Host 'Disabled' -ForegroundColor Red } }; Write-Host ''; Write-Host 'Data Retention: ' -NoNewline; if ($config.DataRetention.Enabled) { Write-Host ('Enabled (' + $config.DataRetention.KeepDays + ' days)') -ForegroundColor Green } else { Write-Host 'Disabled' -ForegroundColor Red } } catch { Write-Host 'Failed to read configuration file.' -ForegroundColor Red }"
 echo.
 pause
 goto EXIT

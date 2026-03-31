@@ -99,9 +99,10 @@ class PermissionChecker:
         current_user=Depends(get_current_user),
     ) -> dict:
         """Check if user has required permissions."""
-        user_permissions = []
+        user_permissions: list[str] = []
         for role in current_user.roles:
-            user_permissions.extend(role.permissions or [])
+            for perm in role.permissions:
+                user_permissions.append(perm.code)
 
         has_permission = any(
             perm in user_permissions for perm in self.required_permissions

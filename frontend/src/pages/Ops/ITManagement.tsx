@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, Table, Tag, Button, Space, Input, Select, Modal, Form, App, Popconfirm } from 'antd';
 import { itFeedbackApi, type ITFeedback } from '../../services/itFeedback';
 
@@ -38,6 +39,7 @@ const lagLevelLabels: Record<string, string> = {
 
 const ITManagement = () => {
   const { message } = App.useApp();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [feedbackList, setFeedbackList] = useState<ITFeedback[]>([]);
   const [total, setTotal] = useState(0);
@@ -50,6 +52,24 @@ const ITManagement = () => {
     saving: boolean;
   }>({ visible: false, feedback: null, saving: false });
   const [form] = Form.useForm();
+  const hasCheckedUrlRef = useRef(false);
+  const [highlightedId, setHighlightedId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!hasCheckedUrlRef.current && feedbackList.length > 0) {
+      const feedbackId = searchParams.get('feedback_id');
+      const action = searchParams.get('action');
+
+      if (feedbackId && action === 'handle') {
+        const feedback = feedbackList.find((f) => f.id === parseInt(feedbackId, 10));
+        if (feedback && feedback.status === 'pending') {
+          hasCheckedUrlRef.current = true;
+          setHighlightedId(feedback.id);
+          setResolveModal({ visible: true, feedback, saving: false });
+        }
+      }
+    }
+  }, [searchParams, feedbackList]);
 
   const fetchFeedbackList = useCallback(async () => {
     setLoading(true);
@@ -260,6 +280,7 @@ const ITManagement = () => {
           dataSource={feedbackList}
           rowKey="id"
           loading={loading}
+          rowClassName={(record) => (highlightedId === record.id ? 'highlight-row' : '')}
           pagination={{
             current: currentPage,
             pageSize: pageSize,

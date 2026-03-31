@@ -25,6 +25,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [feedbackVisible, setFeedbackVisible] = useState(false);
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [loginVisible, setLoginVisible] = useState(false);
   const [feedbackForm] = Form.useForm();
   const pendingDownloadRef = useRef(false);
@@ -99,6 +100,8 @@ const Login = () => {
   };
 
   const handleFeedbackSubmit = async (values: FeedbackFormValues) => {
+    if (feedbackSubmitting) return;
+    setFeedbackSubmitting(true);
     try {
       const submitData = {
         ...values,
@@ -110,6 +113,8 @@ const Login = () => {
       feedbackForm.resetFields();
     } catch {
       message.error('提交反馈失败');
+    } finally {
+      setFeedbackSubmitting(false);
     }
   };
 
@@ -494,10 +499,10 @@ const Login = () => {
 
           <Form.Item style={{ marginBottom: 0, marginTop: 24 }}>
             <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
-              <Button onClick={() => setFeedbackVisible(false)}>
+              <Button onClick={() => setFeedbackVisible(false)} disabled={feedbackSubmitting}>
                 取消
               </Button>
-              <Button type="primary" htmlType="submit">
+              <Button type="primary" htmlType="submit" loading={feedbackSubmitting}>
                 提交反馈
               </Button>
             </Space>

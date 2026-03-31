@@ -71,7 +71,9 @@ class UserResponse(UserBase):
     last_login: datetime | None = None
     created_at: datetime
     updated_at: datetime
+    feishu_open_id: str | None = None
     permissions: list[str] = []
+    roles: list[dict] = []
 
 
 class UserLogin(BaseModel):

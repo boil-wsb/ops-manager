@@ -2,22 +2,23 @@ import api from './api';
 import type { LoginCredentials, User } from '../types';
 
 interface TokenResponseBackend {
-  access_token: string;
-  refresh_token: string;
-  token_type: string;
-  expires_in: number;
+  accessToken: string;
+  refreshToken: string;
+  tokenType: string;
+  expiresIn: number;
   permissions: string[];
   user?: {
     id: number;
     username: string;
     email?: string;
-    full_name?: string;
-    is_active: boolean;
-    is_superuser: boolean;
-    last_login?: string;
-    created_at: string;
-    updated_at: string;
+    fullName?: string;
+    isActive: boolean;
+    isSuperuser: boolean;
+    lastLogin?: string;
+    createdAt: string;
+    updatedAt: string;
     permissions: string[];
+    roles: { id: number; name: string }[];
   };
 }
 
@@ -45,32 +46,26 @@ interface UserResponseBackend {
 export const authApi = {
   login: async (credentials: LoginCredentials): Promise<TokenResponse> => {
     const response = await api.post<TokenResponseBackend>('/auth/login', credentials);
-    const data = response.data as unknown as {
-      accessToken: string;
-      refreshToken: string;
-      tokenType: string;
-      expiresIn: number;
-      permissions: string[];
-      user?: {
-        id: number;
-        username: string;
-        email?: string;
-        fullName?: string;
-        isActive: boolean;
-        isSuperuser: boolean;
-        lastLogin?: string;
-        createdAt: string;
-        updatedAt: string;
-        permissions: string[];
-      };
-    };
+    const data = response.data;
     return {
       accessToken: data.accessToken,
       refreshToken: data.refreshToken,
       tokenType: data.tokenType,
       expiresIn: data.expiresIn,
       permissions: data.permissions || [],
-      user: data.user,
+      user: data.user ? {
+        id: data.user.id,
+        username: data.user.username,
+        email: data.user.email,
+        fullName: data.user.fullName,
+        isActive: data.user.isActive,
+        isSuperuser: data.user.isSuperuser,
+        lastLogin: data.user.lastLogin,
+        createdAt: data.user.createdAt,
+        updatedAt: data.user.updatedAt,
+        permissions: data.user.permissions || [],
+        roles: data.user.roles || [],
+      } : undefined,
     };
   },
 
@@ -84,10 +79,10 @@ export const authApi = {
     });
     const data = response.data;
     return {
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token,
-      tokenType: data.token_type,
-      expiresIn: data.expires_in,
+      accessToken: data.accessToken,
+      refreshToken: data.refreshToken,
+      tokenType: data.tokenType,
+      expiresIn: data.expiresIn,
       permissions: data.permissions || [],
     };
   },

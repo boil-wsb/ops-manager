@@ -5,6 +5,7 @@ import { monitorApi } from '../services/monitor';
 import { opsApi } from '../services/ops';
 import { assetApi } from '../services/assets';
 import { navigationApi } from '../services/navigation';
+import { useAuthStore } from '../stores/authStore';
 
 const iconMap: Record<string, React.ReactNode> = {
   MonitorOutlined: <MonitorOutlined />,
@@ -20,6 +21,9 @@ const iconMap: Record<string, React.ReactNode> = {
 };
 
 const Dashboard = () => {
+  const user = useAuthStore((state) => state.user);
+  const isViewer = user?.roles?.some(role => role.name === 'viewer') ?? false;
+
   const { data: navigationGroups } = useQuery({
     queryKey: ['navigation-links'],
     queryFn: () => navigationApi.getPublicLinks(),
@@ -130,56 +134,60 @@ const Dashboard = () => {
       )}
 
       <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} lg={6}>
-          <Card loading={monitorLoading}>
-            <Statistic
-              title="监控总数"
-              value={monitorStats?.total || 0}
-              suffix="个"
-              style={{ color: '#1890ff' }}
-            />
-            <div style={{ marginTop: 8 }}>
-              <Tag color="green">正常: {monitorStats?.up || 0}</Tag>
-              <Tag color="red">故障: {monitorStats?.down || 0}</Tag>
-            </div>
-          </Card>
-        </Col>
+        {!isViewer && (
+          <>
+            <Col xs={24} sm={12} lg={6}>
+              <Card loading={monitorLoading}>
+                <Statistic
+                  title="监控总数"
+                  value={monitorStats?.total || 0}
+                  suffix="个"
+                  style={{ color: '#1890ff' }}
+                />
+                <div style={{ marginTop: 8 }}>
+                  <Tag color="green">正常: {monitorStats?.up || 0}</Tag>
+                  <Tag color="red">故障: {monitorStats?.down || 0}</Tag>
+                </div>
+              </Card>
+            </Col>
 
-        <Col xs={24} sm={12} lg={6}>
-          <Card loading={alertLoading}>
-            <Statistic
-              title="活跃告警"
-              value={alertStats?.firing || 0}
-              suffix="个"
-              style={{ color: alertStats?.firing > 0 ? '#ff4d4f' : '#52c41a' }}
-            />
-            <div style={{ marginTop: 8 }}>
-              <Tag color="orange">待处理: {alertStats?.firing || 0}</Tag>
-              <Tag color="green">已解决: {alertStats?.resolved || 0}</Tag>
-            </div>
-          </Card>
-        </Col>
+            <Col xs={24} sm={12} lg={6}>
+              <Card loading={alertLoading}>
+                <Statistic
+                  title="活跃告警"
+                  value={alertStats?.firing || 0}
+                  suffix="个"
+                  style={{ color: alertStats?.firing > 0 ? '#ff4d4f' : '#52c41a' }}
+                />
+                <div style={{ marginTop: 8 }}>
+                  <Tag color="orange">待处理: {alertStats?.firing || 0}</Tag>
+                  <Tag color="green">已解决: {alertStats?.resolved || 0}</Tag>
+                </div>
+              </Card>
+            </Col>
 
-        <Col xs={24} sm={12} lg={6}>
-          <Card loading={certLoading}>
-            <Statistic
-              title="证书总数"
-              value={certStats?.total || 0}
-              suffix="个"
-              style={{ color: '#722ed1' }}
-            />
-            <div style={{ marginTop: 8 }}>
-              <Tag color="green">有效: {certStats?.valid || 0}</Tag>
-              <Tag color="orange">即将过期: {certStats?.expiring || 0}</Tag>
-              <Tag color="red">已过期: {certStats?.expired || 0}</Tag>
-            </div>
-          </Card>
-        </Col>
+            <Col xs={24} sm={12} lg={6}>
+              <Card loading={certLoading}>
+                <Statistic
+                  title="证书总数"
+                  value={certStats?.total || 0}
+                  suffix="个"
+                  style={{ color: '#722ed1' }}
+                />
+                <div style={{ marginTop: 8 }}>
+                  <Tag color="green">有效: {certStats?.valid || 0}</Tag>
+                  <Tag color="orange">即将过期: {certStats?.expiring || 0}</Tag>
+                  <Tag color="red">已过期: {certStats?.expired || 0}</Tag>
+                </div>
+              </Card>
+            </Col>
+          </>
+        )}
 
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} lg={isViewer ? 24 : 6}>
           <Card loading={assetLoading}>
             <Statistic
-              title="资产总数"
+              title={isViewer ? "我的资产" : "资产总数"}
               value={assetStats?.total || 0}
               suffix="个"
               style={{ color: '#13c2c2' }}
@@ -192,105 +200,107 @@ const Dashboard = () => {
         </Col>
       </Row>
 
-      <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
-        <Col xs={24} lg={12}>
-          <Card title="最近告警" extra={<a href="/monitor/alerts">查看全部</a>}>
-            <Table
-              dataSource={recentAlerts?.items || []}
-              rowKey="id"
-              loading={alertsLoading}
-              pagination={false}
-              size="small"
-              columns={[
-                {
-                  title: '名称',
-                  dataIndex: 'alertName',
-                  key: 'alertName',
-                  ellipsis: true,
-                },
-                {
-                  title: '严重程度',
-                  dataIndex: 'severity',
-                  key: 'severity',
-                  width: 80,
-                  render: (severity: string) => {
-                    const colorMap: Record<string, string> = {
-                      critical: 'red',
-                      warning: 'orange',
-                      info: 'blue',
-                    };
-                    return <Tag color={colorMap[severity] || 'default'}>{severity?.toUpperCase()}</Tag>;
+      {!isViewer && (
+        <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
+          <Col xs={24} lg={12}>
+            <Card title="最近告警" extra={<a href="/monitor/alerts">查看全部</a>}>
+              <Table
+                dataSource={recentAlerts?.items || []}
+                rowKey="id"
+                loading={alertsLoading}
+                pagination={false}
+                size="small"
+                columns={[
+                  {
+                    title: '名称',
+                    dataIndex: 'alertName',
+                    key: 'alertName',
+                    ellipsis: true,
                   },
-                },
-                {
-                  title: '状态',
-                  dataIndex: 'status',
-                  key: 'status',
-                  width: 80,
-                  render: (status: string) => {
-                    const colorMap: Record<string, string> = {
-                      firing: 'red',
-                      resolved: 'green',
-                      acknowledged: 'blue',
-                    };
-                    return <Tag color={colorMap[status] || 'default'}>{status?.toUpperCase()}</Tag>;
+                  {
+                    title: '严重程度',
+                    dataIndex: 'severity',
+                    key: 'severity',
+                    width: 80,
+                    render: (severity: string) => {
+                      const colorMap: Record<string, string> = {
+                        critical: 'red',
+                        warning: 'orange',
+                        info: 'blue',
+                      };
+                      return <Tag color={colorMap[severity] || 'default'}>{severity?.toUpperCase()}</Tag>;
+                    },
                   },
-                },
-              ]}
-            />
-          </Card>
-        </Col>
+                  {
+                    title: '状态',
+                    dataIndex: 'status',
+                    key: 'status',
+                    width: 80,
+                    render: (status: string) => {
+                      const colorMap: Record<string, string> = {
+                        firing: 'red',
+                        resolved: 'green',
+                        acknowledged: 'blue',
+                      };
+                      return <Tag color={colorMap[status] || 'default'}>{status?.toUpperCase()}</Tag>;
+                    },
+                  },
+                ]}
+              />
+            </Card>
+          </Col>
 
-        <Col xs={24} lg={12}>
-          <Card title="最近发布" extra={<a href="/ops/deployments">查看全部</a>}>
-            <Table
-              dataSource={recentDeployments?.items || []}
-              rowKey="id"
-              loading={deploymentsLoading}
-              pagination={false}
-              size="small"
-              columns={[
-                {
-                  title: '项目',
-                  dataIndex: 'projectName',
-                  key: 'projectName',
-                  ellipsis: true,
-                },
-                {
-                  title: '环境',
-                  dataIndex: 'environment',
-                  key: 'environment',
-                  width: 80,
-                  render: (env: string) => {
-                    const colorMap: Record<string, string> = {
-                      dev: 'blue',
-                      test: 'cyan',
-                      staging: 'orange',
-                      prod: 'red',
-                    };
-                    return <Tag color={colorMap[env] || 'default'}>{env?.toUpperCase()}</Tag>;
+          <Col xs={24} lg={12}>
+            <Card title="最近发布" extra={<a href="/ops/deployments">查看全部</a>}>
+              <Table
+                dataSource={recentDeployments?.items || []}
+                rowKey="id"
+                loading={deploymentsLoading}
+                pagination={false}
+                size="small"
+                columns={[
+                  {
+                    title: '项目',
+                    dataIndex: 'projectName',
+                    key: 'projectName',
+                    ellipsis: true,
                   },
-                },
-                {
-                  title: '状态',
-                  dataIndex: 'status',
-                  key: 'status',
-                  width: 80,
-                  render: (status: string) => {
-                    const colorMap: Record<string, string> = {
-                      pending: 'default',
-                      running: 'processing',
-                      success: 'success',
-                      failed: 'error',
-                    };
-                    return <Tag color={colorMap[status] || 'default'}>{status?.toUpperCase()}</Tag>;
+                  {
+                    title: '环境',
+                    dataIndex: 'environment',
+                    key: 'environment',
+                    width: 80,
+                    render: (env: string) => {
+                      const colorMap: Record<string, string> = {
+                        dev: 'blue',
+                        test: 'cyan',
+                        staging: 'orange',
+                        prod: 'red',
+                      };
+                      return <Tag color={colorMap[env] || 'default'}>{env?.toUpperCase()}</Tag>;
+                    },
                   },
-                },
-              ]}
-            />
-          </Card>
-        </Col>
-      </Row>
+                  {
+                    title: '状态',
+                    dataIndex: 'status',
+                    key: 'status',
+                    width: 80,
+                    render: (status: string) => {
+                      const colorMap: Record<string, string> = {
+                        pending: 'default',
+                        running: 'processing',
+                        success: 'success',
+                        failed: 'error',
+                      };
+                      return <Tag color={colorMap[status] || 'default'}>{status?.toUpperCase()}</Tag>;
+                    },
+                  },
+                ]}
+              />
+            </Card>
+          </Col>
+        </Row>
+      )}
     </div>
   );
 };

@@ -10,6 +10,7 @@ export const routePermissions: Record<string, string | string[]> = {
   '/system/users': 'user:read',
   '/system/roles': 'role:read',
   '/system/navigation': 'navigation:read',
+  '/system/notification-groups': 'notification_group:read',
   '/profile': [],
 };
 
@@ -122,6 +123,16 @@ export const PERMISSION_MODULES = [
       { code: 'navigation:create', name: '创建导航' },
       { code: 'navigation:update', name: '编辑导航' },
       { code: 'navigation:delete', name: '删除导航' },
+    ],
+  },
+  {
+    module: 'notification_group',
+    moduleName: '通知组管理',
+    permissions: [
+      { code: 'notification_group:read', name: '查看通知组' },
+      { code: 'notification_group:create', name: '创建通知组' },
+      { code: 'notification_group:update', name: '编辑通知组' },
+      { code: 'notification_group:delete', name: '删除通知组' },
     ],
   },
 ];

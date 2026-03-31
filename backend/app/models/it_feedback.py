@@ -41,6 +41,7 @@ class ITFeedback(BaseModel):
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     resolved_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    open_message_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
 
     def __repr__(self) -> str:
         return f"<ITFeedback {self.id}: {self.lag_level}>"

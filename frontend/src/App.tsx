@@ -24,6 +24,7 @@ import RoleList from './pages/Roles/RoleList';
 import UserList from './pages/Users/UserList';
 import Profile from './pages/Profile/Profile';
 import NavigationList from './pages/System/NavigationList';
+import NotificationGroupList from './pages/System/NotificationGroupList';
 import Forbidden from './pages/Forbidden';
 
 const queryClient = new QueryClient({
@@ -107,6 +108,7 @@ function App() {
                 <Route path="system/users" element={<UserList />} />
                 <Route path="system/roles" element={<RoleList />} />
                 <Route path="system/navigation" element={<NavigationList />} />
+                <Route path="system/notification-groups" element={<NotificationGroupList />} />
                 <Route path="profile" element={<Profile />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />

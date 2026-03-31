@@ -53,23 +53,35 @@ async def list_navigation_links(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get navigation link list with filters."""
+    """Get navigation link list with filters.
+
+    For non-superadmin users, only shows records where:
+    - The roles list is empty (public to all roles)
+    - OR the user's role is in the navigation link's roles list
+    """
     require_permissions(["navigation:read"])(current_user)
 
     skip = (page - 1) * page_size
 
-    links = await navigation_link.get_multi_with_filter(
+    is_superadmin = current_user.is_superuser
+    user_role_ids = [role.id for role in current_user.roles] if current_user.roles else []
+
+    links = await navigation_link.get_multi_with_access_filter(
         db,
         category=category,
         is_active=is_active,
         skip=skip,
         limit=page_size,
+        is_superadmin=is_superadmin,
+        user_role_ids=user_role_ids,
     )
 
-    total = await navigation_link.count_with_filter(
+    total = await navigation_link.count_with_access_filter(
         db,
         category=category,
         is_active=is_active,
+        is_superadmin=is_superadmin,
+        user_role_ids=user_role_ids,
     )
 
     return {

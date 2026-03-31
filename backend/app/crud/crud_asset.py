@@ -36,13 +36,12 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
         status: str | None = None,
         idc: str | None = None,
         keyword: str | None = None,
-        label_ids: list[int] | None = None
+        label_ids: list[int] | None = None,
+        owner_id: int | None = None,
     ) -> tuple[list[Asset], int]:
         """Get assets with filters and pagination."""
-        # Build query
         query = select(Asset)
 
-        # Apply filters
         filters = []
         if asset_type:
             filters.append(Asset.asset_type == AssetType(asset_type))
@@ -58,6 +57,8 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
                     Asset.ip_address.ilike(f"%{keyword}%")
                 )
             )
+        if owner_id is not None:
+            filters.append(Asset.owner_id == owner_id)
 
         if filters:
             query = query.where(and_(*filters))

@@ -7,6 +7,7 @@ from app.models.base import BaseModel
 from app.models.it_feedback import ITFeedback
 from app.models.monitor import Alert, AlertRule, Monitor, NotificationChannel
 from app.models.navigation import NavigationLink, navigation_link_roles
+from app.models.notification_group import NotificationGroup, notification_group_members
 from app.models.ops import Certificate, Deployment, DNSRecord, InspectionReport, InspectionTask
 from app.models.pc_client_version import PCClientVersion
 from app.models.permission import Permission, Role, role_permissions
@@ -32,8 +33,10 @@ __all__ = [
     "Certificate",
     "DNSRecord",
     "PCClientVersion",
+    "NotificationGroup",
     "user_roles",
     "role_permissions",
     "asset_labels",
     "navigation_link_roles",
+    "notification_group_members",
 ]

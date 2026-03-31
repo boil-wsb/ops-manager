@@ -35,8 +35,8 @@ class FeishuService:
     def send_message_to_user(
         self,
         user_id: str,
-        msg_type: str = "text",
-        content: str | dict[str, Any] | None = None,
+        msg_type: str,
+        content: str | dict[str, Any],
     ) -> dict[str, Any]:
         import lark_oapi as lark
         from lark_oapi.api.im.v1 import CreateMessageRequest, CreateMessageRequestBody
@@ -66,7 +66,7 @@ class FeishuService:
                 "Failed to send Feishu message",
                 extra={
                     "code": response.code,
-                    "msg": response.msg,
+                    "response_msg": response.msg,
                     "user_id": user_id,
                 },
             )
@@ -74,11 +74,21 @@ class FeishuService:
 
         logger.info(
             "Feishu message sent successfully",
-            extra={"user_id": user_id, "message_id": response.data.message_id if response.data else None},
+            extra={
+                "user_id": user_id,
+                "message_id": response.data.message_id if response.data else None,
+            },
         )
 
+        if response.data:
+            msg_id = getattr(response.data, 'message_id', None)
+            return {
+                "message_id": msg_id,
+                "code": response.code,
+                "msg": response.msg,
+            }
         return {
-            "message_id": response.data.message_id if response.data else None,
+            "message_id": None,
             "code": response.code,
             "msg": response.msg,
         }
@@ -96,30 +106,333 @@ class FeishuService:
         title: str,
         content: str,
         tags: list[dict[str, str]] | None = None,
+        buttons: list[dict[str, str]] | None = None,
+        jump_url: str | None = None,
+        header_template: str = "orange",
     ) -> dict[str, Any]:
-        card_content = {
-            "header": {
-                "title": {"tag": "plain_text", "content": title},
-                "template": "blue",
-            },
-            "elements": [
-                {"tag": "div", "text": {"tag": "lark_md", "content": content}},
-            ],
+        tag_icon_map = {
+            "负责人": "👤",
+            "终端IP": "📍",
+            "终端名称": "🖥️",
+            "反馈内容": "💬",
+            "联系方式": "📞",
+            "卡顿程度": "⚡",
+            "终端类型": "💻",
+            "使用年限": "⏰",
+            "提交时间": "⏱️",
         }
+
+        elements = []
+
+        elements.append({"tag": "hr"})
+
         if tags:
-            tag_content = "".join(
-                f"• {tag.get('label', '')}: {tag.get('value', '')}\n"
-                for tag in tags
-            )
-            card_content["elements"].append(
-                {"tag": "div", "text": {"tag": "lark_md", "content": tag_content}}
-            )
+            for tag in tags:
+                label = tag.get('label', '')
+                value = tag.get('value', '')
+                icon = tag_icon_map.get(label, "")
+
+                elements.append({
+                    "tag": "column_set",
+                    "flex_mode": "flow",
+                    "columns": [
+                        {
+                            "tag": "column",
+                            "width": "auto",
+                            "elements": [
+                                {
+                                    "tag": "div",
+                                    "text": {
+                                        "tag": "lark_md",
+                                        "content": f"**{icon} {label}**"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "tag": "column",
+                            "width": "auto",
+                            "elements": [
+                                {
+                                    "tag": "div",
+                                    "text": {
+                                        "tag": "lark_md",
+                                        "content": value
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                })
+
+        if buttons:
+            elements.append({"tag": "hr"})
+
+            btn_column_elements = []
+            for btn in buttons:
+                btn_text = btn.get("text", "按钮")
+                btn_value = str(btn.get("value", btn_text))
+                btn_type = btn.get("type", "primary")
+
+                btn_column_elements.append({
+                    "tag": "button",
+                    "text": {
+                        "tag": "plain_text",
+                        "content": btn_text
+                    },
+                    "type": btn_type,
+                    "width": "fill",
+                    "behaviors": [
+                        {
+                            "type": "callback",
+                            "value": {
+                                "action": btn_value
+                            }
+                        }
+                    ]
+                })
+
+            elements.append({
+                "tag": "column_set",
+                "flex_mode": "right_to_left",
+                "columns": [
+                    {
+                        "tag": "column",
+                        "width": "stretch",
+                        "elements": btn_column_elements
+                    }
+                ]
+            })
+
+        card_content = {
+            "schema": "2.0",
+            "header": {
+                "title": {
+                    "tag": "plain_text",
+                    "content": title
+                },
+                "template": header_template
+            },
+            "body": {
+                "elements": elements
+            }
+        }
 
         return self.send_message_to_user(
             user_id=user_id,
             msg_type="interactive",
             content=card_content,
         )
+
+    def update_card_to_handling(
+        self,
+        open_message_id: str,
+        feedback_id: str,
+        responsible_name: str = ""
+    ) -> dict[str, Any]:
+        """Update card to handling status with input field for resolution notes."""
+        card_content = {
+            "schema": "2.0",
+            "header": {
+                "title": {
+                    "tag": "plain_text",
+                    "content": "【终端卡顿 IT 反馈】"
+                },
+                "template": "blue"
+            },
+            "body": {
+                "elements": [
+                    {"tag": "hr"},
+                    {
+                        "tag": "column_set",
+                        "flex_mode": "flow",
+                        "columns": [
+                            {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**👤 负责人**"}}]},
+                            {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": responsible_name or "待分配"}}]}
+                        ]
+                    },
+                    {
+                        "tag": "column_set",
+                        "flex_mode": "flow",
+                        "columns": [
+                            {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**⚡ 处理状态**"}}]},
+                            {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "处理中"}}]}
+                        ]
+                    },
+                    {
+                        "tag": "div",
+                        "text": {
+                            "tag": "lark_md",
+                            "content": "**📝 处理方式**"
+                        }
+                    },
+                    {
+                        "tag": "form",
+                        "name": "resolution_form",
+                        "elements": [
+                            {
+                                "tag": "input",
+                                "element_id": f"notes_input_{feedback_id}",
+                                "name": "notes",
+                                "placeholder": {
+                                    "tag": "plain_text",
+                                    "content": "填写处理方式（必填）"
+                                }
+                            },
+                            {
+                                "tag": "button",
+                                "text": {
+                                    "tag": "plain_text",
+                                    "content": "🔧 提交处理"
+                                },
+                                "type": "primary",
+                                "width": "fill",
+                                "name": "submit_resolution",
+                                "form_action_type": "submit"
+                            }
+                        ]
+                    },
+                    {"tag": "hr"}
+                ]
+            }
+        }
+
+        return self._patch_message(open_message_id, card_content)
+
+    def update_card_to_resolved(
+        self,
+        open_message_id: str,
+        feedback_id: str,
+        notes: str,
+        responsible_name: str = "",
+        client_ip: str = "",
+        terminal_name: str = "",
+        description: str = "",
+        contact: str = "",
+    ) -> dict[str, Any]:
+        """Update card to resolved status."""
+        elements = []
+
+        elements.append({"tag": "hr"})
+
+        elements.append({
+            "tag": "column_set",
+            "flex_mode": "flow",
+            "columns": [
+                {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**👤 反馈提交人**"}}]},
+                {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": responsible_name or "待分配"}}]}
+            ]
+        })
+
+        elements.append({
+            "tag": "column_set",
+            "flex_mode": "flow",
+            "columns": [
+                {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**⚡ 处理状态**"}}]},
+                {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "✅ 已解决"}}]}
+            ]
+        })
+
+        if client_ip:
+            elements.append({
+                "tag": "column_set",
+                "flex_mode": "flow",
+                "columns": [
+                    {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**📍 终端IP**"}}]},
+                    {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": client_ip}}]}
+                ]
+            })
+
+        if terminal_name:
+            elements.append({
+                "tag": "column_set",
+                "flex_mode": "flow",
+                "columns": [
+                    {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**🖥️ 终端名称**"}}]},
+                    {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": terminal_name}}]}
+                ]
+            })
+
+        if description:
+            elements.append({
+                "tag": "column_set",
+                "flex_mode": "flow",
+                "columns": [
+                    {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**💬 反馈内容**"}}]},
+                    {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": description}}]}
+                ]
+            })
+
+        if contact:
+            elements.append({
+                "tag": "column_set",
+                "flex_mode": "flow",
+                "columns": [
+                    {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**📞 联系方式**"}}]},
+                    {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": contact}}]}
+                ]
+            })
+
+        if notes:
+            elements.append({
+                "tag": "column_set",
+                "flex_mode": "flow",
+                "columns": [
+                    {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**📝 处理方式**"}}]},
+                    {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": notes}}]}
+                ]
+            })
+
+        elements.append({"tag": "hr"})
+
+        card_content = {
+            "schema": "2.0",
+            "header": {
+                "title": {
+                    "tag": "plain_text",
+                    "content": "【终端卡顿 IT 反馈】"
+                },
+                "template": "green"
+            },
+            "body": {
+                "elements": elements
+            }
+        }
+
+        return self._patch_message(open_message_id, card_content)
+
+    def _patch_message(self, open_message_id: str, card_content: dict) -> dict[str, Any]:
+        """Patch a message with updated card content."""
+        import lark_oapi as lark
+
+        try:
+            request = (
+                lark.im.v1.PatchMessageRequest.builder()
+                .message_id(open_message_id)
+                .request_body(
+                    lark.im.v1.PatchMessageRequestBody.builder()
+                    .content(lark.JSON.marshal(card_content))
+                    .build()
+                )
+                .build()
+            )
+
+            response = (
+                lark.Client.builder()
+                .app_id(settings.feishu_app_id)
+                .app_secret(settings.feishu_app_secret)
+                .build()
+            ).im.v1.message.patch(request)
+
+            if response.success():
+                logger.info(f"Card updated successfully for message {open_message_id}")
+                return {"success": True}
+            else:
+                logger.error(f"Failed to update card: {response.code} - {response.msg}")
+                return {"success": False, "error": f"{response.code} - {response.msg}"}
+        except Exception as e:
+            logger.error(f"Error patching message: {e}")
+            return {"success": False, "error": str(e)}
 
     def send_it_feedback_resolved(
         self,
@@ -138,9 +451,10 @@ class FeishuService:
 
         return self.send_interactive_message(
             user_id=user_id,
-            title="【IT反馈处理通知】",
-            content=f"您的IT反馈（ID: {feedback_id}）已处理完成",
+            title="【终端卡顿 IT 反馈】",
+            content="",
             tags=tags,
+            header_template="green",
         )
 
 

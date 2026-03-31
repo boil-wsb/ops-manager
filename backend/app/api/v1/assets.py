@@ -29,6 +29,14 @@ def api_response(data: Any = None, message: str = "操作成功") -> dict:
     return {"data": data, "message": message, "success": True}
 
 
+def is_viewer_role(user: User) -> bool:
+    """Check if user has viewer role."""
+    for role in user.roles:
+        if role.name == "viewer" and role.is_active:
+            return True
+    return False
+
+
 @router.get("/assets")
 async def list_assets(
     skip: int = Query(0, ge=0),
@@ -38,9 +46,16 @@ async def list_assets(
     idc: str | None = Query(None),
     keyword: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user=require_permissions(["asset:read"]),
+    current_user: User = Depends(require_permissions(["asset:read"])),
 ):
-    """List all assets with filters and pagination."""
+    """List all assets with filters and pagination.
+
+    For viewer role users, only returns assets where they are the owner.
+    """
+    owner_id_filter = None
+    if is_viewer_role(current_user):
+        owner_id_filter = current_user.id
+
     items, total = await crud_asset.get_multi_with_filters(
         db,
         skip=skip,
@@ -49,6 +64,7 @@ async def list_assets(
         status=status,
         idc=idc,
         keyword=keyword,
+        owner_id=owner_id_filter,
     )
     serialized_items = [AssetResponse.model_validate(item).model_dump(by_alias=True) for item in items]
     return api_response(data={"total": total, "items": serialized_items})
@@ -226,9 +242,16 @@ async def list_terminals(
     status: str | None = Query(None),
     keyword: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user=require_permissions(["asset:read"]),
+    current_user: User = Depends(require_permissions(["asset:read"])),
 ):
-    """List terminal assets with filters and pagination."""
+    """List terminal assets with filters and pagination.
+
+    For viewer role users, only returns assets where they are the owner.
+    """
+    owner_id_filter = None
+    if is_viewer_role(current_user):
+        owner_id_filter = current_user.id
+
     items, total = await crud_asset.get_multi_with_filters(
         db,
         skip=skip,
@@ -236,6 +259,7 @@ async def list_terminals(
         asset_type="TERMINAL",
         status=status,
         keyword=keyword,
+        owner_id=owner_id_filter,
     )
     serialized_items = [AssetResponse.model_validate(item).model_dump(by_alias=True) for item in items]
     return api_response(data={"total": total, "items": serialized_items})
@@ -244,9 +268,21 @@ async def list_terminals(
 @router.get("/assets/discovery")
 async def discover_prometheus_assets(
     db: AsyncSession = Depends(get_db),
-    current_user=require_permissions(["asset:read"]),
+    current_user: User = Depends(require_permissions(["asset:read"])),
 ):
-    """发现 Prometheus 中未导入的节点"""
+    """发现 Prometheus 中未导入的节点
+
+    For viewer role users, this endpoint returns empty results.
+    """
+    if is_viewer_role(current_user):
+        return {
+            "total": 0,
+            "discovered": 0,
+            "existing": 0,
+            "nodes": [],
+            "message": "Viewer role cannot discover assets",
+        }
+
     from app.crud.crud_asset import crud_asset
     from app.services.prometheus.client import get_prometheus_client
 
@@ -330,10 +366,17 @@ async def import_prometheus_asset(
 @router.get("/assets/tree", response_model=list[AssetTreeNode])
 async def get_asset_tree(
     db: AsyncSession = Depends(get_db),
-    current_user=require_permissions(["asset:read"]),
+    current_user: User = Depends(require_permissions(["asset:read"])),
 ):
-    """Get asset tree structure organized by IDC/Region/Rack."""
-    assets, _ = await crud_asset.get_multi_with_filters(db, skip=0, limit=1000)
+    """Get asset tree structure organized by IDC/Region/Rack.
+
+    For viewer role users, only returns assets where they are the owner.
+    """
+    owner_id_filter = None
+    if is_viewer_role(current_user):
+        owner_id_filter = current_user.id
+
+    assets, _ = await crud_asset.get_multi_with_filters(db, skip=0, limit=1000, owner_id=owner_id_filter)
 
     tree: dict = {}
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Table, Button, Input, Select, Tag, Space, Card, Popconfirm, Tooltip, Tabs, App } from 'antd';
+import { Table, Button, Input, Select, Tag, Space, Card, Popconfirm, Tooltip, Tabs, App, Alert } from 'antd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PlusOutlined, SearchOutlined, DeleteOutlined, EditOutlined, SyncOutlined, CloudOutlined, CompassOutlined, UserOutlined, DesktopOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -9,6 +9,7 @@ import StatusTag from '../../components/StatusTag';
 import AssetFormModal from './AssetFormModal';
 import type { Asset } from '../../types';
 import type { TablePaginationConfig } from 'antd';
+import { useAuthStore } from '../../stores/authStore';
 
 const { Option } = Select;
 
@@ -26,6 +27,8 @@ const AssetList = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { message } = App.useApp();
+  const user = useAuthStore((state) => state.user);
+  const isViewer = user?.roles?.some(role => role.name === 'viewer') ?? false;
   const [activeTab, setActiveTab] = useState('servers');
   const [searchParams, setSearchParams] = useState({
     keyword: '',
@@ -544,6 +547,15 @@ const AssetList = () => {
 
   return (
     <div>
+      {isViewer && activeTab === 'servers' && (
+        <Alert
+          message="视图模式"
+          description="您正在查看由您负责的服务器资产。如需查看全部资产，请联系管理员。"
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+      )}
       <Tabs
         activeKey={activeTab}
         items={tabItems}
