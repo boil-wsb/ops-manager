@@ -75,6 +75,18 @@ class UserResponse(UserBase):
     permissions: list[str] = []
     roles: list[dict] = []
 
+    @field_validator("roles", mode="before")
+    @classmethod
+    def serialize_roles(cls, v):
+        if isinstance(v, list):
+            return [
+                {"id": r.id, "name": r.name, "description": r.description}
+                if hasattr(r, "id")
+                else r
+                for r in v
+            ]
+        return v
+
 
 class UserLogin(BaseModel):
     """User login schema."""
