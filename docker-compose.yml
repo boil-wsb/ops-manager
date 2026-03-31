@@ -48,6 +48,9 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - LOG_FORMAT=${LOG_FORMAT:-json}
       - TZ=Asia/Shanghai
+      - FEISHU_APP_ID=${FEISHU_APP_ID}
+      - FEISHU_APP_SECRET=${FEISHU_APP_SECRET}
+      - FEISHU_ENABLE=${FEISHU_ENABLE:-false}
     volumes:
       - ./logs:/app/logs
     depends_on:
@@ -72,6 +75,9 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - TZ=Asia/Shanghai
+      - FEISHU_APP_ID=${FEISHU_APP_ID}
+      - FEISHU_APP_SECRET=${FEISHU_APP_SECRET}
+      - FEISHU_ENABLE=${FEISHU_ENABLE:-false}
     volumes:
       - ./logs:/app/logs
       - ./celery_beat:/app/celerybeat
