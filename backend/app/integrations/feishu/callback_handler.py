@@ -157,7 +157,7 @@ def _finish_feedback_sync(feedback_id: str, notes: str) -> None:
         with engine.connect() as conn:
             result = conn.execute(
                 text("""
-                    SELECT f.client_ip, f.description, a.customer, u.feishu_open_id
+                    SELECT f.client_ip, f.description, a.customer, u.feishu_open_id, COALESCE(u.full_name, u.username) as resolver_name
                     FROM it_feedbacks f
                     LEFT JOIN assets a ON a.ip_address = f.client_ip
                     LEFT JOIN users u ON u.username = a.customer
@@ -170,6 +170,7 @@ def _finish_feedback_sync(feedback_id: str, notes: str) -> None:
             description = row[1] if row else ""
             customer = row[2] if row else None
             feishu_open_id = row[3] if row else None
+            resolver_name = row[4] if row else "IT管理员"
 
             conn.execute(
                 text("UPDATE it_feedbacks SET status = 'resolved', notes = :notes WHERE id = :id"),
@@ -187,7 +188,7 @@ def _finish_feedback_sync(feedback_id: str, notes: str) -> None:
                     user_id=feishu_open_id,
                     feedback_id=int(feedback_id),
                     feedback_content=description or "",
-                    resolved_by="IT管理员",
+                    resolved_by=resolver_name,
                     notes=notes,
                 )
                 logger.info(f"Notification sent to feishu_open_id {feishu_open_id} (customer: {customer}) for feedback {feedback_id}")
