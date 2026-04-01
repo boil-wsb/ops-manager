@@ -36,21 +36,14 @@ services:
   backend:
     image: ${REGISTRY_URL:-192.168.100.213:8083}/opsmanager/backend:${VERSION:-latest}
     container_name: ops-backend
+    env_file:
+      - .env
     environment:
-      - APP_NAME=${APP_NAME:-OpsManager V2}
-      - APP_VERSION=${APP_VERSION:-1.0.0}
-      - DEBUG=${DEBUG:-false}
-      - SECRET_KEY=${SECRET_KEY}
       - DATABASE_URL=postgresql+asyncpg://${DB_USER:-opsmanager}:${DB_PASSWORD:-opsmanager}@postgres:5432/${DB_NAME:-opsmanager}
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/1
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - LOG_FORMAT=${LOG_FORMAT:-json}
       - TZ=Asia/Shanghai
-      - FEISHU_APP_ID=${FEISHU_APP_ID}
-      - FEISHU_APP_SECRET=${FEISHU_APP_SECRET}
-      - FEISHU_ENABLE=${FEISHU_ENABLE:-false}
     volumes:
       - ./logs:/app/logs
     depends_on:
@@ -65,19 +58,14 @@ services:
   celery-worker:
     image: ${REGISTRY_URL:-192.168.100.213:8083}/opsmanager/backend:${VERSION:-latest}
     container_name: ops-celery-worker
+    env_file:
+      - .env
     environment:
-      - APP_NAME=${APP_NAME:-OpsManager V2}
-      - DEBUG=${DEBUG:-false}
-      - SECRET_KEY=${SECRET_KEY}
       - DATABASE_URL=postgresql+asyncpg://${DB_USER:-opsmanager}:${DB_PASSWORD:-opsmanager}@postgres:5432/${DB_NAME:-opsmanager}
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/1
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - TZ=Asia/Shanghai
-      - FEISHU_APP_ID=${FEISHU_APP_ID}
-      - FEISHU_APP_SECRET=${FEISHU_APP_SECRET}
-      - FEISHU_ENABLE=${FEISHU_ENABLE:-false}
     volumes:
       - ./logs:/app/logs
       - ./celery_beat:/app/celerybeat

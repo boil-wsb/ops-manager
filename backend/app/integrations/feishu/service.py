@@ -63,21 +63,12 @@ class FeishuService:
 
         if not response.success():
             logger.error(
-                "Failed to send Feishu message",
-                extra={
-                    "code": response.code,
-                    "response_msg": response.msg,
-                    "user_id": user_id,
-                },
+                f"[Feishu] Failed to send message - user_id={user_id}, code={response.code}, msg={response.msg}"
             )
             raise RuntimeError(f"Failed to send message: {response.msg}")
 
         logger.info(
-            "Feishu message sent successfully",
-            extra={
-                "user_id": user_id,
-                "message_id": response.data.message_id if response.data else None,
-            },
+            f"[Feishu] Message sent successfully - user_id={user_id}, message_id={response.data.message_id if response.data else None}"
         )
 
         if response.data:
@@ -425,13 +416,13 @@ class FeishuService:
             ).im.v1.message.patch(request)
 
             if response.success():
-                logger.info(f"Card updated successfully for message {open_message_id}")
+                logger.info(f"[Feishu] Card updated successfully - message_id={open_message_id}")
                 return {"success": True}
             else:
-                logger.error(f"Failed to update card: {response.code} - {response.msg}")
+                logger.error(f"[Feishu] Failed to update card - message_id={open_message_id}, code={response.code}, msg={response.msg}")
                 return {"success": False, "error": f"{response.code} - {response.msg}"}
         except Exception as e:
-            logger.error(f"Error patching message: {e}")
+            logger.error(f"[Feishu] Error patching message - message_id={open_message_id}, error={e}")
             return {"success": False, "error": str(e)}
 
     def send_it_feedback_resolved(

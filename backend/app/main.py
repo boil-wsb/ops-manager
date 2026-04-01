@@ -15,6 +15,7 @@ from app.api.router import api_router
 from app.config import settings
 from app.core.logging import configure_logging, get_logger
 from app.core.middleware import RequestLoggingMiddleware
+from app.core.auth_middleware import get_authentication_middleware
 from app.core.rate_limit import limiter
 from app.core.redis import close_redis, init_redis
 from app.db.init_db import init_db
@@ -113,6 +114,10 @@ app.add_middleware(
 )
 
 app.add_middleware(RequestLoggingMiddleware)
+
+# Add authentication middleware
+AuthenticationMiddleware = get_authentication_middleware()
+app.add_middleware(AuthenticationMiddleware)
 
 app.include_router(api_router, prefix="/api")
 

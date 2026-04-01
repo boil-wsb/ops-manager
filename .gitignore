@@ -35,6 +35,7 @@ env/
 .DS_Store
 .trae/
 docs/
+docs/plans
 test/
 skills/
 
