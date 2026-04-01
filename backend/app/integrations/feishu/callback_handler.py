@@ -38,7 +38,9 @@ def _do_card_action_trigger(data: Any) -> Any:
 
         if action_tag == "input":
             logger.info("Ignoring input tag callback, waiting for form submission")
-            from lark_oapi.event.callback.model.p2_card_action_trigger import P2CardActionTriggerResponse
+            from lark_oapi.event.callback.model.p2_card_action_trigger import (
+                P2CardActionTriggerResponse,
+            )
             return P2CardActionTriggerResponse(None)
 
         button_action = value.get("action", "") if isinstance(value, dict) else ""
@@ -56,7 +58,7 @@ def _do_card_action_trigger(data: Any) -> Any:
             if open_message_id:
                 threading.Thread(target=_update_card_to_handling, args=(open_message_id, feedback_id), daemon=True).start()
 
-            resp = {"toast": {"type": "info", "content": f"已开始处理，请填写处理方式"}}
+            resp = {"toast": {"type": "info", "content": "已开始处理，请填写处理方式"}}
 
         elif button_action == "submit_resolution":
             feedback_id_from_value = value.get("feedback_id") if isinstance(value, dict) else None
@@ -74,38 +76,47 @@ def _do_card_action_trigger(data: Any) -> Any:
 
             if not feedback_id:
                 resp = {"toast": {"type": "error", "content": "无法找到反馈记录"}}
-                from lark_oapi.event.callback.model.p2_card_action_trigger import P2CardActionTriggerResponse
+                from lark_oapi.event.callback.model.p2_card_action_trigger import (
+                    P2CardActionTriggerResponse,
+                )
                 return P2CardActionTriggerResponse(resp)
 
             logger.info(f"Finish feedback {feedback_id}, notes: '{notes}'")
 
             if not notes or not notes.strip():
                 resp = {"toast": {"type": "error", "content": "请填写处理方式"}}
-                from lark_oapi.event.callback.model.p2_card_action_trigger import P2CardActionTriggerResponse
+                from lark_oapi.event.callback.model.p2_card_action_trigger import (
+                    P2CardActionTriggerResponse,
+                )
                 return P2CardActionTriggerResponse(resp)
 
             threading.Thread(target=_finish_feedback_sync, args=(feedback_id, notes), daemon=True).start()
 
             if open_message_id:
                 threading.Thread(target=_update_card_to_resolved, args=(open_message_id, feedback_id, notes), daemon=True).start()
-            resp = {"toast": {"type": "info", "content": f"处理完成，已通知提交者"}}
+            resp = {"toast": {"type": "info", "content": "处理完成，已通知提交者"}}
 
         else:
             resp = {"toast": {"type": "info", "content": f"收到回调: {button_action}"}}
 
-        from lark_oapi.event.callback.model.p2_card_action_trigger import P2CardActionTriggerResponse
+        from lark_oapi.event.callback.model.p2_card_action_trigger import (
+            P2CardActionTriggerResponse,
+        )
         return P2CardActionTriggerResponse(resp)
 
     except Exception as e:
         logger.error(f"Error processing card action: {e}")
         resp = {"toast": {"type": "error", "content": f"处理失败: {str(e)}"}}
-        from lark_oapi.event.callback.model.p2_card_action_trigger import P2CardActionTriggerResponse
+        from lark_oapi.event.callback.model.p2_card_action_trigger import (
+            P2CardActionTriggerResponse,
+        )
         return P2CardActionTriggerResponse(resp)
 
 
 def _handle_feedback_sync(feedback_id: str) -> None:
     """Mark feedback as handling using sync database operations."""
     from sqlalchemy import create_engine, text
+
     from app.config import settings
 
     try:
@@ -124,6 +135,7 @@ def _handle_feedback_sync(feedback_id: str) -> None:
 def _get_feedback_id_by_open_message_id(open_message_id: str) -> str | None:
     """Get feedback ID by open_message_id."""
     from sqlalchemy import create_engine, text
+
     from app.config import settings
 
     try:
@@ -148,6 +160,7 @@ def _get_feedback_id_by_open_message_id(open_message_id: str) -> str | None:
 def _finish_feedback_sync(feedback_id: str, notes: str) -> None:
     """Mark feedback as resolved with notes and notify the asset responsible person."""
     from sqlalchemy import create_engine, text
+
     from app.config import settings
 
     try:
@@ -166,7 +179,7 @@ def _finish_feedback_sync(feedback_id: str, notes: str) -> None:
                 {"id": int(feedback_id)}
             )
             row = result.fetchone()
-            client_ip = row[0] if row else None
+            row[0] if row else None
             description = row[1] if row else ""
             customer = row[2] if row else None
             feishu_open_id = row[3] if row else None
@@ -204,6 +217,7 @@ def _finish_feedback_sync(feedback_id: str, notes: str) -> None:
 def _resolve_feedback_sync(feedback_id: str) -> None:
     """Mark feedback as resolved using sync database operations."""
     from sqlalchemy import create_engine, text
+
     from app.config import settings
 
     try:
@@ -222,6 +236,7 @@ def _resolve_feedback_sync(feedback_id: str) -> None:
 def _update_card_to_handling(open_message_id: str, feedback_id: str) -> None:
     """Update card to handling status with finish button."""
     from sqlalchemy import create_engine, text
+
     from app.config import settings
     from app.integrations.feishu.service import get_feishu_service
 
@@ -252,6 +267,7 @@ def _update_card_to_handling(open_message_id: str, feedback_id: str) -> None:
 def _update_card_to_resolved(open_message_id: str, feedback_id: str, notes: str) -> None:
     """Update card to resolved status."""
     from sqlalchemy import create_engine, text
+
     from app.config import settings
     from app.integrations.feishu.service import get_feishu_service
 

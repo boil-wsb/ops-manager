@@ -3,9 +3,10 @@ Feishu callback and real-time notification handling.
 """
 import asyncio
 import json
-from typing import Any, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
 
 from app.core.redis import get_redis
@@ -28,7 +29,7 @@ async def event_generator() -> AsyncGenerator[str, None]:
                 data = message["data"]
                 yield f"event: notification\ndata: {data}\n\n"
             else:
-                yield f"event: ping\ndata: \n\n"
+                yield "event: ping\ndata: \n\n"
             await asyncio.sleep(0.1)
     except asyncio.CancelledError:
         pass

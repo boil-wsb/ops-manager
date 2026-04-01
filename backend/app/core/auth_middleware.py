@@ -4,11 +4,10 @@ Authentication middleware for global API authentication.
 import logging
 from collections.abc import Callable
 
-from fastapi import Request, Response, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import Request, Response, status
+from fastapi.security import HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import AuthenticationError
 from app.core.security import verify_token
 from app.crud.crud_user import crud_user
 from app.db.session import get_db
@@ -47,14 +46,14 @@ class AuthenticationMiddleware:
 
         # Get authorization credentials
         auth_header = request.headers.get("Authorization")
-        
+
         if not auth_header or not auth_header.startswith("Bearer "):
             return Response(
                 content={"detail": "Not authenticated"},
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        
+
         # Extract token
         token = auth_header.split(" ")[1]
 
@@ -122,10 +121,10 @@ class AuthenticationMiddleware:
 def get_authentication_middleware():
     """Get authentication middleware instance."""
     from starlette.middleware.base import BaseHTTPMiddleware
-    
+
     class AuthenticationMiddlewareWrapper(BaseHTTPMiddleware):
         async def dispatch(self, request: Request, call_next: Callable) -> Response:
             middleware = AuthenticationMiddleware()
             return await middleware.dispatch(request, call_next)
-    
+
     return AuthenticationMiddlewareWrapper

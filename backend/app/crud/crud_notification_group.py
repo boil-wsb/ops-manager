@@ -93,7 +93,7 @@ class CRUDNotificationGroup(CRUDBase[NotificationGroup, NotificationGroupCreate,
             .where(
                 and_(
                     NotificationGroup.notification_type == notification_type,
-                    NotificationGroup.is_active == True
+                    NotificationGroup.is_active
                 )
             )
         )

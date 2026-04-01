@@ -18,7 +18,6 @@ from app.schemas.it_feedback import (
     ITFeedbackResponse,
 )
 
-
 NOTIFICATION_TYPE_IT_FEEDBACK_CREATED = "it_feedback_created"
 NOTIFICATION_TYPE_IT_FEEDBACK_RESOLVED = "it_feedback_resolved"
 
@@ -80,11 +79,11 @@ async def create_feedback(
 
     from app.models.asset import Asset, AssetType
 
-    LOCAL_IP_MAPPING = {
+    local_ip_mapping = {
         "127.0.0.1": "192.168.113.120",
         "localhost": "192.168.113.120",
     }
-    lookup_ip = LOCAL_IP_MAPPING.get(client_ip, client_ip)
+    lookup_ip = local_ip_mapping.get(client_ip, client_ip)
 
     result = await db.execute(
         select(Asset).where(
@@ -189,7 +188,7 @@ def send_it_feedback_created_notification(
             tags.append({"label": "联系方式", "value": contact})
 
         buttons = [
-            {"text": "🔧 处理", "value": f"handle_{feedback_id}", "type": "primary"},
+            {"text": "🔧 处理", "value": f"handle_{feedback_id}", "width": "fill", "type": "primary"},
         ]
 
         jump_url = f"http://192.168.23.36:8080/ops/it-management?feedback_id={feedback_id}&action=handle"

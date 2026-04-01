@@ -217,7 +217,6 @@ class CRUDNavigationLink(CRUDBase[NavigationLink, NavigationLinkCreate, Navigati
         For superadmin: counts all records.
         For non-superadmin: only counts records where roles is empty OR user has a matching role.
         """
-        from sqlalchemy import func
 
         query = (
             select(NavigationLink)

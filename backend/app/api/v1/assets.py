@@ -31,10 +31,7 @@ def api_response(data: Any = None, message: str = "操作成功") -> dict:
 
 def is_viewer_role(user: User) -> bool:
     """Check if user has viewer role."""
-    for role in user.roles:
-        if role.name == "viewer" and role.is_active:
-            return True
-    return False
+    return any(role.name == "viewer" and role.is_active for role in user.roles)
 
 
 @router.get("/assets")
