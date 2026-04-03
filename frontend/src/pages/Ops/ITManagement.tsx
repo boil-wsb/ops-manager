@@ -129,12 +129,14 @@ const ITManagement = () => {
       dataIndex: 'id',
       key: 'id',
       width: 60,
+      sorter: (a: ITFeedback, b: ITFeedback) => a.id - b.id,
     },
     {
       title: '电脑类型',
       dataIndex: 'computerType',
       key: 'computerType',
       width: 100,
+      sorter: (a: ITFeedback, b: ITFeedback) => (a.computerType || '').localeCompare(b.computerType || ''),
       render: (text: string) => computerTypeLabels[text] || '-',
     },
     {
@@ -142,6 +144,7 @@ const ITManagement = () => {
       dataIndex: 'usageYears',
       key: 'usageYears',
       width: 100,
+      sorter: (a: ITFeedback, b: ITFeedback) => (a.usageYears || '').localeCompare(b.usageYears || ''),
       render: (text: string) => usageYearsLabels[text] || '-',
     },
     {
@@ -149,6 +152,7 @@ const ITManagement = () => {
       dataIndex: 'lagLevel',
       key: 'lagLevel',
       width: 100,
+      sorter: (a: ITFeedback, b: ITFeedback) => (a.lagLevel || '').localeCompare(b.lagLevel || ''),
       render: (lagLevel: string) => (
         <Tag color={lagLevelColors[lagLevel] || 'blue'}>
           {lagLevelLabels[lagLevel]}
@@ -160,6 +164,7 @@ const ITManagement = () => {
       dataIndex: 'lagScenarios',
       key: 'lagScenarios',
       width: 150,
+      sorter: (a: ITFeedback, b: ITFeedback) => (a.lagScenarios || '').localeCompare(b.lagScenarios || ''),
       render: (text: string) => {
         if (!text) return '-';
         const scenarios = text.split(',');
@@ -175,6 +180,7 @@ const ITManagement = () => {
       dataIndex: 'description',
       key: 'description',
       width: 200,
+      sorter: (a: ITFeedback, b: ITFeedback) => (a.description || '').localeCompare(b.description || ''),
       render: (text: string) => text || '-',
     },
     {
@@ -182,6 +188,7 @@ const ITManagement = () => {
       dataIndex: 'contact',
       key: 'contact',
       width: 120,
+      sorter: (a: ITFeedback, b: ITFeedback) => (a.contact || '').localeCompare(b.contact || ''),
       render: (text: string) => text || '-',
     },
     {
@@ -189,6 +196,7 @@ const ITManagement = () => {
       dataIndex: 'status',
       key: 'status',
       width: 80,
+      sorter: (a: ITFeedback, b: ITFeedback) => (a.status || '').localeCompare(b.status || ''),
       render: (status: string) => (
         <Tag color={statusColors[status]}>
           {status === 'pending' ? '待处理' : '已解决'}
@@ -200,6 +208,7 @@ const ITManagement = () => {
       dataIndex: 'createdAt',
       key: 'createdAt',
       width: 150,
+      sorter: (a: ITFeedback, b: ITFeedback) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
       render: (text: string) => new Date(text).toLocaleString('zh-CN'),
     },
     {
@@ -207,6 +216,7 @@ const ITManagement = () => {
       dataIndex: 'clientIp',
       key: 'clientIp',
       width: 130,
+      sorter: (a: ITFeedback, b: ITFeedback) => (a.clientIp || '').localeCompare(b.clientIp || ''),
       render: (text: string) => text || '-',
     },
     {

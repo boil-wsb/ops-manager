@@ -115,8 +115,6 @@ class FeishuService:
 
         elements = []
 
-        elements.append({"tag": "hr"})
-
         if tags:
             for tag in tags:
                 label = tag.get('label', '')
@@ -233,30 +231,10 @@ class FeishuService:
             },
             "body": {
                 "elements": [
+                    {"tag": "div", "text": {"tag": "lark_md", "content": f"👤 **负责人**：{responsible_name or '待分配'}"}},
+                    {"tag": "div", "text": {"tag": "lark_md", "content": "⚡ **处理状态**：处理中"}},
                     {"tag": "hr"},
-                    {
-                        "tag": "column_set",
-                        "flex_mode": "flow",
-                        "columns": [
-                            {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**👤 负责人**"}}]},
-                            {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": responsible_name or "待分配"}}]}
-                        ]
-                    },
-                    {
-                        "tag": "column_set",
-                        "flex_mode": "flow",
-                        "columns": [
-                            {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**⚡ 处理状态**"}}]},
-                            {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "处理中"}}]}
-                        ]
-                    },
-                    {
-                        "tag": "div",
-                        "text": {
-                            "tag": "lark_md",
-                            "content": "**📝 处理方式**"
-                        }
-                    },
+                    {"tag": "div", "text": {"tag": "lark_md", "content": "**📝 处理方式**"}},
                     {
                         "tag": "form",
                         "name": "resolution_form",
@@ -302,77 +280,25 @@ class FeishuService:
         contact: str = "",
     ) -> dict[str, Any]:
         """Update card to resolved status."""
-        elements = []
-
-        elements.append({"tag": "hr"})
-
-        elements.append({
-            "tag": "column_set",
-            "flex_mode": "flow",
-            "columns": [
-                {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**👤 反馈提交人**"}}]},
-                {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": responsible_name or "待分配"}}]}
-            ]
-        })
-
-        elements.append({
-            "tag": "column_set",
-            "flex_mode": "flow",
-            "columns": [
-                {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**⚡ 处理状态**"}}]},
-                {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "✅ 已解决"}}]}
-            ]
-        })
+        elements = [
+            {"tag": "div", "text": {"tag": "lark_md", "content": f"👤 **反馈提交人**：{responsible_name or '待分配'}"}},
+            {"tag": "div", "text": {"tag": "lark_md", "content": "⚡ **处理状态**：✅ 已解决"}},
+        ]
 
         if client_ip:
-            elements.append({
-                "tag": "column_set",
-                "flex_mode": "flow",
-                "columns": [
-                    {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**📍 终端IP**"}}]},
-                    {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": client_ip}}]}
-                ]
-            })
+            elements.append({"tag": "div", "text": {"tag": "lark_md", "content": f"📍 **终端IP**：{client_ip}"}})
 
         if terminal_name:
-            elements.append({
-                "tag": "column_set",
-                "flex_mode": "flow",
-                "columns": [
-                    {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**🖥️ 终端名称**"}}]},
-                    {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": terminal_name}}]}
-                ]
-            })
+            elements.append({"tag": "div", "text": {"tag": "lark_md", "content": f"🖥️ **终端名称**：{terminal_name}"}})
 
         if description:
-            elements.append({
-                "tag": "column_set",
-                "flex_mode": "flow",
-                "columns": [
-                    {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**💬 反馈内容**"}}]},
-                    {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": description}}]}
-                ]
-            })
+            elements.append({"tag": "div", "text": {"tag": "lark_md", "content": f"💬 **反馈内容**：{description}"}})
 
         if contact:
-            elements.append({
-                "tag": "column_set",
-                "flex_mode": "flow",
-                "columns": [
-                    {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**📞 联系方式**"}}]},
-                    {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": contact}}]}
-                ]
-            })
+            elements.append({"tag": "div", "text": {"tag": "lark_md", "content": f"📞 **联系方式**：{contact}"}})
 
         if notes:
-            elements.append({
-                "tag": "column_set",
-                "flex_mode": "flow",
-                "columns": [
-                    {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**📝 处理方式**"}}]},
-                    {"tag": "column", "width": "auto", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": notes}}]}
-                ]
-            })
+            elements.append({"tag": "div", "text": {"tag": "lark_md", "content": f"📝 **处理方式**：{notes}"}})
 
         elements.append({"tag": "hr"})
 
@@ -447,6 +373,90 @@ class FeishuService:
             tags=tags,
             header_template="green",
         )
+
+    def update_alert_card_to_acknowledged(
+        self,
+        open_message_id: str,
+        alertname: str = "",
+        severity: str = "",
+        instance: str = "",
+    ) -> dict[str, Any]:
+        """Update alert card to acknowledged status with input field for resolution notes."""
+        card_content = {
+            "schema": "2.0",
+            "header": {
+                "title": {
+                    "tag": "plain_text",
+                    "content": f"【{severity}】{alertname}"
+                },
+                "template": "blue"
+            },
+            "body": {
+                "elements": [
+                    {"tag": "div", "text": {"tag": "lark_md", "content": "⚡ **处理状态**：处理中"}},
+                    {"tag": "div", "text": {"tag": "lark_md", "content": f"🖥️ **故障主机**：{instance or '未知'}"}},
+                    {"tag": "hr"},
+                    {"tag": "div", "text": {"tag": "lark_md", "content": "**📝 处理方式**"}},
+                    {
+                        "tag": "form",
+                        "name": "alert_resolution_form",
+                        "elements": [
+                            {
+                                "tag": "input",
+                                "element_id": f"alert_notes_input_{open_message_id}",
+                                "name": "alert_notes",
+                                "placeholder": {
+                                    "tag": "plain_text",
+                                    "content": "填写处理方式（必填）"
+                                }
+                            },
+                            {
+                                "tag": "button",
+                                "text": {
+                                    "tag": "plain_text",
+                                    "content": "✅ 确认解决"
+                                },
+                                "type": "primary",
+                                "width": "fill",
+                                "name": "resolve_alert",
+                                "form_action_type": "submit"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+
+        return self._patch_message(open_message_id, card_content)
+
+    def update_alert_card_to_transferred(
+        self,
+        open_message_id: str,
+        alertname: str = "",
+        severity: str = "",
+        instance: str = "",
+    ) -> dict[str, Any]:
+        """Update alert card to transferred status."""
+        card_content = {
+            "schema": "2.0",
+            "header": {
+                "title": {
+                    "tag": "plain_text",
+                    "content": f"【{severity}】{alertname}"
+                },
+                "template": "orange"
+            },
+            "body": {
+                "elements": [
+                    {"tag": "div", "text": {"tag": "lark_md", "content": "⚡ **处理状态**：已转交 IT 处理"}},
+                    {"tag": "div", "text": {"tag": "lark_md", "content": f"🖥️ **故障主机**：{instance or '未知'}"}},
+                    {"tag": "hr"},
+                    {"tag": "div", "text": {"tag": "lark_md", "content": "<font color='orange'>⏳ IT 人员将介入处理...</font>"}}
+                ]
+            }
+        }
+
+        return self._patch_message(open_message_id, card_content)
 
 
 def create_event_handler(

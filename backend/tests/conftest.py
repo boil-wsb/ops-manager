@@ -54,7 +54,7 @@ async def setup_and_teardown_db():
 
 
 @pytest.fixture(scope="session", autouse=True)
-async def create_test_users():
+def create_test_users():
     """Create test users for authentication tests.
 
     Note: Admin account (admin/admin123) is assumed to exist in the database.

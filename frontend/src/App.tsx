@@ -16,7 +16,6 @@ import AssetList from './pages/Assets/AssetList';
 import AssetDetail from './pages/Assets/AssetDetail';
 import AssetDiscovery from './pages/Assets/AssetDiscovery';
 import MonitorList from './pages/Monitor/MonitorList';
-import AlertList from './pages/Monitor/AlertList';
 import DeploymentList from './pages/Ops/DeploymentList';
 import CertificateList from './pages/Ops/CertificateList';
 import ITManagement from './pages/Ops/ITManagement';
@@ -26,6 +25,10 @@ import Profile from './pages/Profile/Profile';
 import NavigationList from './pages/System/NavigationList';
 import NotificationGroupList from './pages/System/NotificationGroupList';
 import Forbidden from './pages/Forbidden';
+import AlertManager from './pages/Alerts/AlertManager';
+import AlertSilenceList from './pages/Alerts/AlertSilenceList';
+import AlertTemplateList from './pages/Alerts/AlertTemplateList';
+import AlertHistory from './pages/Alerts/AlertHistory';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -69,7 +72,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   const permission = getRoutePermission(location.pathname);
-  
+
   if (permission !== undefined && permission.length > 0) {
     const permissionList = Array.isArray(permission) ? permission : [permission];
     if (!hasAnyPermission(permissionList)) {
@@ -101,7 +104,6 @@ function App() {
                 <Route path="assets/discovery" element={<AssetDiscovery />} />
                 <Route path="assets/:id" element={<AssetDetail />} />
                 <Route path="monitor/list" element={<MonitorList />} />
-                <Route path="monitor/alerts" element={<AlertList />} />
                 <Route path="monitor/domains" element={<CertificateList />} />
                 <Route path="ops/deployments" element={<DeploymentList />} />
                 <Route path="ops/it-management" element={<ITManagement />} />
@@ -110,6 +112,10 @@ function App() {
                 <Route path="system/navigation" element={<NavigationList />} />
                 <Route path="system/notification-groups" element={<NotificationGroupList />} />
                 <Route path="profile" element={<Profile />} />
+                <Route path="alerts/alertmanager" element={<AlertManager />} />
+                <Route path="alerts/alertmanager/silences" element={<AlertSilenceList />} />
+                <Route path="alerts/alertmanager/templates" element={<AlertTemplateList />} />
+                <Route path="alerts/alertmanager/history" element={<AlertHistory />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

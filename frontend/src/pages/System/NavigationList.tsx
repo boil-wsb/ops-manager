@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Table,
   Button,
@@ -30,8 +30,10 @@ import {
   DashboardOutlined,
   SafetyOutlined,
   ApiOutlined,
+  UploadOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons';
-import { navigationApi, type NavigationLink, type NavigationLinkCreate, type NavigationLinkUpdate } from '../../services/navigation';
+import { navigationApi, type NavigationLink, type NavigationLinkCreate, type NavigationLinkUpdate, type NavigationImportResponse } from '../../services/navigation';
 
 const { Title } = Typography;
 const { Search } = Input;
@@ -79,6 +81,10 @@ const NavigationList = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingLink, setEditingLink] = useState<NavigationLink | null>(null);
   const [form] = Form.useForm();
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState<NavigationImportResponse | null>(null);
+  const [importResultModalVisible, setImportResultModalVisible] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchLinks = useCallback(async () => {
     setLoading(true);
@@ -152,6 +158,75 @@ const NavigationList = () => {
     }
   };
 
+  const handleExport = async () => {
+    try {
+      await navigationApi.exportLinks();
+      message.success('导出成功');
+    } catch {
+      message.error('导出失败');
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const parseCSV = (csvText: string) => {
+    const lines = csvText.split('\n').filter(line => line.trim());
+    if (lines.length < 2) return [];
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    const data: Record<string, string>[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',').map(v => v.trim());
+      const row: Record<string, string> = {};
+      headers.forEach((header, index) => {
+        row[header] = values[index] || '';
+      });
+      data.push(row);
+    }
+    return data;
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setImportLoading(true);
+    try {
+      const text = await file.text();
+      const csvData = parseCSV(text);
+
+      const importData = csvData.map(row => ({
+        category: row.category || '',
+        name: row.name || '',
+        url: row.url || '',
+        icon: row.icon || undefined,
+        description: row.description || undefined,
+        sortOrder: parseInt(row.sort_order || '0', 10) || 0,
+        isActive: row.is_active?.toLowerCase() !== 'false',
+        roleNames: row.role_names || '',
+      })).filter(item => item.name && item.url);
+
+      if (importData.length === 0) {
+        message.error('CSV 文件中没有有效数据');
+        return;
+      }
+
+      const result = await navigationApi.importLinks(importData);
+      setImportResult(result);
+      setImportResultModalVisible(true);
+      fetchLinks();
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : '导入失败';
+      message.error(errorMessage);
+    } finally {
+      setImportLoading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   const filteredLinks = links.filter(
     (link) =>
       link.name.toLowerCase().includes(searchText.toLowerCase()) ||
@@ -167,6 +242,7 @@ const NavigationList = () => {
       dataIndex: 'category',
       key: 'category',
       width: 100,
+      sorter: (a: NavigationLink, b: NavigationLink) => a.category.localeCompare(b.category),
       render: (text: string) => <Tag color="blue">{text}</Tag>,
     },
     {
@@ -174,6 +250,7 @@ const NavigationList = () => {
       dataIndex: 'name',
       key: 'name',
       width: 150,
+      sorter: (a: NavigationLink, b: NavigationLink) => a.name.localeCompare(b.name),
       render: (text: string) => <span style={{ fontWeight: 500 }}>{text}</span>,
     },
     {
@@ -181,6 +258,7 @@ const NavigationList = () => {
       dataIndex: 'url',
       key: 'url',
       ellipsis: true,
+      sorter: (a: NavigationLink, b: NavigationLink) => a.url.localeCompare(b.url),
       render: (text: string) => (
         <a href={text} target="_blank" rel="noopener noreferrer">
           <LinkOutlined style={{ marginRight: 4 }} />
@@ -194,6 +272,7 @@ const NavigationList = () => {
       key: 'icon',
       width: 80,
       align: 'center' as const,
+      sorter: (a: NavigationLink, b: NavigationLink) => (a.icon || '').localeCompare(b.icon || ''),
       render: (iconName: string) => {
         if (!iconName) return '-';
         const icon = iconMap[iconName];
@@ -205,6 +284,7 @@ const NavigationList = () => {
       dataIndex: 'roles',
       key: 'roles',
       width: 150,
+      sorter: (a: NavigationLink, b: NavigationLink) => (a.roles?.length || 0) - (b.roles?.length || 0),
       render: (rolesList: Role[]) => {
         if (!rolesList || rolesList.length === 0) {
           return <Tag color="green">全部可见</Tag>;
@@ -226,12 +306,14 @@ const NavigationList = () => {
       key: 'sortOrder',
       width: 80,
       align: 'center' as const,
+      sorter: (a: NavigationLink, b: NavigationLink) => a.sortOrder - b.sortOrder,
     },
     {
       title: '状态',
       dataIndex: 'isActive',
       key: 'isActive',
       width: 80,
+      sorter: (a: NavigationLink, b: NavigationLink) => (a.isActive === b.isActive ? 0 : a.isActive ? -1 : 1),
       render: (isActive: boolean) => (
         <Tag color={isActive ? 'success' : 'default'}>{isActive ? '启用' : '禁用'}</Tag>
       ),
@@ -293,11 +375,24 @@ const NavigationList = () => {
               <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
                 新增链接
               </Button>
+              <Button icon={<DownloadOutlined />} onClick={handleExport}>
+                导出
+              </Button>
+              <Button icon={<UploadOutlined />} onClick={handleImportClick} loading={importLoading}>
+                导入
+              </Button>
             </Space>
           </div>
         }
         style={{ background: 'var(--bg-card)' }}
       >
+        <input
+          type="file"
+          accept=".csv"
+          ref={fileInputRef}
+          style={{ display: 'none' }}
+          onChange={handleFileChange}
+        />
         <Table
           columns={columns}
           dataSource={filteredLinks}
@@ -374,6 +469,42 @@ const NavigationList = () => {
             <Switch checkedChildren="启用" unCheckedChildren="禁用" />
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title="导入结果"
+        open={importResultModalVisible}
+        onOk={() => setImportResultModalVisible(false)}
+        onCancel={() => setImportResultModalVisible(false)}
+        width={600}
+        okText="确定"
+        cancelText="取消"
+      >
+        {importResult && (
+          <div>
+            <p>总记录数：{importResult.total}</p>
+            <p style={{ color: 'green' }}>成功：{importResult.success_count}</p>
+            <p style={{ color: importResult.failed_count > 0 ? 'red' : 'inherit' }}>失败：{importResult.failed_count}</p>
+            {importResult.results.length > 0 && (
+              <div style={{ maxHeight: 300, overflowY: 'auto', marginTop: 16 }}>
+                {importResult.results.map((result, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      padding: '8px',
+                      marginBottom: 4,
+                      background: result.success ? '#f6ffed' : '#fff2f0',
+                      border: `1px solid ${result.success ? '#b7eb8f' : '#ffccc7'}`,
+                      borderRadius: 4,
+                    }}
+                  >
+                    <strong>{result.name}</strong>: {result.message}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
     </div>
   );

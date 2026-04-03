@@ -75,6 +75,7 @@ class AssetCreate(AssetBase):
     """Asset creation schema."""
     label_ids: list[int] = []
     owner_name: str | None = Field(None, max_length=100)
+    owner_id: int | None = None
 
 
 class AssetUpdate(BaseModel):
@@ -98,6 +99,7 @@ class AssetUpdate(BaseModel):
 
     description: str | None = None
     owner_name: str | None = Field(None, max_length=100)
+    owner_id: int | None = None
     label_ids: list[int] | None = None
 
 

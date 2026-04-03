@@ -95,12 +95,14 @@ const AssetDiscovery = () => {
       title: 'IP地址',
       dataIndex: 'ipAddress',
       key: 'ipAddress',
+      sorter: (a: Record<string, unknown>, b: Record<string, unknown>) => (a.ipAddress as string).localeCompare(b.ipAddress as string),
     },
     {
       title: '主机名',
       dataIndex: 'nodename',
       key: 'nodename',
       render: (text: string) => text || '-',
+      sorter: (a: Record<string, unknown>, b: Record<string, unknown>) => ((a.nodename as string) || '').localeCompare((b.nodename as string) || ''),
     },
     {
       title: '操作系统',
@@ -111,24 +113,28 @@ const AssetDiscovery = () => {
           <span style={{ fontSize: 12, color: '#999' }}>{(record.release as string) || ''}</span>
         </Space>
       ),
+      sorter: (a: Record<string, unknown>, b: Record<string, unknown>) => ((a.os as string) || '').localeCompare((b.os as string) || ''),
     },
     {
       title: '架构',
       dataIndex: 'machine',
       key: 'machine',
       render: (text: string) => text || '-',
+      sorter: (a: Record<string, unknown>, b: Record<string, unknown>) => ((a.machine as string) || '').localeCompare((b.machine as string) || ''),
     },
     {
       title: 'Job',
       dataIndex: 'job',
       key: 'job',
       render: (text: string) => <Tag color="blue">{text}</Tag>,
+      sorter: (a: Record<string, unknown>, b: Record<string, unknown>) => ((a.job as string) || '').localeCompare((b.job as string) || ''),
     },
     {
       title: '环境',
       dataIndex: 'env',
       key: 'env',
       render: (text: string) => text ? <Tag color="green">{text}</Tag> : '-',
+      sorter: (a: Record<string, unknown>, b: Record<string, unknown>) => ((a.env as string) || '').localeCompare((b.env as string) || ''),
     },
     {
       title: '操作',

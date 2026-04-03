@@ -96,6 +96,40 @@ def _do_card_action_trigger(data: Any) -> Any:
                 threading.Thread(target=_update_card_to_resolved, args=(open_message_id, feedback_id, notes), daemon=True).start()
             resp = {"toast": {"type": "info", "content": "处理完成，已通知提交者"}}
 
+        elif button_action.startswith("acknowledge_"):
+            alert_id = button_action.replace("acknowledge_", "")
+            threading.Thread(target=_acknowledge_alert, args=(alert_id, open_message_id), daemon=True).start()
+            resp = {"toast": {"type": "info", "content": "已接单，请填写处理方式"}}
+
+        elif button_action.startswith("transfer_it_"):
+            alert_id = button_action.replace("transfer_it_", "")
+            threading.Thread(target=_transfer_alert_to_it, args=(alert_id, open_message_id), daemon=True).start()
+            resp = {"toast": {"type": "info", "content": "已转交 IT 处理"}}
+
+        elif button_action == "resolve_alert":
+            notes = ""
+            if form_value and isinstance(form_value, dict):
+                notes = form_value.get("alert_notes", "") or ""
+            if not notes and input_value and isinstance(input_value, dict):
+                notes = input_value.get("alert_notes", "") or ""
+
+            if not notes or not notes.strip():
+                resp = {"toast": {"type": "error", "content": "请填写处理方式"}}
+                from lark_oapi.event.callback.model.p2_card_action_trigger import (
+                    P2CardActionTriggerResponse,
+                )
+                return P2CardActionTriggerResponse(resp)
+
+            alert_id_from_value = value.get("alert_id") if isinstance(value, dict) else None
+            if not alert_id_from_value and open_message_id:
+                alert_id_from_value = _get_alert_id_by_open_message_id(open_message_id)
+
+            if alert_id_from_value:
+                threading.Thread(target=_resolve_alert_sync, args=(str(alert_id_from_value), notes, open_message_id), daemon=True).start()
+                resp = {"toast": {"type": "info", "content": "告警已解决"}}
+            else:
+                resp = {"toast": {"type": "error", "content": "无法找到告警记录"}}
+
         else:
             resp = {"toast": {"type": "info", "content": f"收到回调: {button_action}"}}
 
@@ -314,6 +348,218 @@ def _update_card_to_resolved(open_message_id: str, feedback_id: str, notes: str)
         logger.error(f"Error updating card to resolved: {e}")
 
 
+def _get_alert_id_by_open_message_id(open_message_id: str) -> str | None:
+    """Get alert ID by open_message_id from alert_history table."""
+    from sqlalchemy import create_engine, text
+
+    from app.config import settings
+
+    try:
+        sync_db_url = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
+        engine = create_engine(sync_db_url, pool_pre_ping=True)
+
+        with engine.connect() as conn:
+            result = conn.execute(
+                text("SELECT alertname, labels->>'instance' as instance FROM alert_history WHERE feishu_open_message_id = :open_message_id AND status = 'firing'"),
+                {"open_message_id": open_message_id}
+            )
+            row = result.fetchone()
+        engine.dispose()
+        if row:
+            alertname = row[0] or ""
+            instance = (row[1] or "").replace(".", "_")
+            return f"{alertname}_{instance}"
+        return None
+    except Exception as e:
+        logger.error(f"Error getting alert_id by open_message_id {open_message_id}: {e}")
+        return None
+
+
+def _acknowledge_alert(alert_id: str, open_message_id: str | None) -> None:
+    """Mark alert as acknowledged and update card to show input form."""
+    from sqlalchemy import create_engine, text
+
+    from app.config import settings
+    from app.integrations.feishu.service import get_feishu_service
+
+    try:
+        sync_db_url = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
+        engine = create_engine(sync_db_url, pool_pre_ping=True)
+
+        alertname = ""
+        severity = ""
+        instance = ""
+        history_id = None
+
+        with engine.connect() as conn:
+            if open_message_id:
+                result = conn.execute(
+                    text("SELECT id, alertname, severity, labels->>'instance' as instance FROM alert_history WHERE feishu_open_message_id = :msg_id AND status = 'firing'"),
+                    {"msg_id": open_message_id}
+                )
+            else:
+                parts = alert_id.rsplit("_", 1)
+                if len(parts) == 2:
+                    alertname_part, instance_part = parts
+                    result = conn.execute(
+                        text("SELECT id, alertname, severity, labels->>'instance' as instance FROM alert_history WHERE alertname = :name AND labels->>'instance' = :instance AND status = 'firing'"),
+                        {"name": alertname_part, "instance": instance_part.replace("_", ".")}
+                    )
+                else:
+                    result = None
+
+            if result:
+                row = result.fetchone()
+                if row:
+                    history_id = row[0]
+                    alertname = row[1] or ""
+                    severity = row[2] or ""
+                    instance = row[3] or ""
+
+        if history_id and open_message_id:
+            feishu = get_feishu_service()
+            feishu.update_alert_card_to_acknowledged(
+                open_message_id=open_message_id,
+                alertname=alertname,
+                severity=severity,
+                instance=instance,
+            )
+            logger.info(f"Alert card {alert_id} updated to acknowledged status")
+    except Exception as e:
+        logger.error(f"Error acknowledging alert {alert_id}: {e}")
+
+
+def _transfer_alert_to_it(alert_id: str, open_message_id: str | None) -> None:
+    """Transfer alert to IT and update card to show transferred status."""
+    from sqlalchemy import create_engine, text
+
+    from app.config import settings
+    from app.integrations.feishu.service import get_feishu_service
+
+    try:
+        sync_db_url = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
+        engine = create_engine(sync_db_url, pool_pre_ping=True)
+
+        alertname = ""
+        severity = ""
+        instance = ""
+        history_id = None
+
+        with engine.connect() as conn:
+            if open_message_id:
+                result = conn.execute(
+                    text("SELECT id, alertname, severity, labels->>'instance' as instance FROM alert_history WHERE feishu_open_message_id = :msg_id AND status = 'firing'"),
+                    {"msg_id": open_message_id}
+                )
+            else:
+                parts = alert_id.rsplit("_", 1)
+                if len(parts) == 2:
+                    alertname_part, instance_part = parts
+                    result = conn.execute(
+                        text("SELECT id, alertname, severity, labels->>'instance' as instance FROM alert_history WHERE alertname = :name AND labels->>'instance' = :instance AND status = 'firing'"),
+                        {"name": alertname_part, "instance": instance_part.replace("_", ".")}
+                    )
+                else:
+                    result = None
+
+            if result:
+                row = result.fetchone()
+                if row:
+                    history_id = row[0]
+                    alertname = row[1] or ""
+                    severity = row[2] or ""
+                    instance = row[3] or ""
+
+        if history_id and open_message_id:
+            feishu = get_feishu_service()
+            feishu.update_alert_card_to_transferred(
+                open_message_id=open_message_id,
+                alertname=alertname,
+                severity=severity,
+                instance=instance,
+            )
+            logger.info(f"Alert card {alert_id} updated to transferred status")
+    except Exception as e:
+        logger.error(f"Error transferring alert {alert_id} to IT: {e}")
+
+
+def _resolve_alert_sync(alert_id: str, notes: str, open_message_id: str | None = None) -> None:
+    """Mark alert as resolved with notes using sync database operations."""
+    from sqlalchemy import create_engine, text
+
+    from app.config import settings
+    from app.services.alerts.feishu_notification import get_feishu_notification_service
+
+    try:
+        sync_db_url = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
+        engine = create_engine(sync_db_url, pool_pre_ping=True)
+
+        with engine.connect() as conn:
+            if open_message_id:
+                result = conn.execute(
+                    text("SELECT id, alertname, labels->>'instance' as instance, feishu_open_message_id, severity FROM alert_history WHERE feishu_open_message_id = :msg_id AND status = 'firing'"),
+                    {"msg_id": open_message_id}
+                )
+                row = result.fetchone()
+                if row:
+                    history_id = row[0]
+                    alertname = row[1] or ""
+                    instance = row[2] or ""
+                    feishu_open_message_id = row[3]
+                    severity = row[4] or "warning"
+                else:
+                    alertname, instance, feishu_open_message_id, severity = "", "", None, "warning"
+                    history_id = None
+            else:
+                parts = alert_id.rsplit("_", 1)
+                if len(parts) == 2:
+                    alertname_part, instance_part = parts
+                    instance = instance_part.replace("_", ".")
+                    result = conn.execute(
+                        text("SELECT id, feishu_open_message_id, severity FROM alert_history WHERE alertname = :name AND labels->>'instance' = :instance AND status = 'firing'"),
+                        {"name": alertname_part, "instance": instance}
+                    )
+                    row = result.fetchone()
+                    if row:
+                        history_id = row[0]
+                        feishu_open_message_id = row[1]
+                        severity = row[2] or "warning"
+                        alertname = alertname_part
+                    else:
+                        history_id = None
+                        feishu_open_message_id = None
+                else:
+                    logger.warning(f"Invalid alert_id format: {alert_id}")
+                    history_id = None
+                    feishu_open_message_id = None
+                    alertname, instance, severity = "", "", "warning"
+
+            if history_id:
+                conn.execute(
+                    text("UPDATE alert_history SET status = 'resolved' WHERE id = :id"),
+                    {"id": history_id}
+                )
+                conn.commit()
+                logger.info(f"Alert {alert_id} marked as resolved with notes: {notes}")
+
+                if feishu_open_message_id:
+                    feishu_svc = get_feishu_notification_service()
+                    resolved_card = feishu_svc.build_resolved_card(
+                        alertname=alertname,
+                        severity=severity,
+                        instance=instance,
+                    )
+                    feishu_svc.update_card_message(
+                        open_message_id=feishu_open_message_id,
+                        card_content=resolved_card,
+                    )
+            else:
+                logger.warning(f"No firing alert found for: {alert_id}")
+        engine.dispose()
+    except Exception as e:
+        logger.error(f"Error resolving alert {alert_id}: {e}")
+
+
 def _start_callback_client() -> None:
     """Start the Feishu WebSocket callback client."""
     global _ws_client
@@ -329,6 +575,7 @@ def _start_callback_client() -> None:
     event_handler = (
         lark.EventDispatcherHandler.builder("", "")
         .register_p2_card_action_trigger(_do_card_action_trigger)
+        .register_p2_im_message_receive_v1(_do_im_message_receive_v1)
         .register_p2_im_chat_access_event_bot_p2p_chat_entered_v1(_do_bot_p2p_chat_entered)
         .build()
     )
@@ -346,9 +593,10 @@ def _start_callback_client() -> None:
     try:
         _ws_client.start()
         logger.info("WebSocket client started")
-    except Exception as e:
-        logger.error(f"WebSocket client start failed: {e}")
-        raise
+    except RuntimeError as e:
+        logger.warning(f"WebSocket client cannot start (event loop conflict). "
+                      "This is expected in uvicorn reload mode. "
+                      "Use 'uvicorn app.main:app' without --reload for production.")
 
 
 def start_feishu_callback_client() -> None:
@@ -377,3 +625,103 @@ def _do_bot_p2p_chat_entered(data: Any) -> None:
     lark = _get_lark_module()
     logger.info(f"Bot p2p chat entered: {lark.JSON.marshal(data)}")
     return None
+
+
+def _do_im_message_receive_v1(data: Any) -> Any:
+    """Handle im.message.receive_v1 event - receive user messages."""
+    lark = _get_lark_module()
+    try:
+        message_content = lark.JSON.marshal(data)
+        logger.info(f"Message received: {message_content[:500]}...")
+
+        event = data.event
+        sender = getattr(event, 'sender', None)
+        sender_id = None
+        if sender:
+            sender_id = getattr(sender, 'sender_id', None)
+            if sender_id:
+                sender_id = getattr(sender_id, 'open_id', None) or getattr(sender_id, 'user_id', None)
+
+        content = getattr(event, 'content', None)
+        if content:
+            try:
+                if isinstance(content, str):
+                    msg_dict = lark.JSON.unmarshal(content)
+                else:
+                    msg_dict = content
+                msg_type = msg_dict.get('msg_type', '') if isinstance(msg_dict, dict) else ''
+                text_content = msg_dict.get('text', '') if isinstance(msg_dict, dict) else ''
+
+                logger.info(f"Message from {sender_id}: type={msg_type}, text={text_content[:100] if text_content else 'N/A'}")
+
+                if msg_type == 'text' and text_content:
+                    _handle_text_message(sender_id, text_content)
+            except Exception as e:
+                logger.error(f"Error parsing message content: {e}")
+
+        from lark_oapi.event.callback.model.p2_im_message_receive_v1 import P2ImMessageReceiveResponse
+        return P2ImMessageReceiveResponse(None)
+
+    except Exception as e:
+        logger.error(f"Error processing message: {e}")
+        from lark_oapi.event.callback.model.p2_im_message_receive_v1 import P2ImMessageReceiveResponse
+        return P2ImMessageReceiveResponse(None)
+
+
+def _handle_text_message(sender_id: str | None, text: str) -> None:
+    """Handle incoming text messages."""
+    if not sender_id:
+        return
+
+    text = text.strip().lower()
+
+    if text in ['help', '帮助', '菜单']:
+        _send_help_menu(sender_id)
+    elif text in ['状态', 'status']:
+        _send_status_info(sender_id)
+    else:
+        logger.info(f"Received text from {sender_id}: {text}")
+
+
+def _send_help_menu(user_id: str) -> None:
+    """Send help menu to user."""
+    try:
+        from app.integrations.feishu.service import get_feishu_service
+        feishu = get_feishu_service()
+        card_content = {
+            "header": {
+                "title": {"tag": "plain_text", "content": "IT反馈机器人帮助"},
+                "template": "blue"
+            },
+            "elements": [
+                {"tag": "div", "text": {"tag": "lark_md", "content": "**欢迎使用IT反馈机器人**\n\n请选择操作："}},
+                {"tag": "action", "actions": [
+                    {"tag": "button", "text": {"tag": "plain_text", "content": "提交反馈"}, "type": "primary", "value": {"action": "submit_feedback"}},
+                    {"tag": "button", "text": {"tag": "plain_text", "content": "查看状态"}, "type": "default", "value": {"action": "check_status"}}
+                ]},
+                {"tag": "div", "text": {"tag": "lark_md", "content": "---\n**使用说明**\n- 发送 `状态` 查看当前反馈状态\n- 发送 `帮助` 显示此菜单"}}
+            ]
+        }
+        feishu.send_p2p_card_message(user_id, card_content)
+    except Exception as e:
+        logger.error(f"Error sending help menu: {e}")
+
+
+def _send_status_info(user_id: str) -> None:
+    """Send status info to user."""
+    try:
+        from app.integrations.feishu.service import get_feishu_service
+        feishu = get_feishu_service()
+        card_content = {
+            "header": {
+                "title": {"tag": "plain_text", "content": "IT反馈状态查询"},
+                "template": "green"
+            },
+            "elements": [
+                {"tag": "div", "text": {"tag": "lark_md", "content": "请通过工单系统查询您的反馈状态"}},
+                {"tag": "div", "text": {"tag": "lark_md", "content": "或联系IT管理员获取帮助"}}
+            ]
+        }
+        feishu.send_p2p_card_message(user_id, card_content)
+    except Exception as e:
+        logger.error(f"Error sending status info: {e}")

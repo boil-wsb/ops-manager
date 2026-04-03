@@ -1,0 +1,229 @@
+import { useState } from 'react';
+import { Table, Button, Space, Card, DatePicker, Select, Input, Tag, Modal } from 'antd';
+import { EyeOutlined } from '@ant-design/icons';
+import { useQuery } from '@tanstack/react-query';
+import type { AlertHistory as AlertHistoryType, AlertHistoryStatus } from '../../types/alert';
+import alertApi from '../../services/alert';
+import type { Dayjs } from 'dayjs';
+
+const { RangePicker } = DatePicker;
+const { Search } = Input;
+
+const statusOptions = [
+  { value: 'firing', label: '触发中' },
+  { value: 'resolved', label: '已解决' },
+  { value: 'suppressed', label: '已抑制' },
+];
+
+const AlertHistoryPage = () => {
+  const [params, setParams] = useState({
+    page: 1,
+    pageSize: 20,
+    status: undefined as AlertHistoryStatus | undefined,
+    alertname: undefined as string | undefined,
+    startTime: undefined as string | undefined,
+    endTime: undefined as string | undefined,
+  });
+  const [selectedRecord, setSelectedRecord] = useState<AlertHistoryType | null>(null);
+  const [detailVisible, setDetailVisible] = useState(false);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['alertHistory', params],
+    queryFn: () => alertApi.getAlertHistory({
+      page: params.page,
+      pageSize: params.pageSize,
+      status: params.status,
+      alertname: params.alertname,
+      startTime: params.startTime,
+      endTime: params.endTime,
+    }),
+  });
+
+  const handleSearch = (value: string) => {
+    setParams({ ...params, alertname: value || undefined, page: 1 });
+  };
+
+  const handleStatusChange = (value: AlertHistoryStatus | undefined) => {
+    setParams({ ...params, status: value, page: 1 });
+  };
+
+  const handleTimeChange = (dates: [Dayjs | null, Dayjs | null] | null) => {
+    if (dates && dates[0] && dates[1]) {
+      setParams({
+        ...params,
+        startTime: dates[0].toISOString(),
+        endTime: dates[1].toISOString(),
+        page: 1,
+      });
+    } else {
+      setParams({
+        ...params,
+        startTime: undefined,
+        endTime: undefined,
+        page: 1,
+      });
+    }
+  };
+
+  const handleShowDetail = (record: AlertHistoryType) => {
+    setSelectedRecord(record);
+    setDetailVisible(true);
+  };
+
+  const columns = [
+    {
+      title: '告警名称',
+      dataIndex: 'alertname',
+      key: 'alertname',
+      width: 150,
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: 100,
+      render: (status: string) => {
+        const colorMap: Record<string, string> = {
+          firing: 'red',
+          resolved: 'green',
+          suppressed: 'default',
+        };
+        const labelMap: Record<string, string> = {
+          firing: '触发中',
+          resolved: '已解决',
+          suppressed: '已抑制',
+        };
+        return <Tag color={colorMap[status]}>{labelMap[status] || status}</Tag>;
+      },
+    },
+    {
+      title: '级别',
+      dataIndex: 'severity',
+      key: 'severity',
+      width: 80,
+      render: (severity: string) => {
+        const colorMap: Record<string, string> = {
+          info: 'blue',
+          warning: 'orange',
+          critical: 'red',
+        };
+        return <Tag color={colorMap[severity]}>{severity}</Tag>;
+      },
+    },
+    {
+      title: '实例',
+      dataIndex: 'labels',
+      key: 'instance',
+      width: 150,
+      render: (labels: Record<string, string>) => labels?.instance || '-',
+    },
+    {
+      title: '开始时间',
+      dataIndex: 'startsAt',
+      key: 'startsAt',
+      width: 180,
+      render: (time: string) => time ? new Date(time).toLocaleString() : '-',
+    },
+    {
+      title: '通知已发送',
+      dataIndex: 'notificationSent',
+      key: 'notificationSent',
+      width: 100,
+      render: (sent: boolean) => (
+        <Tag color={sent ? 'green' : 'default'}>{sent ? '是' : '否'}</Tag>
+      ),
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 80,
+      render: (_: unknown, record: AlertHistoryType) => (
+        <Button
+          type="text"
+          icon={<EyeOutlined />}
+          onClick={() => handleShowDetail(record)}
+        />
+      ),
+    },
+  ];
+
+  return (
+    <div>
+      <Card style={{ marginBottom: 16 }}>
+        <Space wrap>
+          <RangePicker onChange={handleTimeChange} />
+          <Select
+            placeholder="状态"
+            value={params.status}
+            onChange={handleStatusChange}
+            style={{ width: 120 }}
+            allowClear
+            options={statusOptions}
+          />
+          <Search
+            placeholder="搜索告警名称"
+            onSearch={handleSearch}
+            style={{ width: 200 }}
+            allowClear
+          />
+        </Space>
+      </Card>
+
+      <Table
+        columns={columns}
+        dataSource={data?.items || []}
+        rowKey="id"
+        loading={isLoading}
+        pagination={{
+          current: params.page,
+          pageSize: params.pageSize,
+          total: data?.total || 0,
+          showSizeChanger: true,
+          showQuickJumper: true,
+          showTotal: (total) => `共 ${total} 条`,
+          onChange: (page, pageSize) => {
+            setParams({ ...params, page, pageSize });
+          },
+        }}
+      />
+
+      <Modal
+        title="告警详情"
+        open={detailVisible}
+        onCancel={() => setDetailVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setDetailVisible(false)}>
+            关闭
+          </Button>,
+        ]}
+        width={600}
+      >
+        {selectedRecord && (
+          <div>
+            <p><strong>告警名称:</strong> {selectedRecord.alertname}</p>
+            <p><strong>状态:</strong> {
+              selectedRecord.status === 'firing' ? '触发中' :
+              selectedRecord.status === 'resolved' ? '已解决' : '已抑制'
+            }</p>
+            <p><strong>级别:</strong> {selectedRecord.severity}</p>
+            <p><strong>实例:</strong> {selectedRecord.labels?.instance || '-'}</p>
+            <p><strong>开始时间:</strong> {selectedRecord.startsAt ? new Date(selectedRecord.startsAt).toLocaleString() : '-'}</p>
+            <p><strong>结束时间:</strong> {selectedRecord.endsAt ? new Date(selectedRecord.endsAt).toLocaleString() : '-'}</p>
+            <p><strong>是否被抑制:</strong> {selectedRecord.isSuppressed ? '是' : '否'}</p>
+            <p><strong>通知已发送:</strong> {selectedRecord.notificationSent ? '是' : '否'}</p>
+            <p><strong>标签:</strong></p>
+            <pre style={{ background: '#f5f5f5', padding: 8, borderRadius: 4 }}>
+              {JSON.stringify(selectedRecord.labels, null, 2)}
+            </pre>
+            <p><strong>注解:</strong></p>
+            <pre style={{ background: '#f5f5f5', padding: 8, borderRadius: 4 }}>
+              {JSON.stringify(selectedRecord.annotations, null, 2)}
+            </pre>
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+};
+
+export default AlertHistoryPage;

@@ -108,6 +108,7 @@ const RoleList = () => {
       title: '角色名称',
       dataIndex: 'name',
       key: 'name',
+      sorter: (a: Role, b: Role) => a.name.localeCompare(b.name),
       render: (text: string, record: Role) => (
         <Space>
           <span style={{ fontWeight: 500 }}>{text}</span>
@@ -124,12 +125,14 @@ const RoleList = () => {
       dataIndex: 'description',
       key: 'description',
       ellipsis: true,
+      sorter: (a: Role, b: Role) => (a.description || '').localeCompare(b.description || ''),
     },
     {
       title: '权限数量',
       dataIndex: 'permissionCount',
       key: 'permissionCount',
       width: 100,
+      sorter: (a: Role, b: Role) => (a.permissionCount || 0) - (b.permissionCount || 0),
       render: (count: number) => (
         <Tag icon={<SafetyOutlined />} color="success">
           {count}
@@ -141,6 +144,7 @@ const RoleList = () => {
       dataIndex: 'userCount',
       key: 'userCount',
       width: 100,
+      sorter: (a: Role, b: Role) => (a.userCount || 0) - (b.userCount || 0),
       render: (count: number) => (
         <Tag icon={<TeamOutlined />} color="processing">
           {count}
@@ -152,6 +156,7 @@ const RoleList = () => {
       dataIndex: 'isActive',
       key: 'isActive',
       width: 80,
+      sorter: (a: Role, b: Role) => (a.isActive === b.isActive ? 0 : a.isActive ? -1 : 1),
       render: (isActive: boolean) => (
         <Tag color={isActive ? 'success' : 'default'}>
           {isActive ? '启用' : '禁用'}
@@ -163,6 +168,11 @@ const RoleList = () => {
       dataIndex: 'createdAt',
       key: 'createdAt',
       width: 180,
+      sorter: (a: Role, b: Role) => {
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return aTime - bTime;
+      },
       render: (text: string) => new Date(text).toLocaleString(),
     },
     {

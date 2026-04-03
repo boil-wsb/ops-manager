@@ -160,6 +160,11 @@ class Asset(BaseModel):
         back_populates="asset",
         lazy="selectin"
     )
+    terminal_metrics: Mapped[list["TerminalMetric"]] = relationship(
+        "TerminalMetric",
+        back_populates="asset",
+        lazy="selectin"
+    )
 
     # Indexes
     __table_args__ = (

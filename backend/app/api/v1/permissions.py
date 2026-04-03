@@ -18,7 +18,6 @@ MODULE_NAMES = {
     "role": "角色管理",
     "asset": "资产管理",
     "monitor": "监控管理",
-    "alert": "告警管理",
     "deployment": "发布部署",
     "certificate": "证书管理",
     "setting": "系统设置",

@@ -1,6 +1,7 @@
 """
 Models package.
 """
+from app.models.alert import AlertHistory, AlertSilence, AlertTemplate
 from app.models.asset import Asset, Label, asset_labels
 from app.models.audit_log import AuditLog
 from app.models.base import BaseModel
@@ -11,6 +12,7 @@ from app.models.notification_group import NotificationGroup, notification_group_
 from app.models.ops import Certificate, Deployment, DNSRecord, InspectionReport, InspectionTask
 from app.models.pc_client_version import PCClientVersion
 from app.models.permission import Permission, Role, role_permissions
+from app.models.terminal_metric import TerminalMetric
 from app.models.user import User, user_roles
 
 __all__ = [
@@ -34,6 +36,10 @@ __all__ = [
     "DNSRecord",
     "PCClientVersion",
     "NotificationGroup",
+    "AlertSilence",
+    "AlertTemplate",
+    "AlertHistory",
+    "TerminalMetric",
     "user_roles",
     "role_permissions",
     "asset_labels",

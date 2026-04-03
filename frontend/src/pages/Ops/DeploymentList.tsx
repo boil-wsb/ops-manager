@@ -30,17 +30,20 @@ const DeploymentList = () => {
       title: '项目',
       dataIndex: 'projectName',
       key: 'projectName',
+      sorter: (a: Record<string, unknown>, b: Record<string, unknown>) => (a.projectName as string || '').localeCompare(b.projectName as string || ''),
     },
     {
       title: '版本',
       dataIndex: 'version',
       key: 'version',
+      sorter: (a: Record<string, unknown>, b: Record<string, unknown>) => (a.version as string || '').localeCompare(b.version as string || ''),
       render: (version: string) => <Tag>{version || '-'}</Tag>,
     },
     {
       title: '环境',
       dataIndex: 'environment',
       key: 'environment',
+      sorter: (a: Record<string, unknown>, b: Record<string, unknown>) => (a.environment as string || '').localeCompare(b.environment as string || ''),
       render: (env: string) => {
         const colorMap: Record<string, string> = {
           dev: 'blue',
@@ -61,23 +64,34 @@ const DeploymentList = () => {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
+      sorter: (a: Record<string, unknown>, b: Record<string, unknown>) => (a.status as string || '').localeCompare(b.status as string || ''),
       render: (status: string) => <StatusTag status={status} type="deployment" />,
     },
     {
       title: '发布人',
       dataIndex: 'deployerName',
       key: 'deployerName',
+      sorter: (a: Record<string, unknown>, b: Record<string, unknown>) => (a.deployerName as string || '').localeCompare(b.deployerName as string || ''),
     },
     {
       title: '发布时间',
       dataIndex: 'deployTime',
       key: 'deployTime',
+      sorter: (a: Record<string, unknown>, b: Record<string, unknown>) => {
+        const aTime = a.deployTime as string | undefined;
+        const bTime = b.deployTime as string | undefined;
+        if (!aTime && !bTime) return 0;
+        if (!aTime) return 1;
+        if (!bTime) return -1;
+        return new Date(aTime).getTime() - new Date(bTime).getTime();
+      },
       render: (time: string) => (time ? new Date(time).toLocaleString() : '-'),
     },
     {
       title: '耗时',
       dataIndex: 'durationSeconds',
       key: 'durationSeconds',
+      sorter: (a: Record<string, unknown>, b: Record<string, unknown>) => (a.durationSeconds as number || 0) - (b.durationSeconds as number || 0),
       render: (seconds: number) => (seconds ? `${seconds}s` : '-'),
     },
   ];

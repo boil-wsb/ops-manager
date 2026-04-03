@@ -49,11 +49,6 @@ DEFAULT_PERMISSIONS = [
     {"code": "monitor:delete", "name": "删除监控", "module": "monitor", "action": "delete", "description": "删除监控项"},
     {"code": "monitor:test", "name": "测试监控", "module": "monitor", "action": "execute", "description": "手动测试监控项"},
 
-    {"code": "alert:read", "name": "查看告警", "module": "alert", "action": "read", "description": "查看告警事件"},
-    {"code": "alert:acknowledge", "name": "确认告警", "module": "alert", "action": "execute", "description": "确认告警事件"},
-    {"code": "alert:resolve", "name": "解决告警", "module": "alert", "action": "execute", "description": "标记告警为已解决"},
-    {"code": "alert:delete", "name": "删除告警", "module": "alert", "action": "delete", "description": "删除告警记录"},
-
     {"code": "deployment:read", "name": "查看发布", "module": "deployment", "action": "read", "description": "查看发布记录"},
     {"code": "deployment:create", "name": "创建发布", "module": "deployment", "action": "create", "description": "创建新发布记录"},
     {"code": "deployment:approve", "name": "审批发布", "module": "deployment", "action": "execute", "description": "审批发布申请"},
@@ -92,7 +87,6 @@ DEFAULT_ROLES = {
             "role:read", "role:create", "role:update", "role:delete",
             "asset:read", "asset:create", "asset:update", "asset:delete", "asset:import", "asset:export", "asset:admin",
             "monitor:read", "monitor:create", "monitor:update", "monitor:delete", "monitor:test",
-            "alert:read", "alert:acknowledge", "alert:resolve", "alert:delete",
             "deployment:read", "deployment:create", "deployment:approve", "deployment:execute",
             "certificate:read", "certificate:create", "certificate:update", "certificate:delete", "certificate:renew",
             "setting:read", "setting:update",
@@ -105,7 +99,6 @@ DEFAULT_ROLES = {
         "permissions": [
             "asset:read",
             "monitor:read",
-            "alert:read", "alert:acknowledge", "alert:resolve",
             "deployment:read", "deployment:create", "deployment:execute",
             "certificate:read",
         ],
@@ -115,7 +108,6 @@ DEFAULT_ROLES = {
         "permissions": [
             "asset:read",
             "monitor:read",
-            "alert:read",
             "deployment:read",
             "certificate:read",
         ],

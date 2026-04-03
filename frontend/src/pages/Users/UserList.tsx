@@ -56,15 +56,18 @@ const UserList = () => {
       title: '用户名',
       dataIndex: 'username',
       key: 'username',
+      sorter: (a: User, b: User) => a.username.localeCompare(b.username),
     },
     {
       title: '邮箱',
       dataIndex: 'email',
       key: 'email',
+      sorter: (a: User, b: User) => (a.email || '').localeCompare(b.email || ''),
     },
     {
       title: '姓名',
       key: 'fullName',
+      sorter: (a: User, b: User) => ((a as unknown as Record<string, unknown>).fullName as string || '').localeCompare((b as unknown as Record<string, unknown>).fullName as string || ''),
       render: (_: unknown, record: User) => {
         return (record as unknown as Record<string, unknown>).fullName || '-';
       },
@@ -73,12 +76,14 @@ const UserList = () => {
       title: '状态',
       dataIndex: 'isActive',
       key: 'isActive',
+      sorter: (a: User, b: User) => (a.isActive === b.isActive ? 0 : a.isActive ? -1 : 1),
       render: (isActive: boolean) => <StatusTag status={isActive ? 'active' : 'inactive'} type="user" />,
     },
     {
       title: '超级管理员',
       dataIndex: 'isSuperuser',
       key: 'isSuperuser',
+      sorter: (a: User, b: User) => (a.isSuperuser === b.isSuperuser ? 0 : a.isSuperuser ? -1 : 1),
       render: (isSuperuser: boolean) => (
         <Tag color={isSuperuser ? 'purple' : 'default'}>
           {isSuperuser ? '是' : '否'}
@@ -88,6 +93,14 @@ const UserList = () => {
     {
       title: '最后登录',
       key: 'lastLogin',
+      sorter: (a: User, b: User) => {
+        const aLogin = (a as unknown as Record<string, unknown>).lastLogin as string | undefined | null;
+        const bLogin = (b as unknown as Record<string, unknown>).lastLogin as string | undefined | null;
+        if (!aLogin && !bLogin) return 0;
+        if (!aLogin) return 1;
+        if (!bLogin) return -1;
+        return new Date(aLogin).getTime() - new Date(bLogin).getTime();
+      },
       render: (_: unknown, record: User) => {
         const lastLogin = (record as unknown as Record<string, unknown>).lastLogin as string | undefined | null;
         return lastLogin ? new Date(lastLogin).toLocaleString('zh-CN') : '-';

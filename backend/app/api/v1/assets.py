@@ -428,6 +428,37 @@ async def get_asset_tree(
     return result
 
 
+@router.get("/assets/users-for-owner")
+async def get_users_for_owner(
+    keyword: str | None = Query(None, description="搜索用户名或姓名"),
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取用户列表用于负责人选择，无需认证"""
+    from sqlalchemy import select
+    from app.models.user import User
+
+    query = select(User.id, User.username, User.full_name, User.is_active).where(
+        User.is_active == True,
+        User.feishu_open_id != None,
+    )
+
+    if keyword:
+        query = query.where(
+            (User.username.ilike(f"%{keyword}%"))
+            | (User.full_name.ilike(f"%{keyword}%"))
+        )
+
+    query = query.limit(limit)
+    result = await db.execute(query)
+    users = result.all()
+
+    return [
+        {"id": u.id, "username": u.username, "full_name": u.full_name or u.username}
+        for u in users
+    ]
+
+
 @router.get("/assets/{asset_id}", response_model=AssetResponse)
 async def get_asset(
     asset_id: int,

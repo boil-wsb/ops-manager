@@ -53,6 +53,30 @@ export interface NavigationLinkUpdate {
   restrictToCurrentRole?: boolean;
 }
 
+export interface NavigationLinkImportResult {
+  success: boolean;
+  name: string;
+  message: string;
+}
+
+export interface NavigationImportResponse {
+  total: number;
+  success_count: number;
+  failed_count: number;
+  results: NavigationLinkImportResult[];
+}
+
+export interface NavigationLinkImport {
+  category: string;
+  name: string;
+  url: string;
+  icon?: string;
+  description?: string;
+  sortOrder?: number;
+  isActive?: boolean;
+  roleNames?: string;
+}
+
 export const navigationApi = {
   getPublicLinks: async (): Promise<{ groups: NavigationGroup[] }> => {
     const response = await api.get('/navigation/public');
@@ -86,5 +110,33 @@ export const navigationApi = {
 
   deleteLink: async (id: number): Promise<void> => {
     await api.delete(`/navigation/${id}`);
+  },
+
+  exportLinks: async (): Promise<void> => {
+    const response = await api.get('/navigation/export', {
+      responseType: 'blob',
+    });
+    const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const contentDisposition = response.headers['content-disposition'];
+    let filename = 'navigation_export.csv';
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename=(.+)/);
+      if (filenameMatch) {
+        filename = filenameMatch[1];
+      }
+    }
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+
+  importLinks: async (data: NavigationLinkImport[]): Promise<NavigationImportResponse> => {
+    const response = await api.post('/navigation/import', data);
+    return response.data;
   },
 };

@@ -12,13 +12,17 @@ export const routePermissions: Record<string, string | string[]> = {
   '/system/navigation': 'navigation:read',
   '/system/notification-groups': 'notification_group:read',
   '/profile': [],
+  '/alerts/alertmanager': 'alert:read',
+  '/alerts/alertmanager/silences': 'alert:manage_silence',
+  '/alerts/alertmanager/templates': 'alert:manage_template',
+  '/alerts/alertmanager/history': 'alert:read',
 };
 
 export function getRoutePermission(path: string): string | string[] | undefined {
   if (routePermissions[path]) {
     return routePermissions[path];
   }
-  
+
   const wildcardPaths = Object.keys(routePermissions).filter((p) => p.includes('*'));
   for (const wildcardPath of wildcardPaths) {
     const pattern = wildcardPath.replace('*', '');
@@ -26,7 +30,7 @@ export function getRoutePermission(path: string): string | string[] | undefined 
       return routePermissions[wildcardPath];
     }
   }
-  
+
   return undefined;
 }
 
@@ -78,12 +82,14 @@ export const PERMISSION_MODULES = [
   },
   {
     module: 'alert',
-    moduleName: '告警管理',
+    moduleName: '告警中心',
     permissions: [
       { code: 'alert:read', name: '查看告警' },
       { code: 'alert:acknowledge', name: '确认告警' },
       { code: 'alert:resolve', name: '解决告警' },
       { code: 'alert:delete', name: '删除告警' },
+      { code: 'alert:manage_silence', name: '管理抑制规则' },
+      { code: 'alert:manage_template', name: '管理模板' },
     ],
   },
   {

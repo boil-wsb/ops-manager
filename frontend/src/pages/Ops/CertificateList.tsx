@@ -49,21 +49,30 @@ const CertificateList = () => {
       title: '域名',
       dataIndex: 'domain',
       key: 'domain',
+      sorter: (a: Certificate, b: Certificate) => a.domain.localeCompare(b.domain),
     },
     {
       title: '颁发者',
       dataIndex: 'issuer',
       key: 'issuer',
+      sorter: (a: Certificate, b: Certificate) => (a.issuer || '').localeCompare(b.issuer || ''),
     },
     {
       title: '过期时间',
-      dataIndex: 'validUntil',
-      key: 'validUntil',
+      dataIndex: 'valid_until',
+      key: 'valid_until',
+      sorter: (a: Certificate, b: Certificate) => {
+        if (!a.valid_until && !b.valid_until) return 0;
+        if (!a.valid_until) return 1;
+        if (!b.valid_until) return -1;
+        return new Date(a.valid_until).getTime() - new Date(b.valid_until).getTime();
+      },
       render: (date: string) => (date ? new Date(date).toLocaleDateString() : '-'),
     },
     {
       title: '剩余天数',
       key: 'daysUntilExpiry',
+      sorter: (a: Certificate, b: Certificate) => (a.daysUntilExpiry ?? 0) - (b.daysUntilExpiry ?? 0),
       render: (_: unknown, record: Certificate) => {
         const days = record.daysUntilExpiry;
         if (days === null || days === undefined) return '-';
@@ -78,12 +87,14 @@ const CertificateList = () => {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
+      sorter: (a: Certificate, b: Certificate) => (a.status || '').localeCompare(b.status || ''),
       render: (status: string) => <StatusTag status={status} type="certificate" />,
     },
     {
       title: '自动续期',
-      dataIndex: 'is_auto_renewal',
-      key: 'is_auto_renewal',
+      dataIndex: 'isAutoRenewal',
+      key: 'isAutoRenewal',
+      sorter: (a: Certificate, b: Certificate) => (a.isAutoRenewal === b.isAutoRenewal ? 0 : a.isAutoRenewal ? -1 : 1),
       render: (isAutoRenewal: boolean) => (
         <Tag color={isAutoRenewal ? 'green' : 'default'}>
           {isAutoRenewal ? '是' : '否'}
@@ -94,6 +105,12 @@ const CertificateList = () => {
       title: '更新时间',
       dataIndex: 'updatedAt',
       key: 'updatedAt',
+      sorter: (a: Certificate, b: Certificate) => {
+        if (!a.updatedAt && !b.updatedAt) return 0;
+        if (!a.updatedAt) return 1;
+        if (!b.updatedAt) return -1;
+        return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+      },
       render: (time: string) => (time ? new Date(time).toLocaleString() : '-'),
     },
   ];

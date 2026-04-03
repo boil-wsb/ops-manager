@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Modal, Form, Input, Select, InputNumber, App, Alert, Space, Tag, Tooltip, Row, Col } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LockOutlined, CloudOutlined } from '@ant-design/icons';
-import { assetApi } from '../../services/assets';
+import { assetApi, type OwnerUser } from '../../services/assets';
 import type { Asset, Label } from '../../types';
 
 const { Option } = Select;
@@ -26,6 +26,11 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ open, onClose, asset })
     queryFn: assetApi.getLabels,
   });
 
+  const { data: ownerUsers = [] } = useQuery({
+    queryKey: ['owner-users'],
+    queryFn: () => assetApi.getUsersForOwner(),
+  });
+
   const initialLabelIds = useMemo(() => asset?.labels?.map((l) => l.id) || [], [asset]);
 
   const [selectedLabelIds, setSelectedLabelIds] = useState<number[]>(initialLabelIds);
@@ -45,8 +50,9 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ open, onClose, asset })
         osType: asset.osType,
         osVersion: asset.osVersion,
         description: asset.description,
+        ownerId: asset.ownerId,
         ownerName: asset.ownerName,
-    };
+      };
     }
     return {
       assetId: '',
@@ -61,13 +67,21 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ open, onClose, asset })
       osType: '',
       osVersion: '',
       description: '',
+      ownerId: undefined,
       ownerName: '',
     };
   }, [asset]);
 
   const createMutation = useMutation({
-    mutationFn: (data: Partial<Asset>) =>
-      assetApi.createAsset({ ...data, label_ids: selectedLabelIds } as unknown as Partial<Asset>),
+    mutationFn: (data: { ownerName?: string; ownerId?: number; [key: string]: unknown }) => {
+      const { ownerName, ownerId, ...rest } = data;
+      return assetApi.createAsset({
+        ...rest,
+        owner_name: ownerName,
+        owner_id: ownerId,
+        label_ids: selectedLabelIds,
+      } as Partial<Asset>);
+    },
     onSuccess: () => {
       message.success('资产创建成功');
       queryClient.invalidateQueries({ queryKey: ['assets'] });
@@ -79,8 +93,15 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ open, onClose, asset })
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Asset> & { label_ids?: number[] } }) =>
-      assetApi.updateAsset(id, { ...data, label_ids: selectedLabelIds } as unknown as Partial<Asset>),
+    mutationFn: ({ id, data }: { id: number; data: { ownerName?: string; ownerId?: number; [key: string]: unknown } }) => {
+      const { ownerName, ownerId, ...rest } = data;
+      return assetApi.updateAsset(id, {
+        ...rest,
+        owner_name: ownerName,
+        owner_id: ownerId,
+        label_ids: selectedLabelIds,
+      } as Partial<Asset>);
+    },
     onSuccess: () => {
       message.success('资产更新成功');
       queryClient.invalidateQueries({ queryKey: ['assets'] });
@@ -252,8 +273,33 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ open, onClose, asset })
 
         <Row gutter={16}>
           <Col span={12}>
-            <Form.Item name="ownerName" label="负责人">
-              <Input placeholder="请输入负责人姓名" />
+            <Form.Item name="ownerId" label="负责人">
+              <Select
+                showSearch
+                placeholder="请输入或选择负责人"
+                allowClear
+                filterOption={(input, option) =>
+                  (option?.label?.toLowerCase() ?? '').includes(input.toLowerCase())
+                }
+                onSearch={(value) => {
+                  form.setFieldValue('ownerName', value);
+                }}
+                onChange={(value) => {
+                  if (value === undefined) {
+                    form.setFieldValue('ownerName', undefined);
+                  } else {
+                    const selectedUser = ownerUsers.find((u: OwnerUser) => u.id === value);
+                    form.setFieldValue('ownerName', selectedUser?.fullName || value);
+                  }
+                }}
+                options={ownerUsers.map((user: OwnerUser) => ({
+                  value: user.id,
+                  label: user.fullName || user.username,
+                }))}
+              />
+            </Form.Item>
+            <Form.Item name="ownerName" hidden>
+              <Input />
             </Form.Item>
           </Col>
           <Col span={12}>

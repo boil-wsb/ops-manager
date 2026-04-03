@@ -18,6 +18,7 @@ celery_app = Celery(
         "app.tasks.asset_sync_tasks",
         "app.tasks.certificate_sync_tasks",
         "app.tasks.feishu_sync_tasks",
+        "app.tasks.sync_terminal_metrics",
     ],
 )
 
@@ -45,6 +46,8 @@ def setup_periodic_tasks(sender, **kwargs):
     from app.tasks.certificate_sync_tasks import sync_certificates_from_prometheus_task
     from app.tasks.feishu_sync_tasks import sync_feishu_users_task
     from app.tasks.monitor_tasks import check_all_monitors
+    from app.tasks.sync_terminal_metrics import get_sync_interval as get_terminal_sync_interval
+    from app.tasks.sync_terminal_metrics import sync_terminal_metrics_task
 
     sender.add_periodic_task(
         60.0,
@@ -81,6 +84,13 @@ def setup_periodic_tasks(sender, **kwargs):
         crontab(hour=3, minute=0),
         sync_certificates_from_prometheus_task.s(),
         name="sync-certificates-from-prometheus",
+    )
+
+    terminal_sync_interval = get_terminal_sync_interval()
+    sender.add_periodic_task(
+        terminal_sync_interval,
+        sync_terminal_metrics_task.s(),
+        name="sync-terminal-metrics-from-prometheus",
     )
 
 

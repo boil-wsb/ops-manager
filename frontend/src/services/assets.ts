@@ -1,7 +1,20 @@
 import api from './api';
 import type { PaginationData, Asset, Label } from '../types';
 
+export interface OwnerUser {
+  id: number;
+  username: string;
+  fullName: string;
+}
+
 export const assetApi = {
+  getUsersForOwner: async (keyword?: string): Promise<OwnerUser[]> => {
+    const response = await api.get<OwnerUser[]>('/assets/users-for-owner', {
+      params: keyword ? { keyword } : undefined,
+    });
+    return response.data;
+  },
+
   getAssets: async (params?: {
     skip?: number;
     limit?: number;

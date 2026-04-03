@@ -83,7 +83,24 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
         owner_id: int | None = None
     ) -> Asset:
         """Create asset with labels."""
-        # Create asset
+        from app.models.user import User
+
+        resolved_owner_id = owner_id
+
+        if resolved_owner_id is None and obj_in.owner_id is not None:
+            resolved_owner_id = obj_in.owner_id
+
+        if resolved_owner_id is None and obj_in.owner_name:
+            result = await db.execute(
+                select(User.id).where(
+                    User.full_name == obj_in.owner_name,
+                    User.feishu_open_id != None,
+                )
+            )
+            user_id = result.scalar_one_or_none()
+            if user_id:
+                resolved_owner_id = user_id
+
         db_obj = Asset(
             asset_id=obj_in.asset_id,
             name=obj_in.name,
@@ -101,7 +118,7 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
             region=obj_in.region,
             rack=obj_in.rack,
             description=obj_in.description,
-            owner_id=owner_id,
+            owner_id=resolved_owner_id,
             owner_name=obj_in.owner_name,
         )
 
@@ -137,11 +154,26 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
         operator_id: int | None = None
     ) -> Asset:
         """Update asset with labels."""
-        # Track changes
         changes = {}
 
-        # Update fields
         update_data = obj_in.model_dump(exclude_unset=True, exclude={"label_ids"})
+
+        if "owner_name" in update_data and update_data["owner_name"] is not None:
+            owner_name_value = update_data["owner_name"]
+            owner_id_value = update_data.get("owner_id")
+
+            if owner_id_value is None and owner_name_value:
+                from app.models.user import User
+                result = await db.execute(
+                    select(User.id).where(
+                        User.full_name == owner_name_value,
+                        User.feishu_open_id != None,
+                    )
+                )
+                resolved_owner_id = result.scalar_one_or_none()
+                if resolved_owner_id:
+                    update_data["owner_id"] = resolved_owner_id
+
         for field, value in update_data.items():
             if value is not None:
                 old_value = getattr(db_obj, field)

@@ -14,6 +14,7 @@ from app.tasks.notification_tasks import (
     send_email_notification,
     send_webhook_notification,
 )
+from app.tasks.sync_terminal_metrics import sync_terminal_metrics_task
 
 __all__ = [
     # Audit log cleanup
@@ -30,4 +31,6 @@ __all__ = [
     "send_email_notification",
     "send_webhook_notification",
     "send_alert_notification",
+    # Terminal metrics sync
+    "sync_terminal_metrics_task",
 ]

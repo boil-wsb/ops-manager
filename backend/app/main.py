@@ -13,14 +13,14 @@ from slowapi.errors import RateLimitExceeded
 
 from app.api.router import api_router
 from app.config import settings
-from app.core.auth_middleware import get_authentication_middleware
 from app.core.logging import configure_logging, get_logger
 from app.core.middleware import RequestLoggingMiddleware
+from app.core.auth_middleware import get_authentication_middleware
 from app.core.rate_limit import limiter
 from app.core.redis import close_redis, init_redis
 from app.db.init_db import init_db
-from app.integrations.feishu.callback_handler import start_feishu_callback_client
 from app.startup.pc_versions import sync_pc_versions_on_startup
+from app.integrations.feishu.callback_handler import start_feishu_callback_client
 
 logger = get_logger(__name__)
 

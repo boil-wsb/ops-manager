@@ -466,10 +466,11 @@ class PrometheusClient:
         metrics = {}
 
         queries = {
-            "disk_total": f'pc_disk_total{{hostname="{hostname}"}}',
-            "disk_usage": f'pc_disk_usage{{hostname="{hostname}"}}',
-            "memory_total": f'pc_memory_total{{hostname="{hostname}"}}',
-            "memory_usage": f'pc_memory_usage{{hostname="{hostname}"}}',
+            "disk_total": f'pc_disk_total_bytes{{hostname="{hostname}"}}',
+            "disk_usage": f'pc_disk_usage_percent{{hostname="{hostname}"}}',
+            "memory_total": f'pc_memory_total_bytes{{hostname="{hostname}"}}',
+            "memory_usage": f'pc_memory_usage_percent{{hostname="{hostname}"}}',
+            "cpu_usage": f'pc_cpu_usage_percent{{hostname="{hostname}"}}',
         }
 
         results = await asyncio.gather(*[self.query(q) for q in queries.values()], return_exceptions=True)

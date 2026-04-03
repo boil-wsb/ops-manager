@@ -38,6 +38,18 @@ export const menuPermissionConfig: MenuItemConfig[] = [
     ],
   },
   {
+    key: '/alerts',
+    label: '告警中心',
+    icon: 'AlertOutlined',
+    permission: 'alert:read',
+    children: [
+      { key: '/alerts/alertmanager', label: '告警中心' },
+      { key: '/alerts/alertmanager/silences', label: '抑制规则' },
+      { key: '/alerts/alertmanager/templates', label: '模板配置' },
+      { key: '/alerts/alertmanager/history', label: '告警历史' },
+    ],
+  },
+  {
     key: '/ops',
     label: '运维管理',
     icon: 'DeploymentUnitOutlined',

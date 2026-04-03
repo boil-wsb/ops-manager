@@ -1,9 +1,13 @@
 """
 Navigation link management API routes.
 """
+import csv
+import io
 import logging
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,7 +18,10 @@ from app.crud.crud_navigation import navigation_link
 from app.models.permission import Role
 from app.models.user import User
 from app.schemas.navigation import (
+    NavigationImportResponse,
     NavigationLinkCreate,
+    NavigationLinkImport,
+    NavigationLinkImportResult,
     NavigationLinkResponse,
     NavigationLinkUpdate,
 )
@@ -90,6 +97,126 @@ async def list_navigation_links(
         "page": page,
         "page_size": page_size,
     }
+
+
+@router.get("/export")
+async def export_navigation_links(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Export navigation links as CSV for the current user."""
+    require_permissions(["navigation:read"])(current_user)
+
+    is_superadmin = current_user.is_superuser
+    user_role_ids = [role.id for role in current_user.roles] if current_user.roles else []
+
+    links = await navigation_link.get_multi_with_access_filter(
+        db,
+        is_superadmin=is_superadmin,
+        user_role_ids=user_role_ids,
+        skip=0,
+        limit=10000,
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["category", "name", "url", "icon", "description", "sort_order", "is_active", "role_names"])
+
+    for link in links:
+        role_names = ",".join([role.name for role in link.roles]) if link.roles else ""
+        writer.writerow([
+            link.category,
+            link.name,
+            link.url,
+            link.icon or "",
+            link.description or "",
+            link.sort_order,
+            link.is_active,
+            role_names,
+        ])
+
+    output.seek(0)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"navigation_export_{timestamp}.csv"
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.post("/import", response_model=NavigationImportResponse, status_code=status.HTTP_201_CREATED)
+@audit_log(operation_type="IMPORT", module="navigation", object_type="NavigationLink")
+async def import_navigation_links(
+    request: Request,
+    links_in: list[NavigationLinkImport],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Import navigation links from CSV data."""
+    require_permissions(["navigation:create"])(current_user)
+    logger.info(f"[导航管理] 用户 {current_user.username} 开始导入导航链接，共 {len(links_in)} 条")
+
+    results = []
+    success_count = 0
+    failed_count = 0
+
+    for link_in in links_in:
+        try:
+            role_ids = []
+            if link_in.role_names:
+                role_names = [name.strip() for name in link_in.role_names.split(",") if name.strip()]
+                if role_names and role_names[0].lower() != "public":
+                    role_result = await db.execute(
+                        select(Role).where(Role.name.in_(role_names))
+                    )
+                    roles = list(role_result.scalars().all())
+                    if len(roles) != len(role_names):
+                        missing = set(role_names) - {r.name for r in roles}
+                        results.append(NavigationLinkImportResult(
+                            success=False,
+                            name=link_in.name,
+                            message=f"角色不存在: {', '.join(missing)}"
+                        ))
+                        failed_count += 1
+                        continue
+                    role_ids = [role.id for role in roles]
+
+            nav_create = NavigationLinkCreate(
+                category=link_in.category,
+                name=link_in.name,
+                url=link_in.url,
+                icon=link_in.icon,
+                description=link_in.description,
+                sort_order=link_in.sort_order,
+                is_active=link_in.is_active,
+                restrict_to_current_role=False,
+            )
+            await navigation_link.create_with_roles(db, obj_in=nav_create, role_ids=role_ids)
+            results.append(NavigationLinkImportResult(
+                success=True,
+                name=link_in.name,
+                message="导入成功"
+            ))
+            success_count += 1
+        except Exception as e:
+            logger.error(f"[导航管理] 导入导航链接 '{link_in.name}' 失败: {str(e)}")
+            results.append(NavigationLinkImportResult(
+                success=False,
+                name=link_in.name,
+                message=f"导入失败: {str(e)}"
+            ))
+            failed_count += 1
+
+    logger.info(f"[导航管理] 导入完成，成功 {success_count} 条，失败 {failed_count} 条")
+
+    return NavigationImportResponse(
+        total=len(links_in),
+        success_count=success_count,
+        failed_count=failed_count,
+        results=results,
+    )
 
 
 @router.post("", response_model=NavigationLinkResponse, status_code=status.HTTP_201_CREATED)

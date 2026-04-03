@@ -15,6 +15,7 @@ import {
   SafetyOutlined,
   SunOutlined,
   MoonOutlined,
+  AlertOutlined,
 } from '@ant-design/icons';
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -76,8 +77,19 @@ const Layout = () => {
         permission: 'monitor:read',
         children: [
           { key: '/monitor/list', label: '监控列表' },
-          { key: '/monitor/alerts', label: '告警管理' },
           { key: '/monitor/domains', label: '域名监控' },
+        ],
+      },
+      {
+        key: '/alerts',
+        icon: <AlertOutlined />,
+        label: '告警中心',
+        permission: 'alert:read',
+        children: [
+          { key: '/alerts/alertmanager', label: '告警中心' },
+          { key: '/alerts/alertmanager/silences', label: '抑制规则', permission: 'alert:manage_silence' },
+          { key: '/alerts/alertmanager/templates', label: '模板配置', permission: 'alert:manage_template' },
+          { key: '/alerts/alertmanager/history', label: '告警历史' },
         ],
       },
       {

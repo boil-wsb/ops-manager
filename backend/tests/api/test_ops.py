@@ -62,7 +62,6 @@ async def test_deployment_detail(client: AsyncClient):
     assert "id" in data or "deployment_id" in data
 
 
-@pytest.mark.skip(reason="需要修复")
 @pytest.mark.asyncio
 async def test_dns_records(client: AsyncClient):
     """Test DNS records endpoint."""
@@ -70,8 +69,7 @@ async def test_dns_records(client: AsyncClient):
     if not headers:
         pytest.skip("Cannot authenticate for this test")
 
-    response = await client.get("/api/v1/ops/dns-records", headers=headers)
+    response = await client.get("/api/v1/ops/dns", headers=headers)
     assert response.status_code == 200
     data = response.json()
-    assert "items" in data or isinstance(data, list)
-    assert "total" in data or "count" in data
+    assert isinstance(data, list) or "items" in data

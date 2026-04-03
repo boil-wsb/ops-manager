@@ -143,7 +143,7 @@ api.interceptors.request.use(
 
 api.interceptors.response.use(
   (response) => {
-    if (response.data && typeof response.data === 'object') {
+    if (response.data && typeof response.data === 'object' && !(response.data instanceof Blob)) {
       response.data = toCamelCaseObj(response.data as Record<string, unknown>);
     }
     return response;

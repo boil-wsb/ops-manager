@@ -1,0 +1,46 @@
+"""
+API v1 routes package.
+"""
+from app.api.v1 import (
+    assets,
+    audit_logs,
+    auth,
+    dashboard,
+    feishu_sync,
+    it_feedback,
+    it_feedback_notifications,
+    monitor,
+    navigation,
+    notification_groups,
+    ops,
+    pc_client_version,
+    permissions,
+    roles,
+    users,
+    alerts,
+    alert_silences,
+    alert_templates,
+    alert_history,
+)
+
+__all__ = [
+    "assets",
+    "audit_logs",
+    "auth",
+    "dashboard",
+    "feishu_sync",
+    "it_feedback",
+    "it_feedback_notifications",
+    "monitor",
+    "navigation",
+    "notification_groups",
+    "ops",
+    "pc_client_version",
+    "permissions",
+    "roles",
+    "users",
+    "alerts",
+    "alert_silences",
+    "alert_templates",
+    "alert_history",
+]

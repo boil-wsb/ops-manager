@@ -7,11 +7,6 @@ export interface ApiResponse<T> {
   success?: boolean;
 }
 
-export interface PaginationParams {
-  page: number;
-  pageSize: number;
-}
-
 export interface PaginationData<T> {
   total: number;
   items: T[];
@@ -263,3 +258,23 @@ export interface InspectionReport {
   details?: Record<string, unknown>;
   createdAt: string;
 }
+
+// Alert types (re-export from alert.ts)
+export type {
+  AlertReceiver,
+  AlertReceiverCreate,
+  AlertReceiverUpdate,
+  AlertSilence,
+  AlertSilenceCreate,
+  AlertSilenceUpdate,
+  AlertTemplate,
+  AlertTemplateType,
+  AlertTemplateCreate,
+  AlertTemplateUpdate,
+  AlertTemplatePreview,
+  AlertHistory,
+  AlertHistoryStatus,
+  AlertHistorySeverity,
+  AlertHistoryListParams,
+  PaginationParams,
+} from './alert';

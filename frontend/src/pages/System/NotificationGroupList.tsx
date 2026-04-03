@@ -173,6 +173,7 @@ const NotificationGroupList = () => {
       dataIndex: 'name',
       key: 'name',
       width: 150,
+      sorter: (a: NotificationGroup, b: NotificationGroup) => a.name.localeCompare(b.name),
       render: (text: string) => <span style={{ fontWeight: 500 }}>{text}</span>,
     },
     {
@@ -180,6 +181,7 @@ const NotificationGroupList = () => {
       dataIndex: 'notificationType',
       key: 'notificationType',
       width: 150,
+      sorter: (a: NotificationGroup, b: NotificationGroup) => (a.notificationType || '').localeCompare(b.notificationType || ''),
       render: (type: string) => {
         const option = NOTIFICATION_TYPE_OPTIONS.find((opt) => opt.value === type);
         return <Tag color="blue">{option?.label || type}</Tag>;
@@ -190,6 +192,7 @@ const NotificationGroupList = () => {
       dataIndex: 'description',
       key: 'description',
       ellipsis: true,
+      sorter: (a: NotificationGroup, b: NotificationGroup) => (a.description || '').localeCompare(b.description || ''),
       render: (text: string) => text || '-',
     },
     {
@@ -197,6 +200,7 @@ const NotificationGroupList = () => {
       dataIndex: 'members',
       key: 'members',
       width: 200,
+      sorter: (a: NotificationGroup, b: NotificationGroup) => (a.members?.length || 0) - (b.members?.length || 0),
       render: (members: NotificationGroup['members']) => {
         if (!members || members.length === 0) {
           return <Tag color="default">暂无成员</Tag>;
@@ -220,6 +224,7 @@ const NotificationGroupList = () => {
       dataIndex: 'isActive',
       key: 'isActive',
       width: 80,
+      sorter: (a: NotificationGroup, b: NotificationGroup) => (a.isActive === b.isActive ? 0 : a.isActive ? -1 : 1),
       render: (isActive: boolean) => (
         <Tag color={isActive ? 'success' : 'default'}>{isActive ? '启用' : '禁用'}</Tag>
       ),

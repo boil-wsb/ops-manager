@@ -57,3 +57,30 @@ class NavigationLinkGrouped(BaseSchema):
     """Schema for navigation links grouped by category."""
     category: str
     links: list[NavigationLinkResponse]
+
+
+class NavigationLinkImport(BaseSchema):
+    """Schema for importing a navigation link from CSV."""
+    category: str
+    name: str
+    url: str
+    icon: str | None = None
+    description: str | None = None
+    sort_order: int = 0
+    is_active: bool = True
+    role_names: str | None = None
+
+
+class NavigationLinkImportResult(BaseSchema):
+    """Schema for import result."""
+    success: bool
+    name: str
+    message: str
+
+
+class NavigationImportResponse(BaseSchema):
+    """Schema for bulk import response."""
+    total: int
+    success_count: int
+    failed_count: int
+    results: list[NavigationLinkImportResult]

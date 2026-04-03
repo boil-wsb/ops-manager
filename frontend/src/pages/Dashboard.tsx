@@ -5,6 +5,7 @@ import { monitorApi } from '../services/monitor';
 import { opsApi } from '../services/ops';
 import { assetApi } from '../services/assets';
 import { navigationApi } from '../services/navigation';
+import { dashboardApi } from '../services/dashboard';
 import { useAuthStore } from '../stores/authStore';
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -23,6 +24,12 @@ const iconMap: Record<string, React.ReactNode> = {
 const Dashboard = () => {
   const user = useAuthStore((state) => state.user);
   const isViewer = user?.roles?.some(role => role.name === 'viewer') ?? false;
+
+  const { data: terminalMetrics, isLoading: terminalLoading } = useQuery({
+    queryKey: ['my-terminal-metrics'],
+    queryFn: () => dashboardApi.getMyTerminalMetrics(),
+    enabled: isViewer,
+  });
 
   const { data: navigationGroups } = useQuery({
     queryKey: ['navigation-links'],
@@ -199,6 +206,137 @@ const Dashboard = () => {
           </Card>
         </Col>
       </Row>
+
+      {isViewer && terminalMetrics && (
+        <>
+          <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+            <Col xs={24} sm={12} lg={6}>
+              <Card loading={terminalLoading}>
+                <Statistic
+                  title="终端总数"
+                  value={terminalMetrics.summary.totalCount}
+                  suffix="个"
+                  style={{ color: '#1890ff' }}
+                />
+                <div style={{ marginTop: 8 }}>
+                  <Tag color="green">在线: {terminalMetrics.summary.onlineCount}</Tag>
+                  <Tag color="red">离线: {terminalMetrics.summary.offlineCount}</Tag>
+                </div>
+              </Card>
+            </Col>
+
+            <Col xs={24} sm={12} lg={6}>
+              <Card loading={terminalLoading}>
+                <Statistic
+                  title="活跃告警"
+                  value={terminalMetrics.summary.alertCount}
+                  suffix="个"
+                  style={{ color: terminalMetrics.summary.alertCount > 0 ? '#ff4d4f' : '#52c41a' }}
+                />
+              </Card>
+            </Col>
+
+            <Col xs={24} sm={12} lg={6}>
+              <Card loading={terminalLoading}>
+                <Statistic
+                  title="平均 CPU"
+                  value={terminalMetrics.summary.avgCpuUsage}
+                  suffix="%"
+                  style={{ color: '#13c2c2' }}
+                />
+              </Card>
+            </Col>
+
+            <Col xs={24} sm={12} lg={6}>
+              <Card loading={terminalLoading}>
+                <Statistic
+                  title="平均内存"
+                  value={terminalMetrics.summary.avgMemoryUsage}
+                  suffix="%"
+                  style={{ color: '#722ed1' }}
+                />
+              </Card>
+            </Col>
+          </Row>
+
+          <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+            <Col xs={24}>
+              <Card
+                title="终端详情"
+                loading={terminalLoading}
+              >
+                <Table
+                  dataSource={terminalMetrics.terminals}
+                  rowKey="id"
+                  pagination={{ pageSize: 10 }}
+                  size="small"
+                  columns={[
+                    {
+                      title: '主机名',
+                      dataIndex: 'hostname',
+                      key: 'hostname',
+                      width: 150,
+                    },
+                    {
+                      title: 'IP 地址',
+                      dataIndex: 'ipAddress',
+                      key: 'ipAddress',
+                      width: 130,
+                    },
+                    {
+                      title: 'CPU',
+                      dataIndex: 'cpuUsage',
+                      key: 'cpuUsage',
+                      width: 80,
+                      render: (val: number | null) => val !== null ? `${val}%` : '-',
+                    },
+                    {
+                      title: '内存',
+                      dataIndex: 'memoryUsage',
+                      key: 'memoryUsage',
+                      width: 80,
+                      render: (val: number | null) => val !== null ? `${val}%` : '-',
+                    },
+                    {
+                      title: '磁盘',
+                      dataIndex: 'diskUsage',
+                      key: 'diskUsage',
+                      width: 80,
+                      render: (val: number | null) => val !== null ? `${val}%` : '-',
+                    },
+                    {
+                      title: '状态',
+                      dataIndex: 'currentStatus',
+                      key: 'currentStatus',
+                      width: 80,
+                      render: (status: string) => {
+                        const colorMap: Record<string, string> = {
+                          online: 'green',
+                          offline: 'red',
+                          unknown: 'default',
+                        };
+                        const labelMap: Record<string, string> = {
+                          online: '在线',
+                          offline: '离线',
+                          unknown: '未知',
+                        };
+                        return <Tag color={colorMap[status] || 'default'}>{labelMap[status] || status}</Tag>;
+                      },
+                    },
+                    {
+                      title: '告警',
+                      dataIndex: 'alertCount',
+                      key: 'alertCount',
+                      width: 80,
+                      render: (count: number) => count > 0 ? <Tag color="red">{count}</Tag> : '-',
+                    },
+                  ]}
+                />
+              </Card>
+            </Col>
+          </Row>
+        </>
+      )}
 
       {!isViewer && (
         <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
