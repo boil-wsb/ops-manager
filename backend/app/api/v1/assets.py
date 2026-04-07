@@ -73,7 +73,7 @@ async def create_asset(
     request: Request,
     obj_in: AssetCreate,
     db: AsyncSession = Depends(get_db),
-    current_user=require_permissions(["asset:write"]),
+    current_user: User = Depends(require_permissions(["asset:write"])),
 ):
     """Create a new asset."""
     existing = await crud_asset.get_by_asset_id(db, asset_id=obj_in.asset_id)
@@ -93,7 +93,7 @@ async def create_asset(
 async def trigger_asset_sync(
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user=require_permissions(["asset:admin"]),
+    _: None = Depends(require_permissions(["asset:admin"])),
 ):
     """手动触发从 Prometheus 同步资产"""
     try:
@@ -122,7 +122,7 @@ async def trigger_asset_sync(
 async def sync_terminals_from_pc_info(
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user=require_permissions(["asset:admin"]),
+    _: None = Depends(require_permissions(["asset:admin"])),
 ):
     """从 Prometheus pc_info 指标同步终端资产"""
     import logging
@@ -320,7 +320,7 @@ async def import_prometheus_asset(
     request: Request,
     instance: str,
     db: AsyncSession = Depends(get_db),
-    current_user=require_permissions(["asset:write"]),
+    _: None = Depends(require_permissions(["asset:write"])),
 ):
     """从 Prometheus 导入指定节点为资产"""
     import logging
@@ -463,7 +463,7 @@ async def get_users_for_owner(
 async def get_asset(
     asset_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user=require_permissions(["asset:read"]),
+    current_user: User = Depends(require_permissions(["asset:read"])),
 ):
     """Get asset by ID."""
     asset = await crud_asset.get(db, id=asset_id)
@@ -547,7 +547,7 @@ async def delete_asset(
 async def get_asset_metrics(
     asset_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user=require_permissions(["asset:read"]),
+    current_user: User = Depends(require_permissions(["asset:read"])),
 ):
     """获取资产的实时指标数据"""
     from app.services.prometheus.client import get_prometheus_client
@@ -581,7 +581,7 @@ async def list_labels(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
-    current_user=require_permissions(["asset:read"]),
+    current_user: User = Depends(require_permissions(["asset:read"])),
 ):
     """List all labels."""
     labels = await crud_label.get_multi(db, skip=skip, limit=limit)
@@ -594,7 +594,7 @@ async def create_label(
     request: Request,
     obj_in: LabelCreate,
     db: AsyncSession = Depends(get_db),
-    current_user=require_permissions(["asset:write"]),
+    _: None = Depends(require_permissions(["asset:write"])),
 ):
     """Create a new label."""
     existing = await crud_label.get_by_name(db, name=obj_in.name)
@@ -611,7 +611,7 @@ async def delete_label(
     request: Request,
     label_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user=require_permissions(["asset:delete"]),
+    _: None = Depends(require_permissions(["asset:delete"])),
 ):
     """Delete label."""
     label = await crud_label.get(db, id=label_id)

@@ -31,7 +31,7 @@ async def list_audit_logs(
     end_time: datetime | None = Query(None, description="结束时间 (ISO 8601格式)"),
     keyword: str | None = Query(None, description="关键词搜索(对象名称、操作人名称)"),
     db: AsyncSession = Depends(get_db),
-    current_user=require_permissions(["system:audit:read"]),
+    current_user: None = Depends(require_permissions(["system:audit:read"])),
 ):
     """查询审计日志列表。
 
@@ -71,7 +71,7 @@ async def list_audit_logs(
 async def get_audit_log(
     log_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user=require_permissions(["system:audit:read"]),
+    current_user: None = Depends(require_permissions(["system:audit:read"])),
 ):
     """获取单条审计日志详情。
 
