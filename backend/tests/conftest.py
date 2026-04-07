@@ -40,16 +40,9 @@ def event_loop():
 
 @pytest.fixture(scope="session", autouse=True)
 async def setup_and_teardown_db():
-    """Setup database tables once at session start.
-    
-    In CI (ENVIRONMENT=testing), Alembic manages schema via alembic upgrade head.
-    Locally, we use create_all() for simplicity.
-    """
-    if os.environ.get("ENVIRONMENT") == "testing":
-        pass
-    else:
-        async with test_engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+    """Setup database tables once at session start."""
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     yield
 
 

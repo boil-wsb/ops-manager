@@ -166,13 +166,13 @@ class TestAlertHistoryModelHasFeishuField:
     def test_alert_history_has_feishu_open_message_id_field(self):
         """AlertHistory should have feishu_open_message_id attribute."""
         from app.models.alert import AlertHistory
+        from datetime import datetime, timezone
 
         history = AlertHistory(
             alertname="TestAlert",
             status="firing",
             severity="critical",
-            instance="192.168.1.1",
-            description="Test description",
+            starts_at=datetime.now(timezone.utc),
         )
 
         assert hasattr(history, "feishu_open_message_id")
@@ -180,13 +180,13 @@ class TestAlertHistoryModelHasFeishuField:
     def test_alert_history_feishu_open_message_id_default_is_none(self):
         """AlertHistory feishu_open_message_id default should be None."""
         from app.models.alert import AlertHistory
+        from datetime import datetime, timezone
 
         history = AlertHistory(
             alertname="TestAlert",
             status="firing",
             severity="critical",
-            instance="192.168.1.1",
-            description="Test description",
+            starts_at=datetime.now(timezone.utc),
         )
 
         assert history.feishu_open_message_id is None
