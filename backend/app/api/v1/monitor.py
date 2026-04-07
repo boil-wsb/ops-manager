@@ -41,7 +41,7 @@ crud_notification_channel = CRUDBase(NotificationChannel)
 
 
 async def get_asset_owner_name(asset: Asset, db: AsyncSession) -> str | None:
-    """根据 labels_data 中的 CustInfo 标签获取负责人名�?""
+    """根据 labels_data 中的 CustInfo 标签获取负责人名称"""
     labels_data = asset.labels_data or {}
     cust_info_tag = labels_data.get("CustInfo")
     if cust_info_tag:
@@ -59,7 +59,7 @@ async def get_my_terminals(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """获取当前用户负责的监控终端列�?""
+    """获取当前用户负责的监控终端列表"""
     query = select(Asset).where(Asset.asset_type == AssetType.TERMINAL)
 
     count_query = select(func.count()).select_from(query.subquery())
