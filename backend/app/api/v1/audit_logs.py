@@ -6,7 +6,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_db, require_permissions
+from app.api.deps import get_db
 from app.core.exceptions import NotFoundError
 from app.crud.audit_log import crud_audit_log
 from app.schemas.audit_log import AuditLogListResponse, AuditLogResponse
@@ -31,12 +31,10 @@ async def list_audit_logs(
     end_time: datetime | None = Query(None, description="结束时间 (ISO 8601格式)"),
     keyword: str | None = Query(None, description="关键词搜索(对象名称、操作人名称)"),
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["system:audit:read"])),
 ):
     """查询审计日志列表。
 
     支持分页、筛选、时间范围和关键字搜索。
-    仅限管理员访问。
     """
     skip = (page - 1) * page_size
 
@@ -71,12 +69,8 @@ async def list_audit_logs(
 async def get_audit_log(
     log_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["system:audit:read"])),
 ):
-    """获取单条审计日志详情。
-
-    仅限管理员访问。
-    """
+    """获取单条审计日志详情。"""
     audit_log = await crud_audit_log.get_by_id(db, log_id=log_id)
     if not audit_log:
         raise NotFoundError(detail=f"Audit log with ID {log_id} not found")

@@ -113,7 +113,6 @@ async def list_monitors(
     status: str | None = Query(None),
     is_enabled: bool | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["monitor:read"]))
 ):
     """List all monitors with filters."""
     query = select(Monitor)
@@ -227,7 +226,6 @@ async def list_alerts(
     severity: str | None = Query(None),
     monitor_id: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["monitor:read"]))
 ):
     """List all alerts with filters."""
     query = select(Alert)
@@ -305,7 +303,6 @@ async def list_alert_rules(
     limit: int = Query(20, ge=1, le=100),
     is_enabled: bool | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["monitor:read"]))
 ):
     """List all alert rules."""
     query = select(AlertRule)

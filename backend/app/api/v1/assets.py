@@ -581,7 +581,6 @@ async def list_labels(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_permissions(["asset:read"])),
 ):
     """List all labels."""
     labels = await crud_label.get_multi(db, skip=skip, limit=limit)
