@@ -178,7 +178,7 @@ class AlertTemplateService:
             var_path = match.group(1).strip()
             idx = int(match.group(2))
             value = _resolve_path(var_path, ctx)
-            if isinstance(value, (list, tuple)) and idx < len(value):
+            if isinstance(value, list | tuple) and idx < len(value):
                 return str(value[idx])
             return ""
 

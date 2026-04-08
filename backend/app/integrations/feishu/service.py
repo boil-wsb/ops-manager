@@ -44,7 +44,7 @@ class FeishuService:
         self._check_enabled()
         client = self._get_client()
 
-        message_content = content if isinstance(content, (str, dict)) else {"text": content or ""}
+        message_content = content if isinstance(content, str | dict) else {"text": content or ""}
 
         request: CreateMessageRequest = (
             CreateMessageRequest.builder()

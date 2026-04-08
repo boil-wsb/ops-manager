@@ -424,7 +424,7 @@ def _object_to_dict(obj: Any) -> Any:
             pass
 
     # Handle list of objects
-    if isinstance(obj, (list, tuple)):
+    if isinstance(obj, list | tuple):
         return [_object_to_dict(item) for item in obj]
 
     # Return as-is for primitive types
@@ -451,7 +451,7 @@ def _serialize_value(value: Any) -> Any:
         return str(value)
     if isinstance(value, dict):
         return {k: _serialize_value(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, list | tuple):
         return [_serialize_value(item) for item in value]
     return str(value)
 

@@ -92,7 +92,7 @@ def _mask_value(value: Any) -> str:
         else:
             # Show first 2 and last 2 characters
             return value[:2] + '*' * (len(value) - 4) + value[-2:]
-    elif isinstance(value, (int, float, bool)):
+    elif isinstance(value, int | float | bool):
         return '[MASKED]'
     else:
         return '[MASKED]'

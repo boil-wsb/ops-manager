@@ -96,7 +96,7 @@ frontend-lint:
     - ops-docker
   before_script:
     - cd frontend
-    - npm install --frozen-lockfile
+    - npm install --frozen-lockfile --registry=https://registry.npmmirror.com 
   script:
     - npm run lint
   rules:
@@ -113,7 +113,7 @@ frontend-typecheck:
     - ops-docker
   before_script:
     - cd frontend
-    - npm install --frozen-lockfile
+    - npm install --frozen-lockfile --registry=https://registry.npmmirror.com 
   script:
     - npx tsc --noEmit
   rules:
