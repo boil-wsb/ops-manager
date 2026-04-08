@@ -7,16 +7,15 @@ from datetime import datetime
 from typing import Any
 
 from celery import shared_task
-from sqlalchemy import select, case
+from sqlalchemy import case, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
-from app.models.alert import AlertHistory, AlertSilence, AlertTemplate
+from app.models.alert import AlertTemplate
 from app.models.asset import Asset
 from app.models.user import User
 from app.services.alerts.alert_inhibition import alert_inhibition_service
 from app.services.alerts.alert_template import alert_template_service
-from app.services.alerts.email_notification import email_notification_service
 from app.services.alerts.feishu_notification import get_feishu_notification_service
 from app.tasks.utils import get_celery_async_session
 
@@ -52,9 +51,9 @@ async def send_alert_notification(
         email_templates_result = await db.execute(
             select(AlertTemplate).where(
                 AlertTemplate.template_type == "email",
-                AlertTemplate.is_active == True,
+                AlertTemplate.is_active.is_(True),
             ).order_by(
-                case((AlertTemplate.is_default == True, 0), else_=1)
+                case((AlertTemplate.is_default.is_(True), 0), else_=1)
             )
         )
         email_templates = list(email_templates_result.scalars().all())
@@ -62,9 +61,9 @@ async def send_alert_notification(
         feishu_templates_result = await db.execute(
             select(AlertTemplate).where(
                 AlertTemplate.template_type == "feishu",
-                AlertTemplate.is_active == True,
+                AlertTemplate.is_active.is_(True),
             ).order_by(
-                case((AlertTemplate.is_default == True, 0), else_=1)
+                case((AlertTemplate.is_default.is_(True), 0), else_=1)
             )
         )
         feishu_templates = list(feishu_templates_result.scalars().all())
@@ -248,7 +247,7 @@ async def _send_notification_by_instance(
                     )
                     logger.info(f"[DEBUG] Rendered card config: {rendered_card_str[:500]}")
                     card = json.loads(rendered_card_str)
-                    logger.info(f"[DEBUG] Using card_config from template")
+                    logger.info("[DEBUG] Using card_config from template")
 
                 if not card:
                     card = feishu_svc.build_alert_card(
@@ -259,7 +258,7 @@ async def _send_notification_by_instance(
                         description=description,
                         starts_at=starts_at_str,
                     )
-                    logger.info(f"[DEBUG] Using default build_alert_card")
+                    logger.info("[DEBUG] Using default build_alert_card")
 
                 logger.info(f"[DEBUG] Feishu card JSON content: {card}")
 

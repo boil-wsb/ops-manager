@@ -94,7 +94,7 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
             result = await db.execute(
                 select(User.id).where(
                     User.full_name == obj_in.owner_name,
-                    User.feishu_open_id != None,
+                    User.feishu_open_id is not None,
                 )
             )
             user_id = result.scalar_one_or_none()
@@ -167,7 +167,7 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
                 result = await db.execute(
                     select(User.id).where(
                         User.full_name == owner_name_value,
-                        User.feishu_open_id != None,
+                        User.feishu_open_id is not None,
                     )
                 )
                 resolved_owner_id = result.scalar_one_or_none()

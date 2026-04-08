@@ -3,11 +3,11 @@ Alert CRUD operations.
 """
 from datetime import datetime
 
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.base import CRUDBase
-from app.models.alert import AlertSilence, AlertTemplate, AlertHistory
+from app.models.alert import AlertHistory, AlertSilence, AlertTemplate
 from app.schemas.alert import (
     AlertSilenceCreate,
     AlertSilenceUpdate,
@@ -31,7 +31,7 @@ class CRUDAlertSilence(CRUDBase[AlertSilence, AlertSilenceCreate, AlertSilenceUp
         result = await db.execute(
             select(AlertSilence).where(
                 and_(
-                    AlertSilence.is_active == True,
+                    AlertSilence.is_active,
                     AlertSilence.starts_at <= current_time,
                     AlertSilence.ends_at >= current_time
                 )
@@ -70,8 +70,8 @@ class CRUDAlertTemplate(CRUDBase[AlertTemplate, AlertTemplateCreate, AlertTempla
             select(AlertTemplate).where(
                 and_(
                     AlertTemplate.template_type == template_type,
-                    AlertTemplate.is_default == True,
-                    AlertTemplate.is_active == True
+                    AlertTemplate.is_default,
+                    AlertTemplate.is_active
                 )
             )
         )
@@ -83,7 +83,7 @@ class CRUDAlertTemplate(CRUDBase[AlertTemplate, AlertTemplateCreate, AlertTempla
         template_type: str | None = None
     ) -> list[AlertTemplate]:
         """Get all active templates, optionally filtered by type."""
-        query = select(AlertTemplate).where(AlertTemplate.is_active == True)
+        query = select(AlertTemplate).where(AlertTemplate.is_active)
         if template_type:
             query = query.where(AlertTemplate.template_type == template_type)
 

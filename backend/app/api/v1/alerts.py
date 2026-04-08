@@ -5,16 +5,15 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request, status
-from sqlalchemy import select, func
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
 from app.core.logging import get_logger
 from app.crud.crud_alert import crud_alert_history, crud_alert_silence, crud_alert_template
+from app.models.alert import AlertHistory, AlertHistoryStatus
 from app.schemas.alert import AlertmanagerWebhookPayload
-from app.models.alert import AlertHistoryStatus
 from app.services.alerts.alert_inhibition import alert_inhibition_service
-from app.services.alerts.alert_template import alert_template_service
 from app.services.alerts.notification_task import send_alert_notification
 
 router = APIRouter()
@@ -35,7 +34,7 @@ async def get_alert_stats(
     total_silences = silences_result.scalar() or 0
 
     active_silences_result = await db.execute(
-        select(func.count()).select_from(crud_alert_silence.model).where(crud_alert_silence.model.is_active == True)
+        select(func.count()).select_from(crud_alert_silence.model).where(crud_alert_silence.model.is_active)
     )
     active_silences = active_silences_result.scalar() or 0
 
@@ -44,7 +43,7 @@ async def get_alert_stats(
     total_templates = templates_result.scalar() or 0
 
     active_templates_result = await db.execute(
-        select(func.count()).select_from(crud_alert_template.model).where(crud_alert_template.model.is_active == True)
+        select(func.count()).select_from(crud_alert_template.model).where(crud_alert_template.model.is_active)
     )
     active_templates = active_templates_result.scalar() or 0
 
@@ -127,6 +126,30 @@ async def process_alert(
         alert_status = AlertHistoryStatus.RESOLVED
     else:
         alert_status = AlertHistoryStatus.FIRING
+
+    instance = labels.get("instance", "")
+
+    # When resolved, batch-update all non-resolved records with same alertname+instance
+    if status_str == "resolved" and alertname and instance:
+        try:
+            pending_query = select(AlertHistory).where(
+                and_(
+                    AlertHistory.alertname == alertname,
+                    AlertHistory.labels.op("->>")("instance").astext == instance,
+                    AlertHistory.status != AlertHistoryStatus.RESOLVED.value,
+                )
+            )
+            pending_result = await db.execute(pending_query)
+            pending_alerts = pending_result.scalars().all()
+            if pending_alerts:
+                now = datetime.utcnow()
+                for pending in pending_alerts:
+                    pending.status = AlertHistoryStatus.RESOLVED.value
+                    pending.ends_at = now
+                await db.commit()
+                logger.info(f"Batch resolved {len(pending_alerts)} pending alerts for alertname={alertname}, instance={instance}")
+        except Exception as exc:
+            logger.warning(f"Failed to batch resolve pending alerts: {exc}")
 
     # Check if alert should be suppressed
     try:

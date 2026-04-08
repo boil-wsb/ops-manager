@@ -14,6 +14,8 @@ const UserList = () => {
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const [searchParams, setSearchParams] = useState({
+    page: 1,
+    page_size: 10,
     keyword: '',
     isActive: undefined as boolean | undefined,
   });
@@ -22,7 +24,12 @@ const UserList = () => {
 
   const { data, isLoading } = useQuery({
     queryKey: ['users', searchParams],
-    queryFn: () => userApi.getUsers(searchParams),
+    queryFn: () => userApi.getUsers({
+      page: searchParams.page,
+      page_size: searchParams.page_size,
+      keyword: searchParams.keyword,
+      is_active: searchParams.isActive,
+    }),
   });
 
   const deleteMutation = useMutation({
@@ -145,14 +152,14 @@ const UserList = () => {
             placeholder="搜索用户名/邮箱/姓名"
             prefix={<SearchOutlined />}
             value={searchParams.keyword}
-            onChange={(e) => setSearchParams({ ...searchParams, keyword: e.target.value })}
+            onChange={(e) => setSearchParams({ ...searchParams, keyword: e.target.value, page: 1 })}
             style={{ width: 250 }}
             allowClear
           />
           <Select
             placeholder="状态"
             value={searchParams.isActive}
-            onChange={(value) => setSearchParams({ ...searchParams, isActive: value })}
+            onChange={(value) => setSearchParams({ ...searchParams, isActive: value, page: 1 })}
             style={{ width: 120 }}
             allowClear
           >
@@ -173,10 +180,15 @@ const UserList = () => {
         rowKey="id"
         loading={isLoading}
         pagination={{
+          current: searchParams.page,
+          pageSize: searchParams.page_size,
           total: data?.total || 0,
           showSizeChanger: true,
           showQuickJumper: true,
           showTotal: (total) => `共 ${total} 条`,
+          onChange: (page, pageSize) => {
+            setSearchParams((prev) => ({ ...prev, page, page_size: pageSize }));
+          },
         }}
       />
 

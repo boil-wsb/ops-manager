@@ -61,10 +61,7 @@ class AlertInhibitionService:
 
         All silence match_labels must be present in alert_labels with exact values.
         """
-        for key, value in silence_labels.items():
-            if alert_labels.get(key) != value:
-                return False
-        return True
+        return all(alert_labels.get(key) == value for key, value in silence_labels.items())
 
     def _match_regex_pattern(
         self,
@@ -99,17 +96,13 @@ class AlertInhibitionService:
             Tuple of (is_suppressed, matched_silence)
         """
         for silence in silences:
-            # Check exact label match first
-            if silence.match_labels:
-                if self._match_exact_labels(alert_labels, silence.match_labels):
-                    logger.info(f"Alert matched silence rule: {silence.name}")
-                    return True, silence
+            if silence.match_labels and self._match_exact_labels(alert_labels, silence.match_labels):
+                logger.info(f"Alert matched silence rule: {silence.name}")
+                return True, silence
 
-            # Check regex pattern match
-            if silence.match_pattern:
-                if self._match_regex_pattern(alert_labels, silence.match_pattern):
-                    logger.info(f"Alert matched silence regex pattern: {silence.name}")
-                    return True, silence
+            if silence.match_pattern and self._match_regex_pattern(alert_labels, silence.match_pattern):
+                logger.info(f"Alert matched silence regex pattern: {silence.name}")
+                return True, silence
 
         return False, None
 

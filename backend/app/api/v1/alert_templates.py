@@ -9,9 +9,9 @@ from app.core.exceptions import NotFoundError
 from app.crud.crud_alert import crud_alert_template
 from app.schemas.alert import (
     AlertTemplateCreate,
-    AlertTemplateUpdate,
-    AlertTemplateResponse,
     AlertTemplatePreview,
+    AlertTemplateResponse,
+    AlertTemplateUpdate,
 )
 
 router = APIRouter()

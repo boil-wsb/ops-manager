@@ -90,7 +90,7 @@ const AlertReceiverFormModal = ({ visible, receiver, onClose }: AlertReceiverFor
       onCancel={onClose}
       confirmLoading={isLoading}
       width={600}
-      destroyOnClose
+      destroyOnHidden
     >
       <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
         <Form.Item

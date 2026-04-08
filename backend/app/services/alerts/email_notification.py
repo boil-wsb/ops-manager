@@ -52,11 +52,6 @@ class EmailNotificationService:
             HTML email body
         """
         status_color = "#dc3545" if status == "firing" else "#28a745"
-        severity_color = {
-            "critical": "#dc3545",
-            "warning": "#ffc107",
-            "info": "#17a2b8",
-        }.get(severity, "#6c757d")
 
         summary = annotations.get("summary", "")
         detail = annotations.get("detail", description)

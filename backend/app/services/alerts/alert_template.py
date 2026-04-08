@@ -183,7 +183,7 @@ class AlertTemplateService:
             return ""
 
         def _process_variable(match, ctx):
-            var_ref = match.group(0)
+            match.group(0)
             var_name = match.group(1)
             rest = match.group(2) or ""
             value = ctx.get(var_name, "")
@@ -197,7 +197,6 @@ class AlertTemplateService:
             return str(value) if value is not None else ""
 
         def _process_dot_variable(match, ctx):
-            var_ref = match.group(0)
             path = match.group(1).strip()
             rest = match.group(2) or ""
             value = ctx.get(path, "")

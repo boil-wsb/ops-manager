@@ -436,11 +436,12 @@ async def get_users_for_owner(
 ):
     """获取用户列表用于负责人选择，无需认证"""
     from sqlalchemy import select
+
     from app.models.user import User
 
     query = select(User.id, User.username, User.full_name, User.is_active).where(
-        User.is_active == True,
-        User.feishu_open_id != None,
+        User.is_active,
+        User.feishu_open_id is not None,
     )
 
     if keyword:

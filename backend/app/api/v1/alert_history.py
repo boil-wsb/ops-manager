@@ -1,13 +1,13 @@
 """
 Alert history API routes.
 """
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
 from app.core.exceptions import NotFoundError
 from app.crud.crud_alert import crud_alert_history
-from app.schemas.alert import AlertHistoryResponse, AlertHistoryListParams, AlertHistoryListResponse
+from app.schemas.alert import AlertHistoryListParams, AlertHistoryListResponse, AlertHistoryResponse
 
 router = APIRouter()
 

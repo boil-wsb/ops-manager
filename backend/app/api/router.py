@@ -4,6 +4,10 @@ API router configuration.
 from fastapi import APIRouter
 
 from app.api.v1 import (
+    alert_history,
+    alert_silences,
+    alert_templates,
+    alerts,
     assets,
     audit_logs,
     auth,
@@ -19,10 +23,6 @@ from app.api.v1 import (
     permissions,
     roles,
     users,
-    alerts,
-    alert_silences,
-    alert_templates,
-    alert_history,
 )
 
 api_router = APIRouter()

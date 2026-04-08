@@ -5,7 +5,7 @@
 """
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from celery import shared_task
@@ -103,7 +103,7 @@ def sync_terminal_metrics_task(self) -> dict[str, Any]:
                         network_in=None,
                         network_out=None,
                         uptime_hours=None,
-                        last_heartbeat=datetime.now(timezone.utc),
+                        last_heartbeat=datetime.now(UTC),
                         current_status="online",
                         alert_count=0,
                         alert_severity=None,

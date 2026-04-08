@@ -6,6 +6,7 @@ import { opsApi } from '../services/ops';
 import { assetApi } from '../services/assets';
 import { navigationApi } from '../services/navigation';
 import { dashboardApi } from '../services/dashboard';
+import alertApi from '../services/alert';
 import { useAuthStore } from '../stores/authStore';
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -39,8 +40,8 @@ const Dashboard = () => {
   const { data: alertStats, isLoading: alertLoading } = useQuery({
     queryKey: ['alert-stats'],
     queryFn: async () => {
-      const firing = await monitorApi.getAlerts({ status: 'firing', limit: 1 });
-      const resolved = await monitorApi.getAlerts({ status: 'resolved', limit: 1 });
+      const firing = await alertApi.getAlertHistory({ page: 1, pageSize: 1, status: 'firing' });
+      const resolved = await alertApi.getAlertHistory({ page: 1, pageSize: 1, status: 'resolved' });
       return {
         firing: firing.total || 0,
         resolved: resolved.total || 0,
@@ -95,7 +96,7 @@ const Dashboard = () => {
 
   const { data: recentAlerts, isLoading: alertsLoading } = useQuery({
     queryKey: ['recent-alerts'],
-    queryFn: () => monitorApi.getAlerts({ limit: 5 }),
+    queryFn: () => alertApi.getAlertHistory({ page: 1, pageSize: 5 }),
   });
 
   const { data: recentDeployments, isLoading: deploymentsLoading } = useQuery({
@@ -164,7 +165,7 @@ const Dashboard = () => {
                   title="活跃告警"
                   value={alertStats?.firing || 0}
                   suffix="个"
-                  style={{ color: alertStats?.firing > 0 ? '#ff4d4f' : '#52c41a' }}
+                  style={{ color: (alertStats?.firing ?? 0) > 0 ? '#ff4d4f' : '#52c41a' }}
                 />
                 <div style={{ marginTop: 8 }}>
                   <Tag color="orange">待处理: {alertStats?.firing || 0}</Tag>
@@ -351,8 +352,8 @@ const Dashboard = () => {
                 columns={[
                   {
                     title: '名称',
-                    dataIndex: 'alertName',
-                    key: 'alertName',
+                    dataIndex: 'alertname',
+                    key: 'alertname',
                     ellipsis: true,
                   },
                   {

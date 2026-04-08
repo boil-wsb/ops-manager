@@ -593,8 +593,8 @@ def _start_callback_client() -> None:
     try:
         _ws_client.start()
         logger.info("WebSocket client started")
-    except RuntimeError as e:
-        logger.warning(f"WebSocket client cannot start (event loop conflict). "
+    except RuntimeError:
+        logger.warning("WebSocket client cannot start (event loop conflict). "
                       "This is expected in uvicorn reload mode. "
                       "Use 'uvicorn app.main:app' without --reload for production.")
 
@@ -645,10 +645,7 @@ def _do_im_message_receive_v1(data: Any) -> Any:
         content = getattr(event, 'content', None)
         if content:
             try:
-                if isinstance(content, str):
-                    msg_dict = lark.JSON.unmarshal(content)
-                else:
-                    msg_dict = content
+                msg_dict = lark.JSON.unmarshal(content) if isinstance(content, str) else content
                 msg_type = msg_dict.get('msg_type', '') if isinstance(msg_dict, dict) else ''
                 text_content = msg_dict.get('text', '') if isinstance(msg_dict, dict) else ''
 
@@ -659,12 +656,16 @@ def _do_im_message_receive_v1(data: Any) -> Any:
             except Exception as e:
                 logger.error(f"Error parsing message content: {e}")
 
-        from lark_oapi.event.callback.model.p2_im_message_receive_v1 import P2ImMessageReceiveResponse
+        from lark_oapi.event.callback.model.p2_im_message_receive_v1 import (
+            P2ImMessageReceiveResponse,
+        )
         return P2ImMessageReceiveResponse(None)
 
     except Exception as e:
         logger.error(f"Error processing message: {e}")
-        from lark_oapi.event.callback.model.p2_im_message_receive_v1 import P2ImMessageReceiveResponse
+        from lark_oapi.event.callback.model.p2_im_message_receive_v1 import (
+            P2ImMessageReceiveResponse,
+        )
         return P2ImMessageReceiveResponse(None)
 
 

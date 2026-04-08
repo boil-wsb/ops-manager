@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_db
 from app.core.exceptions import NotFoundError
 from app.crud.crud_alert import crud_alert_silence
-from app.schemas.alert import AlertSilenceCreate, AlertSilenceUpdate, AlertSilenceResponse
+from app.schemas.alert import AlertSilenceCreate, AlertSilenceResponse
 
 router = APIRouter()
 

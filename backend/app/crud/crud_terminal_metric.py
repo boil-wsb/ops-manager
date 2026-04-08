@@ -1,10 +1,10 @@
 """
 Terminal Metric CRUD operations.
 """
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.base import CRUDBase
@@ -99,7 +99,7 @@ class CRUDBerminalMetric(CRUDBase[TerminalMetric, Any, Any]):
         result = await db.execute(query)
         metric = result.scalar_one_or_none()
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         if metric:
             metric.owner_username = owner_username
@@ -151,7 +151,6 @@ class CRUDBerminalMetric(CRUDBase[TerminalMetric, Any, Any]):
         metrics_data: list[dict[str, Any]],
     ) -> int:
         """Bulk insert or update terminal metrics."""
-        now = datetime.now(timezone.utc)
         created_count = 0
 
         for data in metrics_data:

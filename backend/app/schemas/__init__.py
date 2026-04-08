@@ -2,16 +2,16 @@
 Schemas package.
 """
 from app.schemas.alert import (
-    AlertSilenceCreate,
-    AlertSilenceUpdate,
-    AlertSilenceResponse,
-    AlertTemplateCreate,
-    AlertTemplateUpdate,
-    AlertTemplateResponse,
-    AlertHistoryResponse,
     AlertHistoryListParams,
     AlertHistoryListResponse,
+    AlertHistoryResponse,
     AlertmanagerWebhookPayload,
+    AlertSilenceCreate,
+    AlertSilenceResponse,
+    AlertSilenceUpdate,
+    AlertTemplateCreate,
+    AlertTemplateResponse,
+    AlertTemplateUpdate,
 )
 
 __all__ = [

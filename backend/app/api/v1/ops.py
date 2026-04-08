@@ -11,7 +11,6 @@ from app.api.deps import get_db, require_permissions
 from app.core.audit import audit_log
 from app.core.exceptions import NotFoundError
 from app.crud.base import CRUDBase
-from app.models.user import User
 from app.models.ops import (
     Certificate,
     Deployment,
@@ -19,6 +18,7 @@ from app.models.ops import (
     InspectionReport,
     InspectionTask,
 )
+from app.models.user import User
 from app.schemas.ops import (
     CertificateCreate,
     CertificateResponse,

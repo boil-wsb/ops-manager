@@ -28,7 +28,7 @@ function useListQuery<T, TParams>(
 
   const [pagination, setPagination] = useState<PaginationState>({
     current: 1,
-    pageSize: 20,
+    pageSize: 10,
   });
 
   const [filter, setFilter] = useState<TParams>((initialFilter as TParams) || ({} as TParams));
