@@ -1,6 +1,7 @@
 """
 Notification group management API routes.
 """
+
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status

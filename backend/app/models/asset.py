@@ -1,6 +1,7 @@
 """
 Asset models.
 """
+
 import enum
 from datetime import datetime
 from typing import Any, Optional
@@ -24,6 +25,7 @@ from app.models.base import BaseModel
 
 class AssetType(enum.StrEnum):
     """Asset type enum."""
+
     SERVER = "SERVER"
     VM = "VM"
     NETWORK = "NETWORK"
@@ -33,6 +35,7 @@ class AssetType(enum.StrEnum):
 
 class AssetStatus(enum.StrEnum):
     """Asset status enum."""
+
     ACTIVE = "ACTIVE"
     OFFLINE = "OFFLINE"
     MAINTENANCE = "MAINTENANCE"
@@ -41,6 +44,7 @@ class AssetStatus(enum.StrEnum):
 
 class AssetSource(enum.StrEnum):
     """Asset source enum."""
+
     MANUAL = "MANUAL"
     PROMETHEUS = "PROMETHEUS"
     IMPORTED = "IMPORTED"
@@ -48,6 +52,7 @@ class AssetSource(enum.StrEnum):
 
 class SyncStatus(enum.StrEnum):
     """Sync status enum."""
+
     PENDING = "PENDING"
     SYNCED = "SYNCED"
     ERROR = "ERROR"
@@ -74,10 +79,7 @@ class Label(BaseModel):
 
     # Relationships
     assets: Mapped[list["Asset"]] = relationship(
-        "Asset",
-        secondary=asset_labels,
-        back_populates="labels",
-        lazy="selectin"
+        "Asset", secondary=asset_labels, back_populates="labels", lazy="selectin"
     )
 
     def __repr__(self) -> str:
@@ -94,9 +96,7 @@ class Asset(BaseModel):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     asset_type: Mapped[AssetType] = mapped_column(SQLEnum(AssetType), nullable=False)
     status: Mapped[AssetStatus] = mapped_column(
-        SQLEnum(AssetStatus),
-        default=AssetStatus.ACTIVE,
-        nullable=False
+        SQLEnum(AssetStatus), default=AssetStatus.ACTIVE, nullable=False
     )
 
     # Network info
@@ -120,16 +120,12 @@ class Asset(BaseModel):
 
     # Prometheus sync info
     source: Mapped[str] = mapped_column(
-        String(50),
-        default=AssetSource.MANUAL.value,
-        nullable=False
+        String(50), default=AssetSource.MANUAL.value, nullable=False
     )
     prometheus_instance: Mapped[str | None] = mapped_column(String(255), nullable=True)
     last_sync_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     sync_status: Mapped[str] = mapped_column(
-        String(50),
-        default=SyncStatus.PENDING.value,
-        nullable=False
+        String(50), default=SyncStatus.PENDING.value, nullable=False
     )
 
     # Location info
@@ -145,25 +141,17 @@ class Asset(BaseModel):
 
     # Relationships
     owner_id: Mapped[int | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     owner: Mapped[Optional["User"]] = relationship("User", lazy="selectin")
     labels: Mapped[list["Label"]] = relationship(
-        "Label",
-        secondary=asset_labels,
-        back_populates="assets",
-        lazy="selectin"
+        "Label", secondary=asset_labels, back_populates="assets", lazy="selectin"
     )
     monitors: Mapped[list["Monitor"]] = relationship(
-        "Monitor",
-        back_populates="asset",
-        lazy="selectin"
+        "Monitor", back_populates="asset", lazy="selectin"
     )
     terminal_metrics: Mapped[list["TerminalMetric"]] = relationship(
-        "TerminalMetric",
-        back_populates="asset",
-        lazy="selectin"
+        "TerminalMetric", back_populates="asset", lazy="selectin"
     )
 
     # Indexes
@@ -183,16 +171,13 @@ class AssetHistory(BaseModel):
     __tablename__ = "asset_history"
 
     asset_id: Mapped[int] = mapped_column(
-        ForeignKey("assets.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True
+        ForeignKey("assets.id", ondelete="CASCADE"), nullable=False, index=True
     )
     action: Mapped[str] = mapped_column(String(50), nullable=False)  # create, update, delete
     changes: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
     operator_id: Mapped[int | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     operator: Mapped[Optional["User"]] = relationship("User", lazy="selectin")
 

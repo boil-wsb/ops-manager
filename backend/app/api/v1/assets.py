@@ -1,6 +1,7 @@
 """
 Asset management API routes.
 """
+
 from datetime import datetime
 from typing import Any
 
@@ -63,7 +64,9 @@ async def list_assets(
         keyword=keyword,
         owner_id=owner_id_filter,
     )
-    serialized_items = [AssetResponse.model_validate(item).model_dump(by_alias=True) for item in items]
+    serialized_items = [
+        AssetResponse.model_validate(item).model_dump(by_alias=True) for item in items
+    ]
     return api_response(data={"total": total, "items": serialized_items})
 
 
@@ -151,9 +154,7 @@ async def sync_terminals_from_pc_info(
             try:
                 asset_id = f"TERMINAL-{hostname}"
 
-                existing_result = await db.execute(
-                    select(Asset).where(Asset.asset_id == asset_id)
-                )
+                existing_result = await db.execute(select(Asset).where(Asset.asset_id == asset_id))
                 existing_asset = existing_result.scalar_one_or_none()
 
                 pc_info_labels = terminal.get("pc_info_labels", {})
@@ -190,9 +191,13 @@ async def sync_terminals_from_pc_info(
                 if terminal.get("cpu_cores"):
                     terminal_data["cpu_cores"] = int(terminal.get("cpu_cores"))
                 if terminal.get("memory_total"):
-                    terminal_data["memory_gb"] = int(terminal.get("memory_total") / (1024 * 1024 * 1024))
+                    terminal_data["memory_gb"] = int(
+                        terminal.get("memory_total") / (1024 * 1024 * 1024)
+                    )
                 if terminal.get("disk_total"):
-                    terminal_data["disk_gb"] = int(terminal.get("disk_total") / (1024 * 1024 * 1024))
+                    terminal_data["disk_gb"] = int(
+                        terminal.get("disk_total") / (1024 * 1024 * 1024)
+                    )
                 if terminal.get("os_type"):
                     terminal_data["os_type"] = terminal.get("os_type")
                 if terminal.get("os_version"):
@@ -258,7 +263,9 @@ async def list_terminals(
         keyword=keyword,
         owner_id=owner_id_filter,
     )
-    serialized_items = [AssetResponse.model_validate(item).model_dump(by_alias=True) for item in items]
+    serialized_items = [
+        AssetResponse.model_validate(item).model_dump(by_alias=True) for item in items
+    ]
     return api_response(data={"total": total, "items": serialized_items})
 
 
@@ -295,16 +302,18 @@ async def discover_prometheus_assets(
         ip_address = instance.split(":")[0] if ":" in instance else instance
 
         if ip_address and ip_address not in existing_ips:
-            discovered_nodes.append({
-                "instance": instance,
-                "ip_address": ip_address,
-                "nodename": node.get("nodename", ""),
-                "sysname": node.get("sysname", ""),
-                "release": node.get("release", ""),
-                "machine": node.get("machine", ""),
-                "job": node.get("job", ""),
-                "env": node.get("env", ""),
-            })
+            discovered_nodes.append(
+                {
+                    "instance": instance,
+                    "ip_address": ip_address,
+                    "nodename": node.get("nodename", ""),
+                    "sysname": node.get("sysname", ""),
+                    "release": node.get("release", ""),
+                    "machine": node.get("machine", ""),
+                    "job": node.get("job", ""),
+                    "env": node.get("env", ""),
+                }
+            )
 
     return {
         "total": len(nodes),
@@ -349,7 +358,9 @@ async def import_prometheus_asset(
                     "asset_id": asset_obj.asset_id,
                     "name": asset_obj.name,
                     "ip_address": asset_obj.ip_address,
-                } if asset_obj else None,
+                }
+                if asset_obj
+                else None,
             }
         else:
             error_msg = result.get("error", "Unknown error")
@@ -373,7 +384,9 @@ async def get_asset_tree(
     if is_viewer_role(current_user):
         owner_id_filter = current_user.id
 
-    assets, _ = await crud_asset.get_multi_with_filters(db, skip=0, limit=1000, owner_id=owner_id_filter)
+    assets, _ = await crud_asset.get_multi_with_filters(
+        db, skip=0, limit=1000, owner_id=owner_id_filter
+    )
 
     tree: dict = {}
 
@@ -399,19 +412,21 @@ async def get_asset_tree(
                 "children": [],
             }
 
-        tree[idc]["children"][region]["children"][rack]["children"].append({
-            "key": f"asset-{asset.id}",
-            "title": f"{asset.asset_id} - {asset.name}",
-            "is_leaf": True,
-            "data": {
-                "id": asset.id,
-                "asset_id": asset.asset_id,
-                "name": asset.name,
-                "type": asset.asset_type.value,
-                "status": asset.status.value,
-                "ip": asset.ip_address,
-            },
-        })
+        tree[idc]["children"][region]["children"][rack]["children"].append(
+            {
+                "key": f"asset-{asset.id}",
+                "title": f"{asset.asset_id} - {asset.name}",
+                "is_leaf": True,
+                "data": {
+                    "id": asset.id,
+                    "asset_id": asset.asset_id,
+                    "name": asset.name,
+                    "type": asset.asset_type.value,
+                    "status": asset.status.value,
+                    "ip": asset.ip_address,
+                },
+            }
+        )
 
     result = []
     for idc_node in tree.values():
@@ -446,8 +461,7 @@ async def get_users_for_owner(
 
     if keyword:
         query = query.where(
-            (User.username.ilike(f"%{keyword}%"))
-            | (User.full_name.ilike(f"%{keyword}%"))
+            (User.username.ilike(f"%{keyword}%")) | (User.full_name.ilike(f"%{keyword}%"))
         )
 
     query = query.limit(limit)
@@ -455,8 +469,7 @@ async def get_users_for_owner(
     users = result.all()
 
     return [
-        {"id": u.id, "username": u.username, "full_name": u.full_name or u.username}
-        for u in users
+        {"id": u.id, "username": u.username, "full_name": u.full_name or u.username} for u in users
     ]
 
 

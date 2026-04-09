@@ -1,6 +1,7 @@
 """
 Feishu service for sending messages.
 """
+
 import logging
 from typing import Any
 
@@ -17,11 +18,14 @@ class FeishuService:
         )
         if self._enabled:
             import lark_oapi as lark
-            self._client = lark.Client.builder() \
-                .app_id(settings.feishu_app_id) \
-                .app_secret(settings.feishu_app_secret) \
-                .log_level(lark.LogLevel.INFO) \
+
+            self._client = (
+                lark.Client.builder()
+                .app_id(settings.feishu_app_id)
+                .app_secret(settings.feishu_app_secret)
+                .log_level(lark.LogLevel.INFO)
                 .build()
+            )
 
     def _check_enabled(self) -> None:
         if not self._enabled:
@@ -72,7 +76,7 @@ class FeishuService:
         )
 
         if response.data:
-            msg_id = getattr(response.data, 'message_id', None)
+            msg_id = getattr(response.data, "message_id", None)
             return {
                 "message_id": msg_id,
                 "code": response.code,
@@ -119,42 +123,38 @@ class FeishuService:
 
         if tags:
             for tag in tags:
-                label = tag.get('label', '')
-                value = tag.get('value', '')
+                label = tag.get("label", "")
+                value = tag.get("value", "")
                 icon = tag_icon_map.get(label, "")
 
-                elements.append({
-                    "tag": "column_set",
-                    "flex_mode": "flow",
-                    "columns": [
-                        {
-                            "tag": "column",
-                            "width": "auto",
-                            "elements": [
-                                {
-                                    "tag": "div",
-                                    "text": {
-                                        "tag": "lark_md",
-                                        "content": f"**{icon} {label}**"
+                elements.append(
+                    {
+                        "tag": "column_set",
+                        "flex_mode": "flow",
+                        "columns": [
+                            {
+                                "tag": "column",
+                                "width": "auto",
+                                "elements": [
+                                    {
+                                        "tag": "div",
+                                        "text": {
+                                            "tag": "lark_md",
+                                            "content": f"**{icon} {label}**",
+                                        },
                                     }
-                                }
-                            ]
-                        },
-                        {
-                            "tag": "column",
-                            "width": "auto",
-                            "elements": [
-                                {
-                                    "tag": "div",
-                                    "text": {
-                                        "tag": "lark_md",
-                                        "content": value
-                                    }
-                                }
-                            ]
-                        }
-                    ]
-                })
+                                ],
+                            },
+                            {
+                                "tag": "column",
+                                "width": "auto",
+                                "elements": [
+                                    {"tag": "div", "text": {"tag": "lark_md", "content": value}}
+                                ],
+                            },
+                        ],
+                    }
+                )
 
         if buttons:
             elements.append({"tag": "hr"})
@@ -165,48 +165,33 @@ class FeishuService:
                 btn_value = str(btn.get("value", btn_text))
                 btn_type = btn.get("type", "primary")
 
-                btn_column_elements.append({
-                    "tag": "button",
-                    "text": {
-                        "tag": "plain_text",
-                        "content": btn_text
-                    },
-                    "type": btn_type,
-                    "width": "fill",
-                    "behaviors": [
-                        {
-                            "type": "callback",
-                            "value": {
-                                "action": btn_value
-                            }
-                        }
-                    ]
-                })
-
-            elements.append({
-                "tag": "column_set",
-                "flex_mode": "right_to_left",
-                "columns": [
+                btn_column_elements.append(
                     {
-                        "tag": "column",
-                        "width": "stretch",
-                        "elements": btn_column_elements
+                        "tag": "button",
+                        "text": {"tag": "plain_text", "content": btn_text},
+                        "type": btn_type,
+                        "width": "fill",
+                        "behaviors": [{"type": "callback", "value": {"action": btn_value}}],
                     }
-                ]
-            })
+                )
+
+            elements.append(
+                {
+                    "tag": "column_set",
+                    "flex_mode": "right_to_left",
+                    "columns": [
+                        {"tag": "column", "width": "stretch", "elements": btn_column_elements}
+                    ],
+                }
+            )
 
         card_content = {
             "schema": "2.0",
             "header": {
-                "title": {
-                    "tag": "plain_text",
-                    "content": title
-                },
-                "template": header_template
+                "title": {"tag": "plain_text", "content": title},
+                "template": header_template,
             },
-            "body": {
-                "elements": elements
-            }
+            "body": {"elements": elements},
         }
 
         return self.send_message_to_user(
@@ -216,25 +201,28 @@ class FeishuService:
         )
 
     def update_card_to_handling(
-        self,
-        open_message_id: str,
-        feedback_id: str,
-        responsible_name: str = ""
+        self, open_message_id: str, feedback_id: str, responsible_name: str = ""
     ) -> dict[str, Any]:
         """Update card to handling status with input field for resolution notes."""
         card_content = {
             "schema": "2.0",
             "header": {
-                "title": {
-                    "tag": "plain_text",
-                    "content": "【终端卡顿 IT 反馈】"
-                },
-                "template": "blue"
+                "title": {"tag": "plain_text", "content": "【终端卡顿 IT 反馈】"},
+                "template": "blue",
             },
             "body": {
                 "elements": [
-                    {"tag": "div", "text": {"tag": "lark_md", "content": f"👤 **负责人**：{responsible_name or '待分配'}"}},
-                    {"tag": "div", "text": {"tag": "lark_md", "content": "⚡ **处理状态**：处理中"}},
+                    {
+                        "tag": "div",
+                        "text": {
+                            "tag": "lark_md",
+                            "content": f"👤 **负责人**：{responsible_name or '待分配'}",
+                        },
+                    },
+                    {
+                        "tag": "div",
+                        "text": {"tag": "lark_md", "content": "⚡ **处理状态**：处理中"},
+                    },
                     {"tag": "hr"},
                     {"tag": "div", "text": {"tag": "lark_md", "content": "**📝 处理方式**"}},
                     {
@@ -247,25 +235,22 @@ class FeishuService:
                                 "name": "notes",
                                 "placeholder": {
                                     "tag": "plain_text",
-                                    "content": "填写处理方式（必填）"
-                                }
+                                    "content": "填写处理方式（必填）",
+                                },
                             },
                             {
                                 "tag": "button",
-                                "text": {
-                                    "tag": "plain_text",
-                                    "content": "🔧 提交处理"
-                                },
+                                "text": {"tag": "plain_text", "content": "🔧 提交处理"},
                                 "type": "primary",
                                 "width": "fill",
                                 "name": "submit_resolution",
-                                "form_action_type": "submit"
-                            }
-                        ]
+                                "form_action_type": "submit",
+                            },
+                        ],
                     },
-                    {"tag": "hr"}
+                    {"tag": "hr"},
                 ]
-            }
+            },
         }
 
         return self._patch_message(open_message_id, card_content)
@@ -283,39 +268,56 @@ class FeishuService:
     ) -> dict[str, Any]:
         """Update card to resolved status."""
         elements = [
-            {"tag": "div", "text": {"tag": "lark_md", "content": f"👤 **反馈提交人**：{responsible_name or '待分配'}"}},
+            {
+                "tag": "div",
+                "text": {
+                    "tag": "lark_md",
+                    "content": f"👤 **反馈提交人**：{responsible_name or '待分配'}",
+                },
+            },
             {"tag": "div", "text": {"tag": "lark_md", "content": "⚡ **处理状态**：✅ 已解决"}},
         ]
 
         if client_ip:
-            elements.append({"tag": "div", "text": {"tag": "lark_md", "content": f"📍 **终端IP**：{client_ip}"}})
+            elements.append(
+                {"tag": "div", "text": {"tag": "lark_md", "content": f"📍 **终端IP**：{client_ip}"}}
+            )
 
         if terminal_name:
-            elements.append({"tag": "div", "text": {"tag": "lark_md", "content": f"🖥️ **终端名称**：{terminal_name}"}})
+            elements.append(
+                {
+                    "tag": "div",
+                    "text": {"tag": "lark_md", "content": f"🖥️ **终端名称**：{terminal_name}"},
+                }
+            )
 
         if description:
-            elements.append({"tag": "div", "text": {"tag": "lark_md", "content": f"💬 **反馈内容**：{description}"}})
+            elements.append(
+                {
+                    "tag": "div",
+                    "text": {"tag": "lark_md", "content": f"💬 **反馈内容**：{description}"},
+                }
+            )
 
         if contact:
-            elements.append({"tag": "div", "text": {"tag": "lark_md", "content": f"📞 **联系方式**：{contact}"}})
+            elements.append(
+                {"tag": "div", "text": {"tag": "lark_md", "content": f"📞 **联系方式**：{contact}"}}
+            )
 
         if notes:
-            elements.append({"tag": "div", "text": {"tag": "lark_md", "content": f"📝 **处理方式**：{notes}"}})
+            elements.append(
+                {"tag": "div", "text": {"tag": "lark_md", "content": f"📝 **处理方式**：{notes}"}}
+            )
 
         elements.append({"tag": "hr"})
 
         card_content = {
             "schema": "2.0",
             "header": {
-                "title": {
-                    "tag": "plain_text",
-                    "content": "【终端卡顿 IT 反馈】"
-                },
-                "template": "green"
+                "title": {"tag": "plain_text", "content": "【终端卡顿 IT 反馈】"},
+                "template": "green",
             },
-            "body": {
-                "elements": elements
-            }
+            "body": {"elements": elements},
         }
 
         return self._patch_message(open_message_id, card_content)
@@ -347,10 +349,14 @@ class FeishuService:
                 logger.info(f"[Feishu] Card updated successfully - message_id={open_message_id}")
                 return {"success": True}
             else:
-                logger.error(f"[Feishu] Failed to update card - message_id={open_message_id}, code={response.code}, msg={response.msg}")
+                logger.error(
+                    f"[Feishu] Failed to update card - message_id={open_message_id}, code={response.code}, msg={response.msg}"
+                )
                 return {"success": False, "error": f"{response.code} - {response.msg}"}
         except Exception as e:
-            logger.error(f"[Feishu] Error patching message - message_id={open_message_id}, error={e}")
+            logger.error(
+                f"[Feishu] Error patching message - message_id={open_message_id}, error={e}"
+            )
             return {"success": False, "error": str(e)}
 
     def send_it_feedback_resolved(
@@ -387,16 +393,22 @@ class FeishuService:
         card_content = {
             "schema": "2.0",
             "header": {
-                "title": {
-                    "tag": "plain_text",
-                    "content": f"【{severity}】{alertname}"
-                },
-                "template": "blue"
+                "title": {"tag": "plain_text", "content": f"【{severity}】{alertname}"},
+                "template": "blue",
             },
             "body": {
                 "elements": [
-                    {"tag": "div", "text": {"tag": "lark_md", "content": "⚡ **处理状态**：处理中"}},
-                    {"tag": "div", "text": {"tag": "lark_md", "content": f"🖥️ **故障主机**：{instance or '未知'}"}},
+                    {
+                        "tag": "div",
+                        "text": {"tag": "lark_md", "content": "⚡ **处理状态**：处理中"},
+                    },
+                    {
+                        "tag": "div",
+                        "text": {
+                            "tag": "lark_md",
+                            "content": f"🖥️ **故障主机**：{instance or '未知'}",
+                        },
+                    },
                     {"tag": "hr"},
                     {"tag": "div", "text": {"tag": "lark_md", "content": "**📝 处理方式**"}},
                     {
@@ -409,24 +421,21 @@ class FeishuService:
                                 "name": "alert_notes",
                                 "placeholder": {
                                     "tag": "plain_text",
-                                    "content": "填写处理方式（必填）"
-                                }
+                                    "content": "填写处理方式（必填）",
+                                },
                             },
                             {
                                 "tag": "button",
-                                "text": {
-                                    "tag": "plain_text",
-                                    "content": "✅ 确认解决"
-                                },
+                                "text": {"tag": "plain_text", "content": "✅ 确认解决"},
                                 "type": "primary",
                                 "width": "fill",
                                 "name": "resolve_alert",
-                                "form_action_type": "submit"
-                            }
-                        ]
-                    }
+                                "form_action_type": "submit",
+                            },
+                        ],
+                    },
                 ]
-            }
+            },
         }
 
         return self._patch_message(open_message_id, card_content)
@@ -442,20 +451,32 @@ class FeishuService:
         card_content = {
             "schema": "2.0",
             "header": {
-                "title": {
-                    "tag": "plain_text",
-                    "content": f"【{severity}】{alertname}"
-                },
-                "template": "orange"
+                "title": {"tag": "plain_text", "content": f"【{severity}】{alertname}"},
+                "template": "orange",
             },
             "body": {
                 "elements": [
-                    {"tag": "div", "text": {"tag": "lark_md", "content": "⚡ **处理状态**：已转交 IT 处理"}},
-                    {"tag": "div", "text": {"tag": "lark_md", "content": f"🖥️ **故障主机**：{instance or '未知'}"}},
+                    {
+                        "tag": "div",
+                        "text": {"tag": "lark_md", "content": "⚡ **处理状态**：已转交 IT 处理"},
+                    },
+                    {
+                        "tag": "div",
+                        "text": {
+                            "tag": "lark_md",
+                            "content": f"🖥️ **故障主机**：{instance or '未知'}",
+                        },
+                    },
                     {"tag": "hr"},
-                    {"tag": "div", "text": {"tag": "lark_md", "content": "<font color='orange'>⏳ IT 人员将介入处理...</font>"}}
+                    {
+                        "tag": "div",
+                        "text": {
+                            "tag": "lark_md",
+                            "content": "<font color='orange'>⏳ IT 人员将介入处理...</font>",
+                        },
+                    },
                 ]
-            }
+            },
         }
 
         return self._patch_message(open_message_id, card_content)

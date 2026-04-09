@@ -1,6 +1,7 @@
 """
 Feishu notification API endpoints.
 """
+
 import logging
 from typing import Any
 
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 def get_feishu_service():
     """Lazy import FeishuService."""
     from app.integrations.feishu.service import get_feishu_service as _get
+
     return _get()
 
 
@@ -32,12 +34,14 @@ router = APIRouter(prefix="/feishu", tags=["飞书通知"])
 
 class FeishuCardSendRequest(BaseModel):
     """Request schema for sending Feishu card notification."""
+
     card_content: dict[str, Any] = Field(..., description="飞书卡片 JSON 内容")
     user: str = Field(..., description="要匹配的用户名或 full_name")
 
 
 class FeishuCardSendResponse(BaseModel):
     """Response schema for Feishu card notification."""
+
     success: bool
     message_id: str | None = None
     matched_user: str | None = None
@@ -54,12 +58,9 @@ async def _get_user_by_identifier(db: AsyncSession, identifier: str) -> User | N
         return user
 
     result = await db.execute(
-        select(User).where(
-            and_(
-                User.full_name == identifier,
-                User.feishu_open_id.isnot(None)
-            )
-        ).limit(1)
+        select(User)
+        .where(and_(User.full_name == identifier, User.feishu_open_id.isnot(None)))
+        .limit(1)
     )
     return result.scalar_one_or_none()
 
@@ -81,8 +82,7 @@ async def send_feishu_card_notification(
 
     if not user.feishu_open_id:
         raise HTTPException(
-            status_code=400,
-            detail=f"User {user.username} does not have a feishu_open_id"
+            status_code=400, detail=f"User {user.username} does not have a feishu_open_id"
         )
 
     record_create = NotificationRecordCreate(

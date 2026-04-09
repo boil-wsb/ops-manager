@@ -1,6 +1,7 @@
 """
 PC Client version management model.
 """
+
 from sqlalchemy import Boolean, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 

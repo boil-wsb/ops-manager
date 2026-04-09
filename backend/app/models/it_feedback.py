@@ -1,6 +1,7 @@
 """
 IT Feedback model for user lag reports.
 """
+
 import enum
 from datetime import datetime
 
@@ -12,6 +13,7 @@ from app.models.base import BaseModel
 
 class LagLevel(enum.StrEnum):
     """Lag severity level."""
+
     SLIGHT = "1"
     MODERATE = "2"
     SEVERE = "3"
@@ -20,6 +22,7 @@ class LagLevel(enum.StrEnum):
 
 class ComputerType(enum.StrEnum):
     """Computer type."""
+
     DESKTOP = "desktop"
     LAPTOP = "laptop"
     WORKSTATION = "workstation"

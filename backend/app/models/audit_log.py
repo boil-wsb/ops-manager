@@ -1,6 +1,7 @@
 """
 Audit log model for tracking user operations.
 """
+
 from datetime import datetime
 from typing import Any
 
@@ -14,6 +15,7 @@ class AuditLog(Base):
     """
     Audit log model for tracking all critical operations.
     """
+
     __tablename__ = "audit_logs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -56,10 +58,7 @@ class AuditLog(Base):
 
     # Operation details
     operation_time: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        default=datetime.utcnow,
-        nullable=False,
-        index=True
+        DateTime(timezone=True), default=datetime.utcnow, nullable=False, index=True
     )
     """Timestamp of the operation"""
 
@@ -77,10 +76,10 @@ class AuditLog(Base):
 
     # Indexes for common queries
     __table_args__ = (
-        Index('idx_audit_logs_module_time', 'operation_module', 'operation_time'),
-        Index('idx_audit_logs_operator_time', 'operator_id', 'operation_time'),
-        Index('idx_audit_logs_type_time', 'operation_type', 'operation_time'),
-        Index('idx_audit_logs_status_time', 'status', 'operation_time'),
+        Index("idx_audit_logs_module_time", "operation_module", "operation_time"),
+        Index("idx_audit_logs_operator_time", "operator_id", "operation_time"),
+        Index("idx_audit_logs_type_time", "operation_type", "operation_time"),
+        Index("idx_audit_logs_status_time", "status", "operation_time"),
     )
 
     def __repr__(self) -> str:

@@ -1,6 +1,7 @@
 """
 CRUD operations for PC Client Version.
 """
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,9 +26,7 @@ class CRUDPCClientVersion(CRUDBase):
         self, db: AsyncSession, version: str
     ) -> PCClientVersion | None:
         """Get version by version string."""
-        result = await db.execute(
-            select(PCClientVersion).where(PCClientVersion.version == version)
-        )
+        result = await db.execute(select(PCClientVersion).where(PCClientVersion.version == version))
         return result.scalar_one_or_none()
 
     async def get_all_versions(

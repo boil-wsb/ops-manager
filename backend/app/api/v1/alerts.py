@@ -1,6 +1,7 @@
 """
 Alert management API routes - Alertmanager Webhook.
 """
+
 from datetime import datetime
 from typing import Any
 
@@ -34,7 +35,9 @@ async def get_alert_stats(
     total_silences = silences_result.scalar() or 0
 
     active_silences_result = await db.execute(
-        select(func.count()).select_from(crud_alert_silence.model).where(crud_alert_silence.model.is_active)
+        select(func.count())
+        .select_from(crud_alert_silence.model)
+        .where(crud_alert_silence.model.is_active)
     )
     active_silences = active_silences_result.scalar() or 0
 
@@ -43,7 +46,9 @@ async def get_alert_stats(
     total_templates = templates_result.scalar() or 0
 
     active_templates_result = await db.execute(
-        select(func.count()).select_from(crud_alert_template.model).where(crud_alert_template.model.is_active)
+        select(func.count())
+        .select_from(crud_alert_template.model)
+        .where(crud_alert_template.model.is_active)
     )
     active_templates = active_templates_result.scalar() or 0
 
@@ -52,12 +57,16 @@ async def get_alert_stats(
     total_history = history_result.scalar() or 0
 
     firing_result = await db.execute(
-        select(func.count()).select_from(crud_alert_history.model).where(crud_alert_history.model.status == "firing")
+        select(func.count())
+        .select_from(crud_alert_history.model)
+        .where(crud_alert_history.model.status == "firing")
     )
     firing_alerts = firing_result.scalar() or 0
 
     resolved_result = await db.execute(
-        select(func.count()).select_from(crud_alert_history.model).where(crud_alert_history.model.status == "resolved")
+        select(func.count())
+        .select_from(crud_alert_history.model)
+        .where(crud_alert_history.model.status == "resolved")
     )
     resolved_alerts = resolved_result.scalar() or 0
 
@@ -147,7 +156,9 @@ async def process_alert(
                     pending.status = AlertHistoryStatus.RESOLVED.value
                     pending.ends_at = now
                 await db.commit()
-                logger.info(f"Batch resolved {len(pending_alerts)} pending alerts for alertname={alertname}, instance={instance}")
+                logger.info(
+                    f"Batch resolved {len(pending_alerts)} pending alerts for alertname={alertname}, instance={instance}"
+                )
         except Exception as exc:
             logger.warning(f"Failed to batch resolve pending alerts: {exc}")
 
@@ -157,7 +168,9 @@ async def process_alert(
             db=db,
             alert_labels=labels,
         )
-        logger.info(f"Inhibition check result: is_suppressed={is_suppressed}, silence_id={silence_id}")
+        logger.info(
+            f"Inhibition check result: is_suppressed={is_suppressed}, silence_id={silence_id}"
+        )
     except Exception as exc:
         logger.error(f"Error in inhibition check: {exc}")
         is_suppressed, silence_id = False, None
@@ -167,7 +180,9 @@ async def process_alert(
 
     # Create alert history record
     try:
-        logger.info(f"Creating history record: alertname={alertname}, status={alert_status.value}, severity={severity}")
+        logger.info(
+            f"Creating history record: alertname={alertname}, status={alert_status.value}, severity={severity}"
+        )
         logger.info(f"  labels type: {type(labels)}, annotations type: {type(annotations)}")
         history = await crud_alert_history.create_from_alertmanager(
             db=db,
@@ -184,6 +199,7 @@ async def process_alert(
         logger.info(f"History record created successfully: id={history.id}")
     except Exception as exc:
         import traceback
+
         logger.error(f"Error creating history record: {exc}\n{traceback.format_exc()}")
         raise
 
@@ -257,13 +273,16 @@ async def receive_alertmanager_webhook(
             results.append(result)
         except Exception as exc:
             import traceback
+
             error_trace = traceback.format_exc()
             logger.error(f"Failed to process alert: {str(exc)}\n{error_trace}")
-            results.append({
-                "error": str(exc),
-                "error_detail": error_trace,
-                "alert": alert.model_dump(),
-            })
+            results.append(
+                {
+                    "error": str(exc),
+                    "error_detail": error_trace,
+                    "alert": alert.model_dump(),
+                }
+            )
 
     # Count results
     suppressed_count = sum(1 for r in results if r.get("is_suppressed"))

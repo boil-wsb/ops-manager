@@ -1,6 +1,7 @@
 """
 FastAPI application entry point.
 """
+
 import asyncio
 import warnings
 from contextlib import asynccontextmanager
@@ -61,6 +62,7 @@ async def lifespan(app: FastAPI):
 
     async def _sync_pc_versions_task():
         from app.db.session import get_async_session_local
+
         async with await get_async_session_local() as db:
             synced = await sync_pc_versions_on_startup(db)
             if synced:

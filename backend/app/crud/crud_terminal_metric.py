@@ -1,6 +1,7 @@
 """
 Terminal Metric CRUD operations.
 """
+
 from datetime import UTC, datetime
 from typing import Any
 
@@ -70,7 +71,9 @@ class CRUDBerminalMetric(CRUDBase[TerminalMetric, Any, Any]):
             "offline_count": offline,
             "alert_count": alerts,
             "avg_cpu_usage": round(sum(cpu_values) / len(cpu_values), 1) if cpu_values else 0.0,
-            "avg_memory_usage": round(sum(memory_values) / len(memory_values), 1) if memory_values else 0.0,
+            "avg_memory_usage": round(sum(memory_values) / len(memory_values), 1)
+            if memory_values
+            else 0.0,
             "avg_disk_usage": round(sum(disk_values) / len(disk_values), 1) if disk_values else 0.0,
         }
 
@@ -173,9 +176,8 @@ class CRUDBerminalMetric(CRUDBase[TerminalMetric, Any, Any]):
         owner_username: str,
     ) -> datetime | None:
         """Get the last sync time for owner's terminals."""
-        query = (
-            select(func.max(TerminalMetric.metrics_timestamp))
-            .where(TerminalMetric.owner_username == owner_username)
+        query = select(func.max(TerminalMetric.metrics_timestamp)).where(
+            TerminalMetric.owner_username == owner_username
         )
         result = await db.execute(query)
         return result.scalar_one_or_none()

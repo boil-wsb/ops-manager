@@ -1,6 +1,7 @@
 """
 CRUD operations for navigation links.
 """
+
 from collections import defaultdict
 
 from sqlalchemy import and_, select
@@ -17,10 +18,7 @@ class CRUDNavigationLink(CRUDBase[NavigationLink, NavigationLinkCreate, Navigati
     """CRUD operations for navigation links."""
 
     async def get_active_links_for_user(
-        self,
-        db: AsyncSession,
-        user_role_ids: set[int],
-        category: str | None = None
+        self, db: AsyncSession, user_role_ids: set[int], category: str | None = None
     ) -> list[NavigationLink]:
         """Get active navigation links visible to user based on their roles."""
 
@@ -49,11 +47,7 @@ class CRUDNavigationLink(CRUDBase[NavigationLink, NavigationLinkCreate, Navigati
 
         return filtered_links
 
-    async def get_grouped_links_for_user(
-        self,
-        db: AsyncSession,
-        user_role_ids: set[int]
-    ) -> dict:
+    async def get_grouped_links_for_user(self, db: AsyncSession, user_role_ids: set[int]) -> dict:
         """Get navigation links grouped by category for a user."""
         links = await self.get_active_links_for_user(db, user_role_ids)
         grouped = defaultdict(list)
@@ -62,9 +56,7 @@ class CRUDNavigationLink(CRUDBase[NavigationLink, NavigationLinkCreate, Navigati
         return dict(grouped)
 
     async def get_active_links(
-        self,
-        db: AsyncSession,
-        category: str | None = None
+        self, db: AsyncSession, category: str | None = None
     ) -> list[NavigationLink]:
         """Get all active navigation links, optionally filtered by category."""
         conditions = [NavigationLink.is_active]
@@ -87,11 +79,7 @@ class CRUDNavigationLink(CRUDBase[NavigationLink, NavigationLinkCreate, Navigati
             grouped[link.category].append(link)
         return dict(grouped)
 
-    async def get_by_category(
-        self,
-        db: AsyncSession,
-        category: str
-    ) -> list[NavigationLink]:
+    async def get_by_category(self, db: AsyncSession, category: str) -> list[NavigationLink]:
         """Get all links by category (including inactive)."""
         result = await db.execute(
             select(NavigationLink)
@@ -108,7 +96,7 @@ class CRUDNavigationLink(CRUDBase[NavigationLink, NavigationLinkCreate, Navigati
         category: str | None = None,
         is_active: bool | None = None,
         skip: int = 0,
-        limit: int = 100
+        limit: int = 100,
     ) -> list[NavigationLink]:
         """Get multiple links with filters."""
         conditions = []
@@ -129,11 +117,7 @@ class CRUDNavigationLink(CRUDBase[NavigationLink, NavigationLinkCreate, Navigati
         return result.scalars().all()
 
     async def count_with_filter(
-        self,
-        db: AsyncSession,
-        *,
-        category: str | None = None,
-        is_active: bool | None = None
+        self, db: AsyncSession, *, category: str | None = None, is_active: bool | None = None
     ) -> int:
         """Count links with filters."""
         from sqlalchemy import func
@@ -167,10 +151,7 @@ class CRUDNavigationLink(CRUDBase[NavigationLink, NavigationLinkCreate, Navigati
         For superadmin: returns all records.
         For non-superadmin: only returns records where roles is empty OR user has a matching role.
         """
-        query = (
-            select(NavigationLink)
-            .options(selectinload(NavigationLink.roles))
-        )
+        query = select(NavigationLink).options(selectinload(NavigationLink.roles))
 
         conditions = []
         if category is not None:
@@ -218,10 +199,7 @@ class CRUDNavigationLink(CRUDBase[NavigationLink, NavigationLinkCreate, Navigati
         For non-superadmin: only counts records where roles is empty OR user has a matching role.
         """
 
-        query = (
-            select(NavigationLink)
-            .options(selectinload(NavigationLink.roles))
-        )
+        query = select(NavigationLink).options(selectinload(NavigationLink.roles))
 
         conditions = []
         if category is not None:
@@ -250,12 +228,7 @@ class CRUDNavigationLink(CRUDBase[NavigationLink, NavigationLinkCreate, Navigati
 
         return count
 
-    async def get_with_roles(
-        self,
-        db: AsyncSession,
-        *,
-        id: int
-    ) -> NavigationLink | None:
+    async def get_with_roles(self, db: AsyncSession, *, id: int) -> NavigationLink | None:
         """Get a navigation link by ID with roles loaded."""
         result = await db.execute(
             select(NavigationLink)
@@ -265,20 +238,14 @@ class CRUDNavigationLink(CRUDBase[NavigationLink, NavigationLinkCreate, Navigati
         return result.scalar_one_or_none()
 
     async def create_with_roles(
-        self,
-        db: AsyncSession,
-        *,
-        obj_in: NavigationLinkCreate,
-        role_ids: list[int] | None = None
+        self, db: AsyncSession, *, obj_in: NavigationLinkCreate, role_ids: list[int] | None = None
     ) -> NavigationLink:
         """Create a navigation link with roles."""
-        obj_data = obj_in.model_dump(exclude={'restrict_to_current_role'})
+        obj_data = obj_in.model_dump(exclude={"restrict_to_current_role"})
         db_obj = NavigationLink(**obj_data)
 
         if role_ids:
-            roles_result = await db.execute(
-                select(Role).where(Role.id.in_(role_ids))
-            )
+            roles_result = await db.execute(select(Role).where(Role.id.in_(role_ids)))
             db_obj.roles = list(roles_result.scalars().all())
 
         db.add(db_obj)
@@ -292,19 +259,17 @@ class CRUDNavigationLink(CRUDBase[NavigationLink, NavigationLinkCreate, Navigati
         *,
         db_obj: NavigationLink,
         obj_in: NavigationLinkUpdate,
-        role_ids: list[int] | None = None
+        role_ids: list[int] | None = None,
     ) -> NavigationLink:
         """Update a navigation link with roles."""
-        update_data = obj_in.model_dump(exclude_unset=True, exclude={'restrict_to_current_role'})
+        update_data = obj_in.model_dump(exclude_unset=True, exclude={"restrict_to_current_role"})
 
         for field, value in update_data.items():
             setattr(db_obj, field, value)
 
         if role_ids is not None:
             if role_ids:
-                roles_result = await db.execute(
-                    select(Role).where(Role.id.in_(role_ids))
-                )
+                roles_result = await db.execute(select(Role).where(Role.id.in_(role_ids)))
                 db_obj.roles = list(roles_result.scalars().all())
             else:
                 db_obj.roles = []

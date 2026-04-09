@@ -1,6 +1,7 @@
 """
 Alert inhibition service.
 """
+
 import re
 from datetime import datetime
 from typing import Any
@@ -96,11 +97,15 @@ class AlertInhibitionService:
             Tuple of (is_suppressed, matched_silence)
         """
         for silence in silences:
-            if silence.match_labels and self._match_exact_labels(alert_labels, silence.match_labels):
+            if silence.match_labels and self._match_exact_labels(
+                alert_labels, silence.match_labels
+            ):
                 logger.info(f"Alert matched silence rule: {silence.name}")
                 return True, silence
 
-            if silence.match_pattern and self._match_regex_pattern(alert_labels, silence.match_pattern):
+            if silence.match_pattern and self._match_regex_pattern(
+                alert_labels, silence.match_pattern
+            ):
                 logger.info(f"Alert matched silence regex pattern: {silence.name}")
                 return True, silence
 

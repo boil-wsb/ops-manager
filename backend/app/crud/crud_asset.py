@@ -1,6 +1,7 @@
 """
 Asset CRUD operations.
 """
+
 from typing import Any
 
 from sqlalchemy import and_, func, or_, select
@@ -14,16 +15,9 @@ from app.schemas.asset import AssetCreate, AssetUpdate
 class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
     """Asset CRUD operations."""
 
-    async def get_by_asset_id(
-        self,
-        db: AsyncSession,
-        *,
-        asset_id: str
-    ) -> Asset | None:
+    async def get_by_asset_id(self, db: AsyncSession, *, asset_id: str) -> Asset | None:
         """Get asset by asset_id."""
-        result = await db.execute(
-            select(Asset).where(Asset.asset_id == asset_id)
-        )
+        result = await db.execute(select(Asset).where(Asset.asset_id == asset_id))
         return result.scalar_one_or_none()
 
     async def get_multi_with_filters(
@@ -54,7 +48,7 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
                 or_(
                     Asset.name.ilike(f"%{keyword}%"),
                     Asset.asset_id.ilike(f"%{keyword}%"),
-                    Asset.ip_address.ilike(f"%{keyword}%")
+                    Asset.ip_address.ilike(f"%{keyword}%"),
                 )
             )
         if owner_id is not None:
@@ -76,11 +70,7 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
         return list(items), total
 
     async def create_with_labels(
-        self,
-        db: AsyncSession,
-        *,
-        obj_in: AssetCreate,
-        owner_id: int | None = None
+        self, db: AsyncSession, *, obj_in: AssetCreate, owner_id: int | None = None
     ) -> Asset:
         """Create asset with labels."""
         from app.models.user import User
@@ -124,9 +114,7 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
 
         # Add labels if provided
         if obj_in.label_ids:
-            labels_result = await db.execute(
-                select(Label).where(Label.id.in_(obj_in.label_ids))
-            )
+            labels_result = await db.execute(select(Label).where(Label.id.in_(obj_in.label_ids)))
             db_obj.labels = list(labels_result.scalars().all())
 
         db.add(db_obj)
@@ -138,7 +126,7 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
             asset_id=db_obj.id,
             action="create",
             changes={"data": obj_in.model_dump()},
-            operator_id=owner_id
+            operator_id=owner_id,
         )
         db.add(history)
         await db.commit()
@@ -151,7 +139,7 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
         *,
         db_obj: Asset,
         obj_in: AssetUpdate,
-        operator_id: int | None = None
+        operator_id: int | None = None,
     ) -> Asset:
         """Update asset with labels."""
         changes = {}
@@ -164,6 +152,7 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
 
             if owner_id_value is None and owner_name_value:
                 from app.models.user import User
+
                 result = await db.execute(
                     select(User.id).where(
                         User.full_name == owner_name_value,
@@ -183,9 +172,7 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
 
         # Update labels if provided
         if obj_in.label_ids is not None:
-            labels_result = await db.execute(
-                select(Label).where(Label.id.in_(obj_in.label_ids))
-            )
+            labels_result = await db.execute(select(Label).where(Label.id.in_(obj_in.label_ids)))
             db_obj.labels = list(labels_result.scalars().all())
             changes["labels"] = {"new": obj_in.label_ids}
 
@@ -196,10 +183,7 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
         # Create history record
         if changes:
             history = AssetHistory(
-                asset_id=db_obj.id,
-                action="update",
-                changes=changes,
-                operator_id=operator_id
+                asset_id=db_obj.id, action="update", changes=changes, operator_id=operator_id
             )
             db.add(history)
             await db.commit()
@@ -210,16 +194,9 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
 class CRUDLabel(CRUDBase[Label, Any, Any]):
     """Label CRUD operations."""
 
-    async def get_by_name(
-        self,
-        db: AsyncSession,
-        *,
-        name: str
-    ) -> Label | None:
+    async def get_by_name(self, db: AsyncSession, *, name: str) -> Label | None:
         """Get label by name."""
-        result = await db.execute(
-            select(Label).where(Label.name == name)
-        )
+        result = await db.execute(select(Label).where(Label.name == name))
         return result.scalar_one_or_none()
 
 

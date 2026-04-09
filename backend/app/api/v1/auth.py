@@ -1,6 +1,7 @@
 """
 Authentication API routes.
 """
+
 import logging
 from datetime import datetime
 
@@ -147,11 +148,7 @@ async def login(
 
     logger.info(f"[登录] 用户 '{credentials.username}' 登录成功，权限数量: {len(permissions)}")
 
-    user_roles = [
-        {"id": role.id, "name": role.name}
-        for role in user.roles
-        if role.is_active
-    ]
+    user_roles = [{"id": role.id, "name": role.name} for role in user.roles if role.is_active]
 
     user_response = UserResponse(
         id=user.id,

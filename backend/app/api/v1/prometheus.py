@@ -2,6 +2,7 @@
 Prometheus 代理 API
 用于从前端访问 Prometheus 数据
 """
+
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -40,10 +41,12 @@ async def get_prometheus_assets(
     for node in filtered_nodes:
         node["asset_type"] = client.map_job_to_asset_type(node.get("job", ""))
 
-    return api_response(data={
-        "items": filtered_nodes,
-        "total": len(filtered_nodes),
-    })
+    return api_response(
+        data={
+            "items": filtered_nodes,
+            "total": len(filtered_nodes),
+        }
+    )
 
 
 @router.get("/assets/{instance}")

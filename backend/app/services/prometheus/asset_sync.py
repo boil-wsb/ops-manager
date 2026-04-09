@@ -165,9 +165,7 @@ class AssetSyncService:
         if not ip_address:
             return None
 
-        result = await self.db.execute(
-            select(Asset).where(Asset.ip_address == ip_address)
-        )
+        result = await self.db.execute(select(Asset).where(Asset.ip_address == ip_address))
         return result.scalar_one_or_none()
 
     def _map_prometheus_node_to_asset_data(self, node: dict[str, Any]) -> dict[str, Any]:
@@ -283,6 +281,7 @@ class AssetSyncService:
             if existing_asset:
                 # 更新现有资产
                 from app.models.asset import AssetSource, SyncStatus
+
                 update_data = {
                     "name": asset_data["name"],
                     "status": asset_data["status"],
@@ -309,11 +308,14 @@ class AssetSyncService:
                 result["success"] = True
                 result["action"] = "updated"
                 result["asset"] = existing_asset
-                logger.info(f"Updated asset: {existing_asset.asset_id} (IP: {asset_data['ip_address']})")
+                logger.info(
+                    f"Updated asset: {existing_asset.asset_id} (IP: {asset_data['ip_address']})"
+                )
             else:
                 # 创建新资产
                 logger.info("Creating new asset...")
                 from app.models.asset import AssetSource, SyncStatus
+
                 new_asset = Asset(
                     asset_id=asset_data["asset_id"],
                     name=asset_data["name"],
@@ -413,8 +415,7 @@ class AssetSyncService:
 
 
 async def sync_assets_from_prometheus(
-    db: AsyncSession,
-    prometheus_client: PrometheusClient | None = None
+    db: AsyncSession, prometheus_client: PrometheusClient | None = None
 ) -> dict[str, Any]:
     """
     从 Prometheus 同步资产的便捷函数

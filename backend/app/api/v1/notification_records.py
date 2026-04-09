@@ -1,6 +1,7 @@
 """
 Notification Record API endpoints.
 """
+
 import logging
 
 from fastapi import APIRouter, Depends, Query
@@ -50,6 +51,7 @@ async def get_notification_record(
     record = await notification_record.get(db, record_id)
     if not record:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=404, detail="Notification record not found")
     return NotificationRecordResponse.model_validate(record)
 
@@ -63,5 +65,6 @@ async def delete_notification_record(
     success = await notification_record.delete(db, record_id=record_id)
     if not success:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=404, detail="Notification record not found")
     return {"message": "Notification record deleted successfully"}

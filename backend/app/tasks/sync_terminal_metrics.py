@@ -3,6 +3,7 @@
 
 从 Prometheus 同步终端指标数据
 """
+
 import asyncio
 import logging
 from datetime import UTC, datetime
@@ -25,9 +26,7 @@ async def get_or_create_asset(
     customer: str,
 ) -> int:
     """Get or create an asset for the terminal."""
-    result = await db.execute(
-        select(Asset).where(Asset.hostname == hostname)
-    )
+    result = await db.execute(select(Asset).where(Asset.hostname == hostname))
     asset = result.scalar_one_or_none()
 
     if asset:
@@ -88,12 +87,14 @@ def sync_terminal_metrics_task(self) -> dict[str, Any]:
                     cpu_usage = terminal.get("cpu_usage", 0)
                     disk_total_bytes = terminal.get("disk_total", 0)
                     memory_total_bytes = terminal.get("memory_total", 0)
-                    disk_total_gb = round(disk_total_bytes / (1024**3), 1) if disk_total_bytes else None
-                    memory_total_gb = round(memory_total_bytes / (1024**3), 1) if memory_total_bytes else None
-
-                    asset_id = await get_or_create_asset(
-                        db, hostname, instance, customer
+                    disk_total_gb = (
+                        round(disk_total_bytes / (1024**3), 1) if disk_total_bytes else None
                     )
+                    memory_total_gb = (
+                        round(memory_total_bytes / (1024**3), 1) if memory_total_bytes else None
+                    )
+
+                    asset_id = await get_or_create_asset(db, hostname, instance, customer)
 
                     await crud_terminal_metric.upsert_metric(
                         db,

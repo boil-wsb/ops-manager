@@ -1,6 +1,7 @@
 """
 Schemas package.
 """
+
 from app.schemas.alert import (
     AlertHistoryListParams,
     AlertHistoryListResponse,

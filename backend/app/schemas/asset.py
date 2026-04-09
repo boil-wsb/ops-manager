@@ -1,6 +1,7 @@
 """
 Asset schemas.
 """
+
 from datetime import datetime
 from typing import Any
 
@@ -9,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class LabelBase(BaseModel):
     """Base label schema."""
+
     name: str = Field(..., min_length=1, max_length=100)
     color: str = Field(default="#1890ff", max_length=7)
     description: str | None = Field(None, max_length=255)
@@ -16,11 +18,13 @@ class LabelBase(BaseModel):
 
 class LabelCreate(LabelBase):
     """Label creation schema."""
+
     pass
 
 
 class LabelResponse(LabelBase):
     """Label response schema."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -29,6 +33,7 @@ class LabelResponse(LabelBase):
 
 class OwnerResponse(BaseModel):
     """Owner response schema for nested owner info."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -38,6 +43,7 @@ class OwnerResponse(BaseModel):
 
 class AssetBase(BaseModel):
     """Base asset schema."""
+
     asset_id: str = Field(..., min_length=1, max_length=100)
     name: str = Field(..., min_length=1, max_length=200)
     asset_type: str = Field(..., pattern="^(SERVER|VM|NETWORK|STORAGE|TERMINAL)$")
@@ -73,6 +79,7 @@ class AssetBase(BaseModel):
 
 class AssetCreate(AssetBase):
     """Asset creation schema."""
+
     label_ids: list[int] = []
     owner_name: str | None = Field(None, max_length=100)
     owner_id: int | None = None
@@ -80,6 +87,7 @@ class AssetCreate(AssetBase):
 
 class AssetUpdate(BaseModel):
     """Asset update schema."""
+
     name: str | None = Field(None, min_length=1, max_length=200)
     status: str | None = Field(None, pattern="^(ACTIVE|OFFLINE|MAINTENANCE|RETIRED)$")
 
@@ -105,10 +113,13 @@ class AssetUpdate(BaseModel):
 
 class AssetResponse(AssetBase):
     """Asset response schema."""
+
     model_config = ConfigDict(
         from_attributes=True,
-        alias_generator=lambda x: ''.join(word.capitalize() if i else word for i, word in enumerate(x.split('_'))),
-        populate_by_name=True
+        alias_generator=lambda x: "".join(
+            word.capitalize() if i else word for i, word in enumerate(x.split("_"))
+        ),
+        populate_by_name=True,
     )
 
     id: int
@@ -133,12 +144,14 @@ class AssetResponse(AssetBase):
 
 class AssetListResponse(BaseModel):
     """Asset list response with pagination."""
+
     total: int
     items: list[AssetResponse]
 
 
 class AssetHistoryResponse(BaseModel):
     """Asset history response."""
+
     id: int
     asset_id: int
     action: str
@@ -149,6 +162,7 @@ class AssetHistoryResponse(BaseModel):
 
 class AssetTreeNode(BaseModel):
     """Asset tree node for hierarchical display."""
+
     key: str
     title: str
     children: list["AssetTreeNode"] | None = None
@@ -158,6 +172,7 @@ class AssetTreeNode(BaseModel):
 
 class AssetFilter(BaseModel):
     """Asset filter parameters."""
+
     asset_type: str | None = None
     status: str | None = None
     idc: str | None = None

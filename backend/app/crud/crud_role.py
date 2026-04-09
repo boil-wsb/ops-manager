@@ -13,25 +13,13 @@ from app.schemas.permission import RoleCreate, RoleUpdate
 class CRUDRole(CRUDBase[Role, RoleCreate, RoleUpdate]):
     """Role CRUD operations."""
 
-    async def get_by_name(
-        self,
-        db: AsyncSession,
-        *,
-        name: str
-    ) -> Role | None:
+    async def get_by_name(self, db: AsyncSession, *, name: str) -> Role | None:
         """Get role by name."""
-        result = await db.execute(
-            select(Role).where(Role.name == name)
-        )
+        result = await db.execute(select(Role).where(Role.name == name))
         return result.scalar_one_or_none()
 
     async def get_multi_with_filters(
-        self,
-        db: AsyncSession,
-        *,
-        is_active: bool | None = None,
-        skip: int = 0,
-        limit: int = 100
+        self, db: AsyncSession, *, is_active: bool | None = None, skip: int = 0, limit: int = 100
     ) -> tuple[list[Role], int]:
         """Get roles with filters and total count."""
         query = select(Role)
@@ -53,12 +41,7 @@ class CRUDRole(CRUDBase[Role, RoleCreate, RoleUpdate]):
 
         return list(roles), total
 
-    async def create_with_permissions(
-        self,
-        db: AsyncSession,
-        *,
-        obj_in: RoleCreate
-    ) -> Role:
+    async def create_with_permissions(self, db: AsyncSession, *, obj_in: RoleCreate) -> Role:
         """Create a new role with permissions."""
         # Extract permission_ids
         permission_ids = obj_in.permission_ids
@@ -82,11 +65,7 @@ class CRUDRole(CRUDBase[Role, RoleCreate, RoleUpdate]):
         return db_obj
 
     async def update_permissions(
-        self,
-        db: AsyncSession,
-        *,
-        role: Role,
-        permission_ids: list[int]
+        self, db: AsyncSession, *, role: Role, permission_ids: list[int]
     ) -> Role:
         """Update role permissions."""
         # Clear existing permissions
@@ -104,16 +83,9 @@ class CRUDRole(CRUDBase[Role, RoleCreate, RoleUpdate]):
         await db.refresh(role)
         return role
 
-    async def get_permission_ids(
-        self,
-        db: AsyncSession,
-        *,
-        role_id: int
-    ) -> list[int]:
+    async def get_permission_ids(self, db: AsyncSession, *, role_id: int) -> list[int]:
         """Get permission IDs for a role."""
-        result = await db.execute(
-            select(Role).where(Role.id == role_id)
-        )
+        result = await db.execute(select(Role).where(Role.id == role_id))
         role = result.scalar_one_or_none()
 
         if not role:

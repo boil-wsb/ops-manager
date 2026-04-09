@@ -1,6 +1,7 @@
 """
 Logging configuration.
 """
+
 import logging
 import sys
 from datetime import datetime, timedelta
@@ -15,8 +16,8 @@ class StandardFormatter(logging.Formatter):
 
     def __init__(self):
         super().__init__(
-            fmt='%(asctime)s.%(msecs)03d - %(levelname)s - %(name)s:%(lineno)d - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
+            fmt="%(asctime)s.%(msecs)03d - %(levelname)s - %(name)s:%(lineno)d - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
         )
 
 
@@ -31,7 +32,7 @@ def cleanup_old_logs(log_dir: str, retention_days: int) -> None:
 
     cutoff = datetime.now() - timedelta(days=retention_days)
 
-    for file in log_path.glob('app.*.log'):
+    for file in log_path.glob("app.*.log"):
         try:
             file_mtime = datetime.fromtimestamp(file.stat().st_mtime)
             if file_mtime < cutoff:
@@ -56,13 +57,13 @@ def configure_logging() -> None:
         cleanup_old_logs(settings.log_file_dir, settings.log_file_retention_days)
 
         file_handler = TimedRotatingFileHandler(
-            filename=log_dir / 'app.log',
-            when='midnight',
+            filename=log_dir / "app.log",
+            when="midnight",
             interval=1,
             backupCount=settings.log_file_retention_days,
-            encoding='utf-8'
+            encoding="utf-8",
         )
-        file_handler.suffix = '%Y-%m-%d'
+        file_handler.suffix = "%Y-%m-%d"
         file_handler.setFormatter(StandardFormatter())
         handlers.append(file_handler)
 
@@ -70,7 +71,9 @@ def configure_logging() -> None:
     root_logger.handlers = handlers
     root_logger.setLevel(getattr(logging, settings.log_level.upper()))
 
-    logging.getLogger("sqlalchemy.engine").setLevel(logging.DEBUG if settings.log_level.upper() == "DEBUG" else logging.WARNING)
+    logging.getLogger("sqlalchemy.engine").setLevel(
+        logging.DEBUG if settings.log_level.upper() == "DEBUG" else logging.WARNING
+    )
     logging.getLogger("sqlalchemy.pool").setLevel(logging.WARNING)
     logging.getLogger("sqlalchemy.dialects").setLevel(logging.WARNING)
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)

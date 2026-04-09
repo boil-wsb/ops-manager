@@ -1,6 +1,7 @@
 """
 Navigation link model for external quick links.
 """
+
 from datetime import datetime
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Table
@@ -11,7 +12,12 @@ from app.models.base import BaseModel
 navigation_link_roles = Table(
     "navigation_link_roles",
     BaseModel.metadata,
-    Column("navigation_link_id", Integer, ForeignKey("navigation_links.id", ondelete="CASCADE"), primary_key=True),
+    Column(
+        "navigation_link_id",
+        Integer,
+        ForeignKey("navigation_links.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
     Column("role_id", Integer, ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True),
     Column("created_at", DateTime(timezone=True), default=datetime.utcnow),
 )
@@ -31,10 +37,7 @@ class NavigationLink(BaseModel):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     roles: Mapped[list["Role"]] = relationship(
-        "Role",
-        secondary=navigation_link_roles,
-        backref="navigation_links",
-        lazy="selectin"
+        "Role", secondary=navigation_link_roles, backref="navigation_links", lazy="selectin"
     )
 
     def __repr__(self) -> str:

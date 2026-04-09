@@ -1,6 +1,7 @@
 """
 Notification tasks.
 """
+
 import asyncio
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -17,7 +18,9 @@ logger = get_logger(__name__)
 
 
 @shared_task(bind=True, max_retries=3)
-def send_email_notification(self, to_addresses: list, subject: str, body: str, html_body: str = None):
+def send_email_notification(
+    self, to_addresses: list, subject: str, body: str, html_body: str = None
+):
     """Send email notification."""
     try:
         if not settings.smtp_host:
@@ -76,9 +79,7 @@ def send_alert_notification(alert_id: int):
         session_local = get_celery_async_session()
 
         async with session_local() as db:
-            result = await db.execute(
-                select(Alert).where(Alert.id == alert_id)
-            )
+            result = await db.execute(select(Alert).where(Alert.id == alert_id))
             alert = result.scalar_one_or_none()
 
             if not alert:
@@ -86,9 +87,7 @@ def send_alert_notification(alert_id: int):
                 return
 
             result = await db.execute(
-                select(NotificationChannel).where(
-                    NotificationChannel.is_enabled is True
-                )
+                select(NotificationChannel).where(NotificationChannel.is_enabled is True)
             )
             channels = result.scalars().all()
 
@@ -103,7 +102,7 @@ def send_alert_notification(alert_id: int):
 Alert: {alert.title}
 Severity: {alert.severity.value}
 Status: {alert.status}
-Message: {alert.message or 'N/A'}
+Message: {alert.message or "N/A"}
 Time: {alert.started_at}
                             """
                             send_email_notification.delay(to_addresses, subject, body)
@@ -118,7 +117,7 @@ Time: {alert.started_at}
                                 "severity": alert.severity.value,
                                 "status": alert.status,
                                 "message": alert.message,
-                                "started_at": alert.started_at.isoformat()
+                                "started_at": alert.started_at.isoformat(),
                             }
                             headers = config.get("headers", {})
                             send_webhook_notification.delay(url, payload, headers)

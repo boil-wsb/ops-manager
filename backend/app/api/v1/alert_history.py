@@ -1,6 +1,7 @@
 """
 Alert history API routes.
 """
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,7 +33,7 @@ async def get_alert_history(
         total=total,
         page=params.page,
         page_size=params.page_size,
-        items=[AlertHistoryResponse.model_validate(item) for item in items]
+        items=[AlertHistoryResponse.model_validate(item) for item in items],
     )
 
 

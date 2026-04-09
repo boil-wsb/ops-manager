@@ -1,6 +1,7 @@
 """
 Operations management API routes.
 """
+
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query, Request, status
@@ -143,7 +144,9 @@ async def list_inspection_tasks(
     return tasks
 
 
-@router.post("/inspections/tasks", response_model=InspectionTaskResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/inspections/tasks", response_model=InspectionTaskResponse, status_code=status.HTTP_201_CREATED
+)
 @audit_log(operation_type="CREATE", module="ops", object_type="InspectionTask")
 async def create_inspection_task(
     request: Request,
@@ -160,7 +163,7 @@ async def create_inspection_task(
 async def get_inspection_task(
     task_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["ops:read"]))
+    current_user: None = Depends(require_permissions(["ops:read"])),
 ):
     """Get inspection task by ID."""
     task = await crud_inspection_task.get(db, id=task_id)
@@ -176,7 +179,7 @@ async def update_inspection_task(
     task_id: int,
     obj_in: InspectionTaskUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["ops:write"]))
+    current_user: None = Depends(require_permissions(["ops:write"])),
 ):
     """Update inspection task."""
     task = await crud_inspection_task.get(db, id=task_id)
@@ -193,7 +196,7 @@ async def delete_inspection_task(
     request: Request,
     task_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["ops:delete"]))
+    current_user: None = Depends(require_permissions(["ops:delete"])),
 ):
     """Delete inspection task."""
     task = await crud_inspection_task.get(db, id=task_id)
@@ -210,7 +213,7 @@ async def list_inspection_reports(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["ops:read"]))
+    current_user: None = Depends(require_permissions(["ops:read"])),
 ):
     """List inspection reports."""
     query = select(InspectionReport)
@@ -227,7 +230,7 @@ async def list_inspection_reports(
 async def get_inspection_report(
     report_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["ops:read"]))
+    current_user: None = Depends(require_permissions(["ops:read"])),
 ):
     """Get inspection report by ID."""
     report = await crud_inspection_report.get(db, id=report_id)
@@ -243,7 +246,7 @@ async def list_certificates(
     status: str | None = Query(None),
     expiring_soon: bool | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["ops:read"]))
+    current_user: None = Depends(require_permissions(["ops:read"])),
 ):
     """List all certificates."""
     query = select(Certificate)
@@ -262,13 +265,15 @@ async def list_certificates(
     return certificates
 
 
-@router.post("/certificates", response_model=CertificateResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/certificates", response_model=CertificateResponse, status_code=status.HTTP_201_CREATED
+)
 @audit_log(operation_type="CREATE", module="ops", object_type="Certificate")
 async def create_certificate(
     request: Request,
     obj_in: CertificateCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["ops:write"]))
+    current_user: None = Depends(require_permissions(["ops:write"])),
 ):
     """Create a new certificate."""
     days_until_expiry = (obj_in.valid_until - datetime.utcnow()).days
@@ -291,7 +296,7 @@ async def create_certificate(
 async def get_certificate(
     cert_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["ops:read"]))
+    current_user: None = Depends(require_permissions(["ops:read"])),
 ):
     """Get certificate by ID."""
     certificate = await crud_certificate.get(db, id=cert_id)
@@ -307,7 +312,7 @@ async def update_certificate(
     cert_id: int,
     obj_in: CertificateUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["ops:write"]))
+    current_user: None = Depends(require_permissions(["ops:write"])),
 ):
     """Update certificate."""
     certificate = await crud_certificate.get(db, id=cert_id)
@@ -324,7 +329,7 @@ async def delete_certificate(
     request: Request,
     cert_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["ops:delete"]))
+    current_user: None = Depends(require_permissions(["ops:delete"])),
 ):
     """Delete certificate."""
     certificate = await crud_certificate.get(db, id=cert_id)
@@ -340,7 +345,7 @@ async def delete_certificate(
 async def sync_certificates_from_prometheus(
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["ops:write"]))
+    current_user: None = Depends(require_permissions(["ops:write"])),
 ):
     """Sync SSL certificates from Prometheus monitoring."""
     prometheus_client = get_prometheus_client()
@@ -424,7 +429,7 @@ async def list_dns_records(
     limit: int = Query(20, ge=1, le=100),
     domain: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["ops:read"]))
+    current_user: None = Depends(require_permissions(["ops:read"])),
 ):
     """List all DNS records."""
     query = select(DNSRecord)
@@ -444,7 +449,7 @@ async def create_dns_record(
     request: Request,
     obj_in: DNSRecordCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["ops:write"]))
+    current_user: None = Depends(require_permissions(["ops:write"])),
 ):
     """Create a new DNS record."""
     record = await crud_dns.create(db, obj_in=obj_in)
@@ -455,7 +460,7 @@ async def create_dns_record(
 async def get_dns_record(
     record_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["ops:read"]))
+    current_user: None = Depends(require_permissions(["ops:read"])),
 ):
     """Get DNS record by ID."""
     record = await crud_dns.get(db, id=record_id)
@@ -471,7 +476,7 @@ async def update_dns_record(
     record_id: int,
     obj_in: DNSRecordUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["ops:write"]))
+    current_user: None = Depends(require_permissions(["ops:write"])),
 ):
     """Update DNS record."""
     record = await crud_dns.get(db, id=record_id)
@@ -488,7 +493,7 @@ async def delete_dns_record(
     request: Request,
     record_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["ops:delete"]))
+    current_user: None = Depends(require_permissions(["ops:delete"])),
 ):
     """Delete DNS record."""
     record = await crud_dns.get(db, id=record_id)

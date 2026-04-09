@@ -104,9 +104,7 @@ class PermissionChecker:
             for perm in role.permissions:
                 user_permissions.append(perm.code)
 
-        has_permission = any(
-            perm in user_permissions for perm in self.required_permissions
-        )
+        has_permission = any(perm in user_permissions for perm in self.required_permissions)
 
         if current_user.is_superuser:
             has_permission = True

@@ -1,6 +1,7 @@
 """
 Operations management schemas.
 """
+
 from datetime import datetime
 
 from pydantic import BaseModel, Field
@@ -9,6 +10,7 @@ from pydantic import BaseModel, Field
 # Deployment schemas
 class DeploymentBase(BaseModel):
     """Base deployment schema."""
+
     project_name: str = Field(..., min_length=1, max_length=100)
     version: str = Field(..., min_length=1, max_length=50)
     environment: str = Field(..., pattern="^(dev|test|staging|prod)$")
@@ -16,11 +18,13 @@ class DeploymentBase(BaseModel):
 
 class DeploymentCreate(DeploymentBase):
     """Deployment creation schema."""
+
     pass
 
 
 class DeploymentUpdate(BaseModel):
     """Deployment update schema."""
+
     status: str | None = Field(None, pattern="^(pending|running|success|failed|rollback)$")
     log_output: str | None = None
     rollback_reason: str | None = None
@@ -29,6 +33,7 @@ class DeploymentUpdate(BaseModel):
 
 class DeploymentResponse(DeploymentBase):
     """Deployment response schema."""
+
     id: int
     status: str
     deployer_id: int | None
@@ -43,6 +48,7 @@ class DeploymentResponse(DeploymentBase):
 
 class DeploymentListResponse(BaseModel):
     """Deployment list response."""
+
     total: int
     items: list[DeploymentResponse]
 
@@ -50,6 +56,7 @@ class DeploymentListResponse(BaseModel):
 # Inspection schemas
 class InspectionCheckItem(BaseModel):
     """Inspection check item."""
+
     name: str
     command: str | None = None
     expected_result: str | None = None
@@ -58,6 +65,7 @@ class InspectionCheckItem(BaseModel):
 
 class InspectionTaskBase(BaseModel):
     """Base inspection task schema."""
+
     name: str = Field(..., min_length=1, max_length=200)
     task_type: str = Field(default="system", pattern="^(system|security|performance|custom)$")
     description: str | None = None
@@ -68,11 +76,13 @@ class InspectionTaskBase(BaseModel):
 
 class InspectionTaskCreate(InspectionTaskBase):
     """Inspection task creation schema."""
+
     pass
 
 
 class InspectionTaskUpdate(BaseModel):
     """Inspection task update schema."""
+
     name: str | None = Field(None, min_length=1, max_length=200)
     description: str | None = None
     cron_expression: str | None = Field(None, min_length=1, max_length=100)
@@ -83,6 +93,7 @@ class InspectionTaskUpdate(BaseModel):
 
 class InspectionTaskResponse(InspectionTaskBase):
     """Inspection task response schema."""
+
     id: int
     is_enabled: bool
     last_run_at: datetime | None
@@ -93,6 +104,7 @@ class InspectionTaskResponse(InspectionTaskBase):
 
 class InspectionReportDetail(BaseModel):
     """Inspection report detail item."""
+
     check_name: str
     status: str  # passed, failed, warning
     message: str | None = None
@@ -101,6 +113,7 @@ class InspectionReportDetail(BaseModel):
 
 class InspectionReportResponse(BaseModel):
     """Inspection report response schema."""
+
     id: int
     task_id: int
     task_name: str
@@ -117,6 +130,7 @@ class InspectionReportResponse(BaseModel):
 # Certificate schemas
 class CertificateBase(BaseModel):
     """Base certificate schema."""
+
     domain: str = Field(..., min_length=1, max_length=255)
     issuer: str = Field(..., min_length=1, max_length=255)
     subject: str = Field(..., min_length=1, max_length=255)
@@ -127,6 +141,7 @@ class CertificateBase(BaseModel):
 
 class CertificateCreate(CertificateBase):
     """Certificate creation schema."""
+
     alert_threshold_days: int = 30
     is_auto_renewal: bool = False
     cert_content: str | None = None
@@ -136,6 +151,7 @@ class CertificateCreate(CertificateBase):
 
 class CertificateUpdate(BaseModel):
     """Certificate update schema."""
+
     alert_threshold_days: int | None = None
     is_auto_renewal: bool | None = None
     cert_content: str | None = None
@@ -146,6 +162,7 @@ class CertificateUpdate(BaseModel):
 
 class CertificateResponse(CertificateBase):
     """Certificate response schema."""
+
     id: int
     days_until_expiry: int
     alert_threshold_days: int
@@ -158,6 +175,7 @@ class CertificateResponse(CertificateBase):
 
 class CertificateSyncResponse(BaseModel):
     """Certificate sync response schema."""
+
     total: int
     created: int
     updated: int
@@ -167,6 +185,7 @@ class CertificateSyncResponse(BaseModel):
 # DNS schemas
 class DNSRecordBase(BaseModel):
     """Base DNS record schema."""
+
     domain: str = Field(..., min_length=1, max_length=255)
     record_type: str = Field(..., pattern="^(A|AAAA|CNAME|MX|TXT|NS|SRV|PTR|CAA)$")
     host: str = Field(..., min_length=1, max_length=255)
@@ -177,12 +196,14 @@ class DNSRecordBase(BaseModel):
 
 class DNSRecordCreate(DNSRecordBase):
     """DNS record creation schema."""
+
     provider: str | None = None
     asset_ids: list[int] = []
 
 
 class DNSRecordUpdate(BaseModel):
     """DNS record update schema."""
+
     value: str | None = Field(None, min_length=1)
     ttl: int | None = Field(None, ge=60)
     priority: int | None = Field(None, ge=0, le=65535)
@@ -192,6 +213,7 @@ class DNSRecordUpdate(BaseModel):
 
 class DNSRecordResponse(DNSRecordBase):
     """DNS record response schema."""
+
     id: int
     is_active: bool
     provider: str | None

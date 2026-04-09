@@ -1,6 +1,7 @@
 """
 CRUD operations for notification groups.
 """
+
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -11,7 +12,9 @@ from app.models.user import User
 from app.schemas.notification_group import NotificationGroupCreate, NotificationGroupUpdate
 
 
-class CRUDNotificationGroup(CRUDBase[NotificationGroup, NotificationGroupCreate, NotificationGroupUpdate]):
+class CRUDNotificationGroup(
+    CRUDBase[NotificationGroup, NotificationGroupCreate, NotificationGroupUpdate]
+):
     """CRUD operations for notification groups."""
 
     async def get_multi_with_filter(
@@ -21,7 +24,7 @@ class CRUDNotificationGroup(CRUDBase[NotificationGroup, NotificationGroupCreate,
         notification_type: str | None = None,
         is_active: bool | None = None,
         skip: int = 0,
-        limit: int = 100
+        limit: int = 100,
     ) -> list[NotificationGroup]:
         """Get multiple notification groups with filters."""
         conditions = []
@@ -30,18 +33,11 @@ class CRUDNotificationGroup(CRUDBase[NotificationGroup, NotificationGroupCreate,
         if is_active is not None:
             conditions.append(NotificationGroup.is_active == is_active)
 
-        query = (
-            select(NotificationGroup)
-            .options(selectinload(NotificationGroup.members))
-        )
+        query = select(NotificationGroup).options(selectinload(NotificationGroup.members))
         if conditions:
             query = query.where(and_(*conditions))
 
-        result = await db.execute(
-            query.order_by(NotificationGroup.id)
-            .offset(skip)
-            .limit(limit)
-        )
+        result = await db.execute(query.order_by(NotificationGroup.id).offset(skip).limit(limit))
         return result.scalars().all()
 
     async def count_with_filter(
@@ -49,7 +45,7 @@ class CRUDNotificationGroup(CRUDBase[NotificationGroup, NotificationGroupCreate,
         db: AsyncSession,
         *,
         notification_type: str | None = None,
-        is_active: bool | None = None
+        is_active: bool | None = None,
     ) -> int:
         """Count notification groups with filters."""
         from sqlalchemy import func
@@ -67,12 +63,7 @@ class CRUDNotificationGroup(CRUDBase[NotificationGroup, NotificationGroupCreate,
         result = await db.execute(query)
         return result.scalar() or 0
 
-    async def get_with_members(
-        self,
-        db: AsyncSession,
-        *,
-        id: int
-    ) -> NotificationGroup | None:
+    async def get_with_members(self, db: AsyncSession, *, id: int) -> NotificationGroup | None:
         """Get a notification group by ID with members loaded."""
         result = await db.execute(
             select(NotificationGroup)
@@ -82,9 +73,7 @@ class CRUDNotificationGroup(CRUDBase[NotificationGroup, NotificationGroupCreate,
         return result.scalar_one_or_none()
 
     async def get_by_notification_type(
-        self,
-        db: AsyncSession,
-        notification_type: str
+        self, db: AsyncSession, notification_type: str
     ) -> list[NotificationGroup]:
         """Get active notification groups by notification type."""
         result = await db.execute(
@@ -93,17 +82,13 @@ class CRUDNotificationGroup(CRUDBase[NotificationGroup, NotificationGroupCreate,
             .where(
                 and_(
                     NotificationGroup.notification_type == notification_type,
-                    NotificationGroup.is_active
+                    NotificationGroup.is_active,
                 )
             )
         )
         return result.scalars().all()
 
-    async def get_group_member_feishu_ids(
-        self,
-        db: AsyncSession,
-        group_id: int
-    ) -> list[str]:
+    async def get_group_member_feishu_ids(self, db: AsyncSession, group_id: int) -> list[str]:
         """Get feishu open_ids of all members in a notification group."""
         result = await db.execute(
             select(NotificationGroup)
@@ -121,11 +106,7 @@ class CRUDNotificationGroup(CRUDBase[NotificationGroup, NotificationGroupCreate,
         return feishu_ids
 
     async def add_member(
-        self,
-        db: AsyncSession,
-        *,
-        group_id: int,
-        user_id: int
+        self, db: AsyncSession, *, group_id: int, user_id: int
     ) -> NotificationGroup | None:
         """Add a user to a notification group."""
         group = await self.get_with_members(db, id=group_id)
@@ -145,11 +126,7 @@ class CRUDNotificationGroup(CRUDBase[NotificationGroup, NotificationGroupCreate,
         return group
 
     async def remove_member(
-        self,
-        db: AsyncSession,
-        *,
-        group_id: int,
-        user_id: int
+        self, db: AsyncSession, *, group_id: int, user_id: int
     ) -> NotificationGroup | None:
         """Remove a user from a notification group."""
         group = await self.get_with_members(db, id=group_id)

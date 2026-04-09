@@ -1,6 +1,7 @@
 """
 Alert notification service.
 """
+
 import asyncio
 import re
 from datetime import datetime
@@ -49,22 +50,22 @@ async def send_alert_notification(
             return
 
         email_templates_result = await db.execute(
-            select(AlertTemplate).where(
+            select(AlertTemplate)
+            .where(
                 AlertTemplate.template_type == "email",
                 AlertTemplate.is_active.is_(True),
-            ).order_by(
-                case((AlertTemplate.is_default.is_(True), 0), else_=1)
             )
+            .order_by(case((AlertTemplate.is_default.is_(True), 0), else_=1))
         )
         email_templates = list(email_templates_result.scalars().all())
 
         feishu_templates_result = await db.execute(
-            select(AlertTemplate).where(
+            select(AlertTemplate)
+            .where(
                 AlertTemplate.template_type == "feishu",
                 AlertTemplate.is_active.is_(True),
-            ).order_by(
-                case((AlertTemplate.is_default.is_(True), 0), else_=1)
             )
+            .order_by(case((AlertTemplate.is_default.is_(True), 0), else_=1))
         )
         feishu_templates = list(feishu_templates_result.scalars().all())
 
@@ -166,7 +167,9 @@ async def _send_notification_by_instance(
             feishu_template = template
 
     if email_template:
-        logger.info(f"[DEBUG] Email template matched: id={email_template.id}, name={email_template.name}")
+        logger.info(
+            f"[DEBUG] Email template matched: id={email_template.id}, name={email_template.name}"
+        )
         subject, body = await alert_template_service.render_alert_template(
             db=db,
             template=email_template,
@@ -181,15 +184,18 @@ async def _send_notification_by_instance(
         )
 
         if subject and body:
-            logger.info(
-                f"Email notification prepared: instance={instance}, "
-                f"subject={subject}"
-            )
+            logger.info(f"Email notification prepared: instance={instance}, subject={subject}")
 
     if feishu_template:
-        logger.info(f"[DEBUG] Feishu template matched: id={feishu_template.id}, name={feishu_template.name}")
-        logger.info(f"[DEBUG] Feishu template content - subject_template: {feishu_template.subject_template}")
-        logger.info(f"[DEBUG] Feishu template content - body_template: {feishu_template.body_template}")
+        logger.info(
+            f"[DEBUG] Feishu template matched: id={feishu_template.id}, name={feishu_template.name}"
+        )
+        logger.info(
+            f"[DEBUG] Feishu template content - subject_template: {feishu_template.subject_template}"
+        )
+        logger.info(
+            f"[DEBUG] Feishu template content - body_template: {feishu_template.body_template}"
+        )
         subject, body = await alert_template_service.render_alert_template(
             db=db,
             template=feishu_template,
@@ -204,7 +210,11 @@ async def _send_notification_by_instance(
         )
 
         if body:
-            starts_at_str = starts_at.strftime("%Y-%m-%d %H:%M:%S") if isinstance(starts_at, datetime) else str(starts_at)
+            starts_at_str = (
+                starts_at.strftime("%Y-%m-%d %H:%M:%S")
+                if isinstance(starts_at, datetime)
+                else str(starts_at)
+            )
 
             asset_owner_open_id = await _get_asset_owner_open_id(db, instance)
             if asset_owner_open_id:
@@ -212,7 +222,11 @@ async def _send_notification_by_instance(
 
                 card = None
                 if feishu_template and feishu_template.card_config:
-                    starts_at_str = starts_at.strftime("%Y-%m-%d %H:%M:%S") if isinstance(starts_at, datetime) else str(starts_at)
+                    starts_at_str = (
+                        starts_at.strftime("%Y-%m-%d %H:%M:%S")
+                        if isinstance(starts_at, datetime)
+                        else str(starts_at)
+                    )
 
                     external_url = labels.get("externalURL", annotations.get("externalURL", ""))
                     alerts_list = alert_data.get("alerts", [{}])
@@ -240,6 +254,7 @@ async def _send_notification_by_instance(
                         "firstAlert": first_alert,
                     }
                     import json
+
                     card_config_json = json.dumps(feishu_template.card_config)
                     rendered_card_str = alert_template_service.render_template(
                         template_str=card_config_json,
@@ -291,9 +306,13 @@ async def _send_notification_by_instance(
                         )
                         logger.info(f"P2P Feishu card sent to asset owner for instance={instance}")
                     else:
-                        logger.warning(f"Failed to send P2P Feishu card to asset owner for instance={instance}")
+                        logger.warning(
+                            f"Failed to send P2P Feishu card to asset owner for instance={instance}"
+                        )
             else:
-                logger.info(f"No asset owner found for instance={instance}, skipping Feishu notification")
+                logger.info(
+                    f"No asset owner found for instance={instance}, skipping Feishu notification"
+                )
 
 
 async def _save_firing_alert_message_id(
@@ -316,8 +335,10 @@ async def _save_firing_alert_message_id(
 
     try:
         result = await db.execute(
-            text("SELECT id FROM alert_history WHERE alertname = :name AND labels->>'instance' = :instance AND status = 'firing'"),
-            {"name": alertname, "instance": instance}
+            text(
+                "SELECT id FROM alert_history WHERE alertname = :name AND labels->>'instance' = :instance AND status = 'firing'"
+            ),
+            {"name": alertname, "instance": instance},
         )
         row = result.fetchone()
 
@@ -325,12 +346,16 @@ async def _save_firing_alert_message_id(
             history_id = row[0]
             await db.execute(
                 text("UPDATE alert_history SET feishu_open_message_id = :msg_id WHERE id = :id"),
-                {"msg_id": message_id, "id": history_id}
+                {"msg_id": message_id, "id": history_id},
             )
             await db.commit()
-            logger.info(f"Saved feishu_open_message_id for firing alert: alertname={alertname}, instance={instance}")
+            logger.info(
+                f"Saved feishu_open_message_id for firing alert: alertname={alertname}, instance={instance}"
+            )
         else:
-            logger.warning(f"No firing AlertHistory found for: alertname={alertname}, instance={instance}")
+            logger.warning(
+                f"No firing AlertHistory found for: alertname={alertname}, instance={instance}"
+            )
 
     except Exception as exc:
         logger.error(f"Error saving feishu_open_message_id: {str(exc)}")
@@ -356,13 +381,17 @@ async def _update_resolved_alert_card(
 
     try:
         result = await db.execute(
-            text("SELECT id, feishu_open_message_id FROM alert_history WHERE alertname = :name AND labels->>'instance' = :instance AND status = 'firing' AND feishu_open_message_id IS NOT NULL"),
-            {"name": alertname, "instance": instance}
+            text(
+                "SELECT id, feishu_open_message_id FROM alert_history WHERE alertname = :name AND labels->>'instance' = :instance AND status = 'firing' AND feishu_open_message_id IS NOT NULL"
+            ),
+            {"name": alertname, "instance": instance},
         )
         row = result.fetchone()
 
         if not row:
-            logger.warning(f"No firing alert with message_id found for: alertname={alertname}, instance={instance}")
+            logger.warning(
+                f"No firing alert with message_id found for: alertname={alertname}, instance={instance}"
+            )
             return
 
         history_id, feishu_open_message_id = row[0], row[1]
@@ -381,8 +410,10 @@ async def _update_resolved_alert_card(
 
         if update_result.get("success"):
             await db.execute(
-                text("UPDATE alert_history SET status = 'resolved', notification_sent = True WHERE id = :id"),
-                {"id": history_id}
+                text(
+                    "UPDATE alert_history SET status = 'resolved', notification_sent = True WHERE id = :id"
+                ),
+                {"id": history_id},
             )
             await db.commit()
             logger.info(f"Updated card to resolved for: alertname={alertname}, instance={instance}")
@@ -409,8 +440,10 @@ async def _update_alert_history_notification_sent(
 
     try:
         result = await db.execute(
-            text("SELECT id FROM alert_history WHERE alertname = :name AND labels->>'instance' = :instance AND status = 'firing'"),
-            {"name": alertname, "instance": instance}
+            text(
+                "SELECT id FROM alert_history WHERE alertname = :name AND labels->>'instance' = :instance AND status = 'firing'"
+            ),
+            {"name": alertname, "instance": instance},
         )
         row = result.fetchone()
 
@@ -418,12 +451,16 @@ async def _update_alert_history_notification_sent(
             history_id = row[0]
             await db.execute(
                 text("UPDATE alert_history SET notification_sent = True WHERE id = :id"),
-                {"id": history_id}
+                {"id": history_id},
             )
             await db.commit()
-            logger.info(f"Updated notification_sent=True for AlertHistory: id={history_id}, alertname={alertname}, instance={instance}")
+            logger.info(
+                f"Updated notification_sent=True for AlertHistory: id={history_id}, alertname={alertname}, instance={instance}"
+            )
         else:
-            logger.warning(f"No firing AlertHistory found for notification_sent update: alertname={alertname}, instance={instance}")
+            logger.warning(
+                f"No firing AlertHistory found for notification_sent update: alertname={alertname}, instance={instance}"
+            )
 
     except Exception as exc:
         logger.error(f"Error updating notification_sent: {str(exc)}")
@@ -457,7 +494,9 @@ async def _get_asset_owner_open_id(db: AsyncSession, instance: str) -> str | Non
         if row:
             asset, user = row
             if user.feishu_open_id:
-                logger.info(f"Found asset owner: asset={asset.name}, user={user.username}, open_id={user.feishu_open_id}")
+                logger.info(
+                    f"Found asset owner: asset={asset.name}, user={user.username}, open_id={user.feishu_open_id}"
+                )
                 return user.feishu_open_id
 
         logger.debug(f"No asset owner found for IP: {instance}")

@@ -1,6 +1,7 @@
 """
 Application configuration using Pydantic Settings.
 """
+
 from pathlib import Path
 
 from pydantic import Field, model_validator
@@ -30,7 +31,7 @@ class Settings(BaseSettings):
     # Database
     database_url: str = Field(
         default="postgresql+asyncpg://opsmanager:opsmanager@localhost:5432/opsmanager",
-        alias="DATABASE_URL"
+        alias="DATABASE_URL",
     )
     db_pool_size: int = Field(default=20, alias="DB_POOL_SIZE")
     db_max_overflow: int = Field(default=10, alias="DB_MAX_OVERFLOW")
@@ -41,10 +42,14 @@ class Settings(BaseSettings):
 
     # Celery
     celery_broker_url: str = Field(default="redis://localhost:6379/1", alias="CELERY_BROKER_URL")
-    celery_result_backend: str = Field(default="redis://localhost:6379/2", alias="CELERY_RESULT_BACKEND")
+    celery_result_backend: str = Field(
+        default="redis://localhost:6379/2", alias="CELERY_RESULT_BACKEND"
+    )
 
     # CORS - Use string type and parse manually
-    cors_origins_str: str = Field(default="http://localhost:3000,http://localhost:5173", alias="CORS_ORIGINS")
+    cors_origins_str: str = Field(
+        default="http://localhost:3000,http://localhost:5173", alias="CORS_ORIGINS"
+    )
 
     # Email (optional)
     smtp_host: str | None = Field(default=None, alias="SMTP_HOST")
@@ -109,9 +114,7 @@ class Settings(BaseSettings):
                     "Please set a secure random string via SECRET_KEY environment variable."
                 )
             if len(self.secret_key) < 32:
-                raise ValueError(
-                    "SECRET_KEY must be at least 32 characters long for security."
-                )
+                raise ValueError("SECRET_KEY must be at least 32 characters long for security.")
         return self
 
 

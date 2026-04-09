@@ -1,6 +1,7 @@
 """
 Audit log cleanup tasks for database and file retention.
 """
+
 import asyncio
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -53,9 +54,7 @@ def cleanup_audit_logs_db(self) -> dict[str, Any]:
                         "message": "No expired records found",
                     }
 
-                delete_stmt = delete(AuditLog).where(
-                    AuditLog.operation_time < cutoff_date
-                )
+                delete_stmt = delete(AuditLog).where(AuditLog.operation_time < cutoff_date)
                 await db.execute(delete_stmt)
                 await db.commit()
 

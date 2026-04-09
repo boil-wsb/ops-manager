@@ -1,6 +1,7 @@
 """
 Terminal Metric models - aggregated metrics for terminal assets.
 """
+
 from datetime import datetime
 
 from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String
@@ -21,7 +22,9 @@ class TerminalMetric(BaseModel):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    asset_id: Mapped[int] = mapped_column(Integer, ForeignKey("assets.id", ondelete="CASCADE"), nullable=False)
+    asset_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("assets.id", ondelete="CASCADE"), nullable=False
+    )
     owner_username: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     hostname: Mapped[str] = mapped_column(String(255), nullable=False)
     ip_address: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -41,7 +44,9 @@ class TerminalMetric(BaseModel):
     alert_severity: Mapped[str | None] = mapped_column(String(20), nullable=True)
     monitor_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
-    metrics_timestamp: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    metrics_timestamp: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     asset: Mapped["Asset"] = relationship("Asset", back_populates="terminal_metrics")
 

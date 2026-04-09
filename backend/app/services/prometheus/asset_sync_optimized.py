@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class NodeCache:
     """节点缓存"""
+
     nodes: list[dict[str, Any]]
     timestamp: datetime
     ttl: timedelta = timedelta(minutes=5)  # 缓存5分钟
@@ -364,13 +365,12 @@ class OptimizedAssetSyncService:
         if not ip_address:
             return None
 
-        result = await self.db.execute(
-            select(Asset).where(Asset.ip_address == ip_address)
-        )
+        result = await self.db.execute(select(Asset).where(Asset.ip_address == ip_address))
         return result.scalar_one_or_none()
 
-    async def _update_asset(self, existing_asset: Asset, asset_data: dict[str, Any],
-                           node: dict[str, Any], instance: str) -> None:
+    async def _update_asset(
+        self, existing_asset: Asset, asset_data: dict[str, Any], node: dict[str, Any], instance: str
+    ) -> None:
         """更新现有资产"""
         update_data = {
             "name": asset_data["name"],
@@ -395,8 +395,9 @@ class OptimizedAssetSyncService:
         await self.db.refresh(existing_asset)
         logger.info(f"Updated asset: {existing_asset.asset_id}")
 
-    async def _create_asset(self, asset_data: dict[str, Any],
-                           node: dict[str, Any], instance: str) -> Asset:
+    async def _create_asset(
+        self, asset_data: dict[str, Any], node: dict[str, Any], instance: str
+    ) -> Asset:
         """创建新资产"""
         new_asset = Asset(
             asset_id=asset_data["asset_id"],

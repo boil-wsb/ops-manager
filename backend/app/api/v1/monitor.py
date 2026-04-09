@@ -1,6 +1,7 @@
 """
 Monitoring and alerting API routes.
 """
+
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query, Request, status
@@ -79,28 +80,37 @@ async def get_my_terminals(
 
         owner_name = await get_asset_owner_name(asset, db)
 
-        monitor_info = {"monitor_id": None, "monitor_name": None, "current_status": "unknown", "last_check_at": None}
+        monitor_info = {
+            "monitor_id": None,
+            "monitor_name": None,
+            "current_status": "unknown",
+            "last_check_at": None,
+        }
         if asset.monitors:
             monitor = asset.monitors[0]
             monitor_info = {
                 "monitor_id": monitor.id,
                 "monitor_name": monitor.name,
-                "current_status": monitor.current_status.value if hasattr(monitor.current_status, 'value') else str(monitor.current_status),
+                "current_status": monitor.current_status.value
+                if hasattr(monitor.current_status, "value")
+                else str(monitor.current_status),
                 "last_check_at": monitor.last_check_at,
             }
 
-        items.append(MonitorTerminalResponse(
-            id=asset.id,
-            name=asset.name,
-            asset_id=asset.asset_id,
-            ip_address=asset.ip_address,
-            hostname=asset.hostname,
-            owner_name=owner_name,
-            current_status=monitor_info["current_status"],
-            last_check_at=monitor_info["last_check_at"],
-            monitor_id=monitor_info["monitor_id"],
-            monitor_name=monitor_info["monitor_name"],
-        ))
+        items.append(
+            MonitorTerminalResponse(
+                id=asset.id,
+                name=asset.name,
+                asset_id=asset.asset_id,
+                ip_address=asset.ip_address,
+                hostname=asset.hostname,
+                owner_name=owner_name,
+                current_status=monitor_info["current_status"],
+                last_check_at=monitor_info["last_check_at"],
+                monitor_id=monitor_info["monitor_id"],
+                monitor_name=monitor_info["monitor_name"],
+            )
+        )
 
     return MonitorTerminalListResponse(total=len(items), items=items)
 
@@ -144,7 +154,7 @@ async def create_monitor(
     request: Request,
     obj_in: MonitorCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["monitor:write"]))
+    current_user: None = Depends(require_permissions(["monitor:write"])),
 ):
     """Create a new monitor."""
     monitor = await crud_monitor.create(db, obj_in=obj_in)
@@ -155,7 +165,7 @@ async def create_monitor(
 async def get_monitor(
     monitor_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["monitor:read"]))
+    current_user: None = Depends(require_permissions(["monitor:read"])),
 ):
     """Get monitor by ID."""
     monitor = await crud_monitor.get(db, id=monitor_id)
@@ -171,7 +181,7 @@ async def update_monitor(
     monitor_id: int,
     obj_in: MonitorUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["monitor:write"]))
+    current_user: None = Depends(require_permissions(["monitor:write"])),
 ):
     """Update monitor."""
     monitor = await crud_monitor.get(db, id=monitor_id)
@@ -188,7 +198,7 @@ async def delete_monitor(
     request: Request,
     monitor_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["monitor:delete"]))
+    current_user: None = Depends(require_permissions(["monitor:delete"])),
 ):
     """Delete monitor."""
     monitor = await crud_monitor.get(db, id=monitor_id)
@@ -205,7 +215,7 @@ async def toggle_monitor(
     request: Request,
     monitor_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["monitor:write"]))
+    current_user: None = Depends(require_permissions(["monitor:write"])),
 ):
     """Toggle monitor enabled status."""
     monitor = await crud_monitor.get(db, id=monitor_id)
@@ -256,7 +266,7 @@ async def list_alerts(
 async def get_alert(
     alert_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["monitor:read"]))
+    current_user: None = Depends(require_permissions(["monitor:read"])),
 ):
     """Get alert by ID."""
     alert = await crud_alert.get(db, id=alert_id)
@@ -272,7 +282,7 @@ async def alert_action(
     alert_id: int,
     action: AlertAction,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_permissions(["monitor:write"]))
+    current_user: User = Depends(require_permissions(["monitor:write"])),
 ):
     """Perform action on alert (acknowledge, resolve, suppress)."""
     alert = await crud_alert.get(db, id=alert_id)
@@ -322,7 +332,7 @@ async def create_alert_rule(
     request: Request,
     obj_in: AlertRuleCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["monitor:write"]))
+    current_user: None = Depends(require_permissions(["monitor:write"])),
 ):
     """Create a new alert rule."""
     rule = await crud_alert_rule.create(db, obj_in=obj_in)
@@ -333,7 +343,7 @@ async def create_alert_rule(
 async def get_alert_rule(
     rule_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["monitor:read"]))
+    current_user: None = Depends(require_permissions(["monitor:read"])),
 ):
     """Get alert rule by ID."""
     rule = await crud_alert_rule.get(db, id=rule_id)
@@ -349,7 +359,7 @@ async def update_alert_rule(
     rule_id: int,
     obj_in: AlertRuleUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["monitor:write"]))
+    current_user: None = Depends(require_permissions(["monitor:write"])),
 ):
     """Update alert rule."""
     rule = await crud_alert_rule.get(db, id=rule_id)
@@ -366,7 +376,7 @@ async def delete_alert_rule(
     request: Request,
     rule_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["monitor:delete"]))
+    current_user: None = Depends(require_permissions(["monitor:delete"])),
 ):
     """Delete alert rule."""
     rule = await crud_alert_rule.get(db, id=rule_id)
@@ -382,20 +392,24 @@ async def list_notification_channels(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["monitor:read"]))
+    current_user: None = Depends(require_permissions(["monitor:read"])),
 ):
     """List all notification channels."""
     channels = await crud_notification_channel.get_multi(db, skip=skip, limit=limit)
     return channels
 
 
-@router.post("/notification-channels", response_model=NotificationChannelResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/notification-channels",
+    response_model=NotificationChannelResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 @audit_log(operation_type="CREATE", module="monitor", object_type="NotificationChannel")
 async def create_notification_channel(
     request: Request,
     obj_in: NotificationChannelCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["monitor:write"]))
+    current_user: None = Depends(require_permissions(["monitor:write"])),
 ):
     """Create a new notification channel."""
     channel = await crud_notification_channel.create(db, obj_in=obj_in)
@@ -406,7 +420,7 @@ async def create_notification_channel(
 async def get_notification_channel(
     channel_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["monitor:read"]))
+    current_user: None = Depends(require_permissions(["monitor:read"])),
 ):
     """Get notification channel by ID."""
     channel = await crud_notification_channel.get(db, id=channel_id)
@@ -422,7 +436,7 @@ async def update_notification_channel(
     channel_id: int,
     obj_in: NotificationChannelUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["monitor:write"]))
+    current_user: None = Depends(require_permissions(["monitor:write"])),
 ):
     """Update notification channel."""
     channel = await crud_notification_channel.get(db, id=channel_id)
@@ -439,7 +453,7 @@ async def delete_notification_channel(
     request: Request,
     channel_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["monitor:delete"]))
+    current_user: None = Depends(require_permissions(["monitor:delete"])),
 ):
     """Delete notification channel."""
     channel = await crud_notification_channel.get(db, id=channel_id)
@@ -456,7 +470,7 @@ async def test_notification_channel(
     request: Request,
     channel_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: None = Depends(require_permissions(["monitor:write"]))
+    current_user: None = Depends(require_permissions(["monitor:write"])),
 ):
     """Test notification channel."""
     channel = await crud_notification_channel.get(db, id=channel_id)

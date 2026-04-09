@@ -1,6 +1,7 @@
 """
 Audit log system for tracking user operations.
 """
+
 from app.core.audit.constants import Module, OperationType
 from app.core.audit.decorator import audit_log
 from app.core.audit.logger import AuditLogger, get_audit_logger

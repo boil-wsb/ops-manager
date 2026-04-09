@@ -1,6 +1,7 @@
 """
 Feishu (Lark) notification service using lark_oapi SDK.
 """
+
 from typing import Any
 
 from app.config import settings
@@ -23,6 +24,7 @@ class FeishuNotificationService:
         """Lazily initialize and return the lark_oapi client."""
         if self._client is None and self._enabled:
             import lark_oapi as lark
+
             self._client = (
                 lark.Client.builder()
                 .app_id(settings.feishu_app_id)
@@ -74,7 +76,9 @@ class FeishuNotificationService:
 
             if response.success():
                 message_id = response.data.message_id if response.data else None
-                logger.info(f"P2P card message sent to open_id: {open_id}, message_id: {message_id}")
+                logger.info(
+                    f"P2P card message sent to open_id: {open_id}, message_id: {message_id}"
+                )
                 return {"success": True, "message_id": message_id}
             else:
                 logger.error(f"Failed to send P2P card: code={response.code}, msg={response.msg}")
@@ -132,28 +136,48 @@ class FeishuNotificationService:
         starts_at: str,
     ) -> dict[str, Any]:
         """Build Feishu interactive card for alert notification."""
-        header_template = "red" if severity == "critical" else ("orange" if severity == "warning" else "blue")
+        header_template = (
+            "red" if severity == "critical" else ("orange" if severity == "warning" else "blue")
+        )
 
         card = {
             "schema": "2.0",
             "header": {
-                "title": {
-                    "tag": "plain_text",
-                    "content": f"【{severity.upper()}】{alertname}"
-                },
-                "template": header_template
+                "title": {"tag": "plain_text", "content": f"【{severity.upper()}】{alertname}"},
+                "template": header_template,
             },
             "body": {
                 "elements": [
-                    {"tag": "div", "text": {"tag": "lark_md", "content": f"🔴 **告警状态**：{status.upper()}"}},
-                    {"tag": "div", "text": {"tag": "lark_md", "content": f"⚠️ **严重程度**：{severity.upper()}"}},
-                    {"tag": "div", "text": {"tag": "lark_md", "content": f"🖥️ **故障主机**：{instance}"}},
-                    {"tag": "div", "text": {"tag": "lark_md", "content": f"📋 **事件详情**：{description}"}},
-                    {"tag": "div", "text": {"tag": "lark_md", "content": f"🕐 **开始时间**：{starts_at}"}},
+                    {
+                        "tag": "div",
+                        "text": {"tag": "lark_md", "content": f"🔴 **告警状态**：{status.upper()}"},
+                    },
+                    {
+                        "tag": "div",
+                        "text": {
+                            "tag": "lark_md",
+                            "content": f"⚠️ **严重程度**：{severity.upper()}",
+                        },
+                    },
+                    {
+                        "tag": "div",
+                        "text": {"tag": "lark_md", "content": f"🖥️ **故障主机**：{instance}"},
+                    },
+                    {
+                        "tag": "div",
+                        "text": {"tag": "lark_md", "content": f"📋 **事件详情**：{description}"},
+                    },
+                    {
+                        "tag": "div",
+                        "text": {"tag": "lark_md", "content": f"🕐 **开始时间**：{starts_at}"},
+                    },
                     {"tag": "hr"},
-                    {"tag": "div", "text": {"tag": "lark_md", "content": "*来自 OpsManager 告警中心*"}}
+                    {
+                        "tag": "div",
+                        "text": {"tag": "lark_md", "content": "*来自 OpsManager 告警中心*"},
+                    },
                 ]
-            }
+            },
         }
 
         return card
@@ -207,20 +231,29 @@ class FeishuNotificationService:
         card = {
             "schema": "2.0",
             "header": {
-                "title": {
-                    "tag": "plain_text",
-                    "content": f"🟢 {alertname}"
-                },
-                "template": "green"
+                "title": {"tag": "plain_text", "content": f"🟢 {alertname}"},
+                "template": "green",
             },
             "body": {
                 "elements": [
-                    {"tag": "div", "text": {"tag": "lark_md", "content": f"📋 **告警名称**：{alertname}"}},
-                    {"tag": "div", "text": {"tag": "lark_md", "content": f"🖥️ **故障主机**：{instance}"}},
+                    {
+                        "tag": "div",
+                        "text": {"tag": "lark_md", "content": f"📋 **告警名称**：{alertname}"},
+                    },
+                    {
+                        "tag": "div",
+                        "text": {"tag": "lark_md", "content": f"🖥️ **故障主机**：{instance}"},
+                    },
                     {"tag": "hr"},
-                    {"tag": "div", "text": {"tag": "lark_md", "content": "<font color='green'>✅ 该告警已恢复</font>"}}
+                    {
+                        "tag": "div",
+                        "text": {
+                            "tag": "lark_md",
+                            "content": "<font color='green'>✅ 该告警已恢复</font>",
+                        },
+                    },
                 ]
-            }
+            },
         }
 
         return card

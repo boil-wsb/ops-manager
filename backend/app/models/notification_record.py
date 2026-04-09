@@ -1,6 +1,7 @@
 """
 Notification Record model for tracking Feishu notification history.
 """
+
 from datetime import datetime
 
 from sqlalchemy import JSON, Boolean, DateTime, String
@@ -22,9 +23,7 @@ class NotificationRecord(BaseModel):
     success: Mapped[bool] = mapped_column(Boolean, default=False)
     error: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=datetime.utcnow
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
     )
 
     def __repr__(self) -> str:

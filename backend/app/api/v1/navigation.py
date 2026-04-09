@@ -1,6 +1,7 @@
 """
 Navigation link management API routes.
 """
+
 import csv
 import io
 import logging
@@ -44,10 +45,12 @@ async def get_public_navigation_links(
 
     result = []
     for category, links in grouped.items():
-        result.append({
-            "category": category,
-            "links": [NavigationLinkResponse.model_validate(link) for link in links],
-        })
+        result.append(
+            {
+                "category": category,
+                "links": [NavigationLinkResponse.model_validate(link) for link in links],
+            }
+        )
     return {"groups": result}
 
 
@@ -120,20 +123,24 @@ async def export_navigation_links(
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["category", "name", "url", "icon", "description", "sort_order", "is_active", "role_names"])
+    writer.writerow(
+        ["category", "name", "url", "icon", "description", "sort_order", "is_active", "role_names"]
+    )
 
     for link in links:
         role_names = ",".join([role.name for role in link.roles]) if link.roles else ""
-        writer.writerow([
-            link.category,
-            link.name,
-            link.url,
-            link.icon or "",
-            link.description or "",
-            link.sort_order,
-            link.is_active,
-            role_names,
-        ])
+        writer.writerow(
+            [
+                link.category,
+                link.name,
+                link.url,
+                link.icon or "",
+                link.description or "",
+                link.sort_order,
+                link.is_active,
+                role_names,
+            ]
+        )
 
     output.seek(0)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -146,7 +153,9 @@ async def export_navigation_links(
     )
 
 
-@router.post("/import", response_model=NavigationImportResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/import", response_model=NavigationImportResponse, status_code=status.HTTP_201_CREATED
+)
 @audit_log(operation_type="IMPORT", module="navigation", object_type="NavigationLink")
 async def import_navigation_links(
     request: Request,
@@ -166,19 +175,21 @@ async def import_navigation_links(
         try:
             role_ids = []
             if link_in.role_names:
-                role_names = [name.strip() for name in link_in.role_names.split(",") if name.strip()]
+                role_names = [
+                    name.strip() for name in link_in.role_names.split(",") if name.strip()
+                ]
                 if role_names and role_names[0].lower() != "public":
-                    role_result = await db.execute(
-                        select(Role).where(Role.name.in_(role_names))
-                    )
+                    role_result = await db.execute(select(Role).where(Role.name.in_(role_names)))
                     roles = list(role_result.scalars().all())
                     if len(roles) != len(role_names):
                         missing = set(role_names) - {r.name for r in roles}
-                        results.append(NavigationLinkImportResult(
-                            success=False,
-                            name=link_in.name,
-                            message=f"角色不存在: {', '.join(missing)}"
-                        ))
+                        results.append(
+                            NavigationLinkImportResult(
+                                success=False,
+                                name=link_in.name,
+                                message=f"角色不存在: {', '.join(missing)}",
+                            )
+                        )
                         failed_count += 1
                         continue
                     role_ids = [role.id for role in roles]
@@ -194,19 +205,17 @@ async def import_navigation_links(
                 restrict_to_current_role=False,
             )
             await navigation_link.create_with_roles(db, obj_in=nav_create, role_ids=role_ids)
-            results.append(NavigationLinkImportResult(
-                success=True,
-                name=link_in.name,
-                message="导入成功"
-            ))
+            results.append(
+                NavigationLinkImportResult(success=True, name=link_in.name, message="导入成功")
+            )
             success_count += 1
         except Exception as e:
             logger.error(f"[导航管理] 导入导航链接 '{link_in.name}' 失败: {str(e)}")
-            results.append(NavigationLinkImportResult(
-                success=False,
-                name=link_in.name,
-                message=f"导入失败: {str(e)}"
-            ))
+            results.append(
+                NavigationLinkImportResult(
+                    success=False, name=link_in.name, message=f"导入失败: {str(e)}"
+                )
+            )
             failed_count += 1
 
     logger.info(f"[导航管理] 导入完成，成功 {success_count} 条，失败 {failed_count} 条")
@@ -285,9 +294,7 @@ async def update_navigation_link(
     if link_in.restrict_to_current_role is not None:
         if link_in.restrict_to_current_role:
             if current_user.is_superuser:
-                role_result = await db.execute(
-                    select(Role).where(Role.name == "superadmin")
-                )
+                role_result = await db.execute(select(Role).where(Role.name == "superadmin"))
                 superadmin_role = role_result.scalar_one_or_none()
                 role_ids = [superadmin_role.id] if superadmin_role else []
             elif not current_user.roles:
@@ -300,7 +307,9 @@ async def update_navigation_link(
         else:
             role_ids = []
 
-    link = await navigation_link.update_with_roles(db, db_obj=link, obj_in=link_in, role_ids=role_ids)
+    link = await navigation_link.update_with_roles(
+        db, db_obj=link, obj_in=link_in, role_ids=role_ids
+    )
     logger.info(f"[导航管理] 导航链接 '{link.name}' 更新成功")
 
     return NavigationLinkResponse.model_validate(link)

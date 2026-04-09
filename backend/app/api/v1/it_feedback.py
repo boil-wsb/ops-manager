@@ -1,6 +1,7 @@
 """
 IT Feedback API endpoints.
 """
+
 import logging
 from contextlib import suppress
 from datetime import datetime
@@ -27,6 +28,7 @@ logger = logging.getLogger(__name__)
 def get_feishu_service():
     """Lazy import FeishuService."""
     from app.integrations.feishu.service import get_feishu_service as _get
+
     return _get()
 
 
@@ -86,21 +88,24 @@ async def create_feedback(
     lookup_ip = local_ip_mapping.get(client_ip, client_ip)
 
     result = await db.execute(
-        select(Asset).where(
-            Asset.ip_address == lookup_ip,
-            Asset.asset_type == AssetType.TERMINAL
-        )
+        select(Asset).where(Asset.ip_address == lookup_ip, Asset.asset_type == AssetType.TERMINAL)
     )
     asset = result.scalar_one_or_none()
 
     if asset:
         responsible_name = None
-        if hasattr(asset, 'responsible') and asset.responsible:
-            responsible_name = getattr(asset.responsible, 'name', None) or getattr(asset.responsible, 'username', None)
+        if hasattr(asset, "responsible") and asset.responsible:
+            responsible_name = getattr(asset.responsible, "name", None) or getattr(
+                asset.responsible, "username", None
+            )
 
-        notification_user_ids = await get_notification_user_ids(db, NOTIFICATION_TYPE_IT_FEEDBACK_CREATED)
+        notification_user_ids = await get_notification_user_ids(
+            db, NOTIFICATION_TYPE_IT_FEEDBACK_CREATED
+        )
         open_msg_ids = []
-        logger.info(f"[IT Feedback] Sending notifications to {len(notification_user_ids)} users: {notification_user_ids}")
+        logger.info(
+            f"[IT Feedback] Sending notifications to {len(notification_user_ids)} users: {notification_user_ids}"
+        )
         for user_id in notification_user_ids:
             open_msg_id = send_it_feedback_created_notification(
                 user_id=user_id,
@@ -117,7 +122,9 @@ async def create_feedback(
             feedback.open_message_id = open_msg_ids[0]
             await db.commit()
             await db.refresh(feedback)
-            logger.info(f"[IT Feedback] Saved open_message_id={open_msg_ids[0]} for feedback {feedback.id}, sent to {len(open_msg_ids)} users")
+            logger.info(
+                f"[IT Feedback] Saved open_message_id={open_msg_ids[0]} for feedback {feedback.id}, sent to {len(open_msg_ids)} users"
+            )
 
     return ITFeedbackResponse.model_validate(feedback)
 
@@ -156,9 +163,7 @@ async def get_feedback(
     feedback_id: int,
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(ITFeedback).where(ITFeedback.id == feedback_id)
-    )
+    result = await db.execute(select(ITFeedback).where(ITFeedback.id == feedback_id))
     feedback = result.scalar_one_or_none()
 
     if not feedback:
@@ -188,10 +193,17 @@ def send_it_feedback_created_notification(
             tags.append({"label": "联系方式", "value": contact})
 
         buttons = [
-            {"text": "🔧 处理", "value": f"handle_{feedback_id}", "width": "fill", "type": "primary"},
+            {
+                "text": "🔧 处理",
+                "value": f"handle_{feedback_id}",
+                "width": "fill",
+                "type": "primary",
+            },
         ]
 
-        jump_url = f"http://192.168.23.36:8080/ops/it-management?feedback_id={feedback_id}&action=handle"
+        jump_url = (
+            f"http://192.168.23.36:8080/ops/it-management?feedback_id={feedback_id}&action=handle"
+        )
 
         result = get_feishu_service().send_interactive_message(
             user_id=user_id,
@@ -204,7 +216,9 @@ def send_it_feedback_created_notification(
         )
         open_message_id = result.get("message_id") if isinstance(result, dict) else None
         if open_message_id:
-            logger.info(f"[IT Feedback] Notification sent to user_id={user_id}, message_id={open_message_id}")
+            logger.info(
+                f"[IT Feedback] Notification sent to user_id={user_id}, message_id={open_message_id}"
+            )
         return open_message_id
     except Exception as e:
         logger.error(f"[IT Feedback] Failed to send notification to user_id={user_id}: {e}")
@@ -258,9 +272,7 @@ async def resolve_feedback(
     notes: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(ITFeedback).where(ITFeedback.id == feedback_id)
-    )
+    result = await db.execute(select(ITFeedback).where(ITFeedback.id == feedback_id))
     feedback = result.scalar_one_or_none()
 
     if not feedback:
@@ -292,9 +304,7 @@ async def delete_feedback(
     feedback_id: int,
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(ITFeedback).where(ITFeedback.id == feedback_id)
-    )
+    result = await db.execute(select(ITFeedback).where(ITFeedback.id == feedback_id))
     feedback = result.scalar_one_or_none()
 
     if not feedback:

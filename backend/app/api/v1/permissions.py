@@ -54,9 +54,7 @@ async def list_permissions(
                 "module_name": MODULE_NAMES.get(perm.module, perm.module),
                 "permissions": [],
             }
-        module_groups[perm.module]["permissions"].append(
-            PermissionResponse.model_validate(perm)
-        )
+        module_groups[perm.module]["permissions"].append(PermissionResponse.model_validate(perm))
 
     return {
         "items": list(module_groups.values()),

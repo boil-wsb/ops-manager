@@ -1,6 +1,7 @@
 """
 Feishu callback and real-time notification handling.
 """
+
 import asyncio
 import json
 from collections.abc import AsyncGenerator

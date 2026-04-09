@@ -1,6 +1,7 @@
 """
 Permission model for RBAC.
 """
+
 from datetime import datetime
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Table
@@ -13,7 +14,9 @@ role_permissions = Table(
     "role_permissions",
     BaseModel.metadata,
     Column("role_id", Integer, ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True),
-    Column("permission_id", Integer, ForeignKey("permissions.id", ondelete="CASCADE"), primary_key=True),
+    Column(
+        "permission_id", Integer, ForeignKey("permissions.id", ondelete="CASCADE"), primary_key=True
+    ),
     Column("created_at", DateTime(timezone=True), default=datetime.utcnow),
 )
 
@@ -32,10 +35,7 @@ class Permission(BaseModel):
 
     # Relationships
     roles: Mapped[list["Role"]] = relationship(
-        "Role",
-        secondary=role_permissions,
-        back_populates="permissions",
-        lazy="selectin"
+        "Role", secondary=role_permissions, back_populates="permissions", lazy="selectin"
     )
 
     def __repr__(self) -> str:
@@ -54,16 +54,10 @@ class Role(BaseModel):
 
     # Relationships
     users: Mapped[list["User"]] = relationship(
-        "User",
-        secondary="user_roles",
-        back_populates="roles",
-        lazy="selectin"
+        "User", secondary="user_roles", back_populates="roles", lazy="selectin"
     )
     permissions: Mapped[list["Permission"]] = relationship(
-        "Permission",
-        secondary=role_permissions,
-        back_populates="roles",
-        lazy="selectin"
+        "Permission", secondary=role_permissions, back_populates="roles", lazy="selectin"
     )
 
     def __repr__(self) -> str:

@@ -1,6 +1,7 @@
 """
 API v1 routes package.
 """
+
 from app.api.v1 import (
     alert_history,
     alert_silences,

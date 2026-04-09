@@ -1,6 +1,7 @@
 """
 Models package.
 """
+
 from app.models.alert import AlertHistory, AlertSilence, AlertTemplate
 from app.models.asset import Asset, Label, asset_labels
 from app.models.audit_log import AuditLog

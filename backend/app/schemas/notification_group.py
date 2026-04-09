@@ -1,11 +1,13 @@
 """
 Notification group schemas.
 """
+
 from app.schemas.base import BaseResponse, BaseSchema
 
 
 class UserBrief(BaseSchema):
     """Brief user info for notification group response."""
+
     id: int
     username: str
     full_name: str | None = None
@@ -14,6 +16,7 @@ class UserBrief(BaseSchema):
 
 class NotificationGroupCreate(BaseSchema):
     """Schema for creating a notification group."""
+
     name: str
     description: str | None = None
     notification_type: str
@@ -22,6 +25,7 @@ class NotificationGroupCreate(BaseSchema):
 
 class NotificationGroupUpdate(BaseSchema):
     """Schema for updating a notification group."""
+
     name: str | None = None
     description: str | None = None
     notification_type: str | None = None
@@ -30,6 +34,7 @@ class NotificationGroupUpdate(BaseSchema):
 
 class NotificationGroupResponse(BaseResponse):
     """Schema for notification group response."""
+
     name: str
     description: str | None = None
     notification_type: str
@@ -39,5 +44,6 @@ class NotificationGroupResponse(BaseResponse):
 
 class NotificationGroupListResponse(BaseSchema):
     """Schema for notification group list response."""
+
     items: list[NotificationGroupResponse]
     total: int

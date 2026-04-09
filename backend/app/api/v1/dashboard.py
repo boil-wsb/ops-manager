@@ -1,6 +1,7 @@
 """
 Dashboard API routes for terminal metrics.
 """
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,9 +23,7 @@ async def get_my_terminal_metrics(
     """
     owner_username = current_user.username
 
-    summary = await crud_terminal_metric.get_summary_by_owner(
-        db, owner_username=owner_username
-    )
+    summary = await crud_terminal_metric.get_summary_by_owner(db, owner_username=owner_username)
 
     terminals = await crud_terminal_metric.get_multi_by_owner(
         db, owner_username=owner_username, skip=0, limit=100

@@ -1,6 +1,7 @@
 """
 Rate limiter configuration.
 """
+
 import os
 
 from slowapi import Limiter

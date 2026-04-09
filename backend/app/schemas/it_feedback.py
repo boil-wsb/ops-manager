@@ -1,6 +1,7 @@
 """
 IT Feedback schemas.
 """
+
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -8,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class ITFeedbackBase(BaseModel):
     """Base schema for IT feedback."""
+
     computer_type: str = Field(..., alias="computerType", min_length=1, max_length=20)
     usage_years: str = Field(..., alias="usageYears", min_length=1, max_length=20)
     lag_level: str = Field(..., alias="lagLevel", min_length=1, max_length=1)
@@ -24,6 +26,7 @@ class ITFeedbackBase(BaseModel):
 
 class ITFeedbackCreate(BaseModel):
     """Schema for creating IT feedback."""
+
     computer_type: str = Field(..., alias="computerType")
     usage_years: str = Field(..., alias="usageYears")
     lag_level: str = Field(..., alias="lagLevel")
@@ -38,6 +41,7 @@ class ITFeedbackCreate(BaseModel):
 
 class ITFeedbackResponse(BaseModel):
     """Response schema for IT feedback."""
+
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     id: int
@@ -58,5 +62,6 @@ class ITFeedbackResponse(BaseModel):
 
 class ITFeedbackListResponse(BaseModel):
     """List response for IT feedback."""
+
     total: int
     items: list[ITFeedbackResponse]

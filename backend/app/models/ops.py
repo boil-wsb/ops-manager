@@ -1,6 +1,7 @@
 """
 Operations management models.
 """
+
 import enum
 from datetime import datetime
 from typing import Any, Optional
@@ -14,6 +15,7 @@ from app.models.base import BaseModel
 
 class DeploymentStatus(enum.StrEnum):
     """Deployment status enum."""
+
     PENDING = "pending"
     RUNNING = "running"
     SUCCESS = "success"
@@ -30,23 +32,23 @@ class Deployment(BaseModel):
     version: Mapped[str] = mapped_column(String(50), nullable=False)
     environment: Mapped[str] = mapped_column(String(50), nullable=False)  # dev, test, staging, prod
     status: Mapped[DeploymentStatus] = mapped_column(
-        SQLEnum(DeploymentStatus),
-        default=DeploymentStatus.PENDING,
-        nullable=False
+        SQLEnum(DeploymentStatus), default=DeploymentStatus.PENDING, nullable=False
     )
 
     # People
     deployer_id: Mapped[int | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
-    deployer: Mapped[Optional["User"]] = relationship("User", foreign_keys=[deployer_id], lazy="selectin")
+    deployer: Mapped[Optional["User"]] = relationship(
+        "User", foreign_keys=[deployer_id], lazy="selectin"
+    )
 
     approver_id: Mapped[int | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
-    approver: Mapped[Optional["User"]] = relationship("User", foreign_keys=[approver_id], lazy="selectin")
+    approver: Mapped[Optional["User"]] = relationship(
+        "User", foreign_keys=[approver_id], lazy="selectin"
+    )
 
     # Timing
     deploy_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -63,6 +65,7 @@ class Deployment(BaseModel):
 
 class InspectionType(enum.StrEnum):
     """Inspection type enum."""
+
     SYSTEM = "system"
     SECURITY = "security"
     PERFORMANCE = "performance"
@@ -76,9 +79,7 @@ class InspectionTask(BaseModel):
 
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     task_type: Mapped[InspectionType] = mapped_column(
-        SQLEnum(InspectionType),
-        default=InspectionType.SYSTEM,
-        nullable=False
+        SQLEnum(InspectionType), default=InspectionType.SYSTEM, nullable=False
     )
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -96,10 +97,7 @@ class InspectionTask(BaseModel):
 
     # Relationships
     reports: Mapped[list["InspectionReport"]] = relationship(
-        "InspectionReport",
-        back_populates="task",
-        lazy="selectin",
-        cascade="all, delete-orphan"
+        "InspectionReport", back_populates="task", lazy="selectin", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:
@@ -112,13 +110,13 @@ class InspectionReport(BaseModel):
     __tablename__ = "inspection_reports"
 
     task_id: Mapped[int] = mapped_column(
-        ForeignKey("inspection_tasks.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True
+        ForeignKey("inspection_tasks.id", ondelete="CASCADE"), nullable=False, index=True
     )
     task: Mapped["InspectionTask"] = relationship("InspectionTask", back_populates="reports")
 
-    status: Mapped[str] = mapped_column(String(20), default="running", nullable=False)  # running, completed, failed
+    status: Mapped[str] = mapped_column(
+        String(20), default="running", nullable=False
+    )  # running, completed, failed
 
     # Statistics
     total_checks: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -136,6 +134,7 @@ class InspectionReport(BaseModel):
 
 class CertificateStatus(enum.StrEnum):
     """Certificate status enum."""
+
     ACTIVE = "active"
     EXPIRING = "expiring"
     EXPIRED = "expired"
@@ -166,9 +165,7 @@ class Certificate(BaseModel):
     key_content: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     status: Mapped[CertificateStatus] = mapped_column(
-        SQLEnum(CertificateStatus),
-        default=CertificateStatus.ACTIVE,
-        nullable=False
+        SQLEnum(CertificateStatus), default=CertificateStatus.ACTIVE, nullable=False
     )
 
     # Associated assets
@@ -184,7 +181,9 @@ class DNSRecord(BaseModel):
     __tablename__ = "dns_records"
 
     domain: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-    record_type: Mapped[str] = mapped_column(String(10), nullable=False)  # A, AAAA, CNAME, MX, TXT, etc.
+    record_type: Mapped[str] = mapped_column(
+        String(10), nullable=False
+    )  # A, AAAA, CNAME, MX, TXT, etc.
     host: Mapped[str] = mapped_column(String(255), nullable=False)  # @, www, mail, etc.
     value: Mapped[str] = mapped_column(Text, nullable=False)
 

@@ -1,6 +1,7 @@
 """
 Audit log API routes.
 """
+
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query

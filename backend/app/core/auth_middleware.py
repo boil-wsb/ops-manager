@@ -1,6 +1,7 @@
 """
 Authentication middleware for global API authentication.
 """
+
 import logging
 from collections.abc import Callable
 

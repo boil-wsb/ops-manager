@@ -1,6 +1,7 @@
 """
 Celery tasks for background job processing.
 """
+
 from app.tasks.audit_log_cleanup import (
     cleanup_all_audit_logs,
     cleanup_audit_logs_db,

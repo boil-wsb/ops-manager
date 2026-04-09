@@ -1,6 +1,7 @@
 """
 Monitoring and alerting models.
 """
+
 import enum
 from datetime import datetime
 from typing import Any, Optional
@@ -14,6 +15,7 @@ from app.models.base import BaseModel
 
 class MonitorType(enum.StrEnum):
     """Monitor type enum."""
+
     PING = "ping"
     HTTP = "http"
     TCP = "tcp"
@@ -22,6 +24,7 @@ class MonitorType(enum.StrEnum):
 
 class MonitorStatus(enum.StrEnum):
     """Monitor status enum."""
+
     UP = "up"
     DOWN = "down"
     UNKNOWN = "unknown"
@@ -34,10 +37,7 @@ class Monitor(BaseModel):
     __tablename__ = "monitors"
 
     name: Mapped[str] = mapped_column(String(200), nullable=False)
-    monitor_type: Mapped[MonitorType] = mapped_column(
-        SQLEnum(MonitorType),
-        nullable=False
-    )
+    monitor_type: Mapped[MonitorType] = mapped_column(SQLEnum(MonitorType), nullable=False)
     target: Mapped[str] = mapped_column(String(500), nullable=False)  # IP, URL, etc.
 
     # Check configuration
@@ -59,9 +59,7 @@ class Monitor(BaseModel):
     # Status
     is_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     current_status: Mapped[MonitorStatus] = mapped_column(
-        SQLEnum(MonitorStatus),
-        default=MonitorStatus.UNKNOWN,
-        nullable=False
+        SQLEnum(MonitorStatus), default=MonitorStatus.UNKNOWN, nullable=False
     )
     last_check_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_check_result: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -69,17 +67,12 @@ class Monitor(BaseModel):
 
     # Associated asset
     asset_id: Mapped[int | None] = mapped_column(
-        ForeignKey("assets.id", ondelete="SET NULL"),
-        nullable=True
+        ForeignKey("assets.id", ondelete="SET NULL"), nullable=True
     )
     asset: Mapped[Optional["Asset"]] = relationship("Asset", back_populates="monitors")
 
     # Relationships
-    alerts: Mapped[list["Alert"]] = relationship(
-        "Alert",
-        back_populates="monitor",
-        lazy="selectin"
-    )
+    alerts: Mapped[list["Alert"]] = relationship("Alert", back_populates="monitor", lazy="selectin")
 
     def __repr__(self) -> str:
         return f"<Monitor {self.name}: {self.target}>"
@@ -87,6 +80,7 @@ class Monitor(BaseModel):
 
 class AlertSeverity(enum.StrEnum):
     """Alert severity enum."""
+
     INFO = "info"
     WARNING = "warning"
     CRITICAL = "critical"
@@ -94,6 +88,7 @@ class AlertSeverity(enum.StrEnum):
 
 class AlertStatus(enum.StrEnum):
     """Alert status enum."""
+
     FIRING = "firing"
     ACKNOWLEDGED = "acknowledged"
     RESOLVED = "resolved"
@@ -106,26 +101,19 @@ class Alert(BaseModel):
     __tablename__ = "alerts"
 
     monitor_id: Mapped[int] = mapped_column(
-        ForeignKey("monitors.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True
+        ForeignKey("monitors.id", ondelete="CASCADE"), nullable=False, index=True
     )
     monitor: Mapped["Monitor"] = relationship("Monitor", back_populates="alerts")
 
     alert_rule_id: Mapped[int | None] = mapped_column(
-        ForeignKey("alert_rules.id", ondelete="SET NULL"),
-        nullable=True
+        ForeignKey("alert_rules.id", ondelete="SET NULL"), nullable=True
     )
 
     severity: Mapped[AlertSeverity] = mapped_column(
-        SQLEnum(AlertSeverity),
-        default=AlertSeverity.WARNING,
-        nullable=False
+        SQLEnum(AlertSeverity), default=AlertSeverity.WARNING, nullable=False
     )
     status: Mapped[AlertStatus] = mapped_column(
-        SQLEnum(AlertStatus),
-        default=AlertStatus.FIRING,
-        nullable=False
+        SQLEnum(AlertStatus), default=AlertStatus.FIRING, nullable=False
     )
 
     title: Mapped[str] = mapped_column(String(500), nullable=False)
@@ -140,13 +128,11 @@ class Alert(BaseModel):
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     acknowledged_by: Mapped[int | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     resolved_by: Mapped[int | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
     # Notification
@@ -166,12 +152,14 @@ class AlertRule(BaseModel):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Condition
-    condition_expression: Mapped[str] = mapped_column(Text, nullable=False)  # e.g., "response_time > 1000"
-    duration_seconds: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # 0 = immediate
+    condition_expression: Mapped[str] = mapped_column(
+        Text, nullable=False
+    )  # e.g., "response_time > 1000"
+    duration_seconds: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False
+    )  # 0 = immediate
     severity: Mapped[AlertSeverity] = mapped_column(
-        SQLEnum(AlertSeverity),
-        default=AlertSeverity.WARNING,
-        nullable=False
+        SQLEnum(AlertSeverity), default=AlertSeverity.WARNING, nullable=False
     )
 
     # Notification
@@ -189,6 +177,7 @@ class AlertRule(BaseModel):
 
 class NotificationChannelType(enum.StrEnum):
     """Notification channel type enum."""
+
     EMAIL = "email"
     WEBHOOK = "webhook"
     SMS = "sms"
@@ -201,8 +190,7 @@ class NotificationChannel(BaseModel):
 
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     channel_type: Mapped[NotificationChannelType] = mapped_column(
-        SQLEnum(NotificationChannelType),
-        nullable=False
+        SQLEnum(NotificationChannelType), nullable=False
     )
 
     # Configuration (encrypted in production)

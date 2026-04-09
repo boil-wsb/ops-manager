@@ -26,6 +26,7 @@ class PrometheusClient:
     def client(self) -> httpx.AsyncClient:
         if self._client is None:
             import httpx
+
             self._client = httpx.AsyncClient(timeout=self.timeout)
         return self._client
 
@@ -65,11 +66,7 @@ class PrometheusClient:
             return {"status": "error", "error": str(e)}
 
     async def query_range(
-        self,
-        query: str,
-        start: datetime,
-        end: datetime,
-        step: str = "1m"
+        self, query: str, start: datetime, end: datetime, step: str = "1m"
     ) -> dict[str, Any]:
         """
         执行 Prometheus 范围查询
@@ -84,12 +81,7 @@ class PrometheusClient:
             查询结果字典
         """
         url = f"{self.base_url}/api/v1/query_range"
-        params = {
-            "query": query,
-            "start": start.timestamp(),
-            "end": end.timestamp(),
-            "step": step
-        }
+        params = {"query": query, "start": start.timestamp(), "end": end.timestamp(), "step": step}
 
         try:
             response = await self.client.get(url, params=params)
@@ -121,15 +113,17 @@ class PrometheusClient:
         nodes = []
         for result in data.get("data", {}).get("result", []):
             metric = result.get("metric", {})
-            nodes.append({
-                "instance": metric.get("instance", ""),
-                "nodename": metric.get("nodename", ""),
-                "sysname": metric.get("sysname", ""),
-                "release": metric.get("release", ""),
-                "machine": metric.get("machine", ""),
-                "job": metric.get("job", ""),
-                "env": metric.get("env", ""),
-            })
+            nodes.append(
+                {
+                    "instance": metric.get("instance", ""),
+                    "nodename": metric.get("nodename", ""),
+                    "sysname": metric.get("sysname", ""),
+                    "release": metric.get("release", ""),
+                    "machine": metric.get("machine", ""),
+                    "job": metric.get("job", ""),
+                    "env": metric.get("env", ""),
+                }
+            )
 
         return nodes
 
@@ -198,16 +192,22 @@ class PrometheusClient:
                 metrics["disk_usage_percent"] = round(float(value[1]), 2)
 
         # 网络流量
-        net_recv_query = f'node_network_receive_bytes_total{{instance=~".*{instance}.*",device="eth0"}}'
+        net_recv_query = (
+            f'node_network_receive_bytes_total{{instance=~".*{instance}.*",device="eth0"}}'
+        )
         net_recv_data = await self.query(net_recv_query)
         if net_recv_data.get("status") == "success" and net_recv_data.get("data", {}).get("result"):
             value = net_recv_data["data"]["result"][0].get("value", [])
             if len(value) >= 2:
                 metrics["network_receive_bytes"] = int(float(value[1]))
 
-        net_transmit_query = f'node_network_transmit_bytes_total{{instance=~".*{instance}.*",device="eth0"}}'
+        net_transmit_query = (
+            f'node_network_transmit_bytes_total{{instance=~".*{instance}.*",device="eth0"}}'
+        )
         net_transmit_data = await self.query(net_transmit_query)
-        if net_transmit_data.get("status") == "success" and net_transmit_data.get("data", {}).get("result"):
+        if net_transmit_data.get("status") == "success" and net_transmit_data.get("data", {}).get(
+            "result"
+        ):
             value = net_transmit_data["data"]["result"][0].get("value", [])
             if len(value) >= 2:
                 metrics["network_transmit_bytes"] = int(float(value[1]))
@@ -221,17 +221,25 @@ class PrometheusClient:
                 metrics["uptime_seconds"] = int(float(value[1]))
 
         # CPU 核心数
-        cpu_cores_query = f'count(node_cpu_seconds_total{{mode="system",instance=~".*{instance}.*"}})'
+        cpu_cores_query = (
+            f'count(node_cpu_seconds_total{{mode="system",instance=~".*{instance}.*"}})'
+        )
         cpu_cores_data = await self.query(cpu_cores_query)
-        if cpu_cores_data.get("status") == "success" and cpu_cores_data.get("data", {}).get("result"):
+        if cpu_cores_data.get("status") == "success" and cpu_cores_data.get("data", {}).get(
+            "result"
+        ):
             value = cpu_cores_data["data"]["result"][0].get("value", [])
             if len(value) >= 2:
                 metrics["cpu_cores"] = int(float(value[1]))
 
         # 内存总量
-        mem_total_query = f'node_memory_MemTotal_bytes{{instance=~".*{instance}.*"}} / 1024 / 1024 / 1024'
+        mem_total_query = (
+            f'node_memory_MemTotal_bytes{{instance=~".*{instance}.*"}} / 1024 / 1024 / 1024'
+        )
         mem_total_data = await self.query(mem_total_query)
-        if mem_total_data.get("status") == "success" and mem_total_data.get("data", {}).get("result"):
+        if mem_total_data.get("status") == "success" and mem_total_data.get("data", {}).get(
+            "result"
+        ):
             value = mem_total_data["data"]["result"][0].get("value", [])
             if len(value) >= 2:
                 metrics["memory_gb"] = round(float(value[1]), 2)
@@ -239,7 +247,9 @@ class PrometheusClient:
         # 磁盘总量
         disk_total_query = f'node_filesystem_size_bytes{{instance=~".*{instance}.*",mount="/"}} / 1024 / 1024 / 1024'
         disk_total_data = await self.query(disk_total_query)
-        if disk_total_data.get("status") == "success" and disk_total_data.get("data", {}).get("result"):
+        if disk_total_data.get("status") == "success" and disk_total_data.get("data", {}).get(
+            "result"
+        ):
             value = disk_total_data["data"]["result"][0].get("value", [])
             if len(value) >= 2:
                 metrics["disk_gb"] = round(float(value[1]), 2)
@@ -302,7 +312,7 @@ class PrometheusClient:
         certificates = []
 
         # 查询 SSL 证书过期时间
-        query = 'probe_ssl_earliest_cert_expiry'
+        query = "probe_ssl_earliest_cert_expiry"
         data = await self.query(query)
 
         if data.get("status") != "success":
@@ -319,14 +329,19 @@ class PrometheusClient:
                 now = datetime.now()
                 days_until_expiry = (expiry_date - now).days
 
-                certificates.append({
-                    "domain": metric.get("instance", "").replace("https://", "").replace("http://", "").split("/")[0],
-                    "target": metric.get("instance", ""),
-                    "job": metric.get("job", ""),
-                    "expiry_date": expiry_date.isoformat(),
-                    "days_until_expiry": days_until_expiry,
-                    "status": self._get_cert_status(days_until_expiry),
-                })
+                certificates.append(
+                    {
+                        "domain": metric.get("instance", "")
+                        .replace("https://", "")
+                        .replace("http://", "")
+                        .split("/")[0],
+                        "target": metric.get("instance", ""),
+                        "job": metric.get("job", ""),
+                        "expiry_date": expiry_date.isoformat(),
+                        "days_until_expiry": days_until_expiry,
+                        "status": self._get_cert_status(days_until_expiry),
+                    }
+                )
 
         return certificates
 
@@ -375,7 +390,10 @@ class PrometheusClient:
         days_until_expiry = (expiry_date - now).days
 
         return {
-            "domain": metric.get("instance", "").replace("https://", "").replace("http://", "").split("/")[0],
+            "domain": metric.get("instance", "")
+            .replace("https://", "")
+            .replace("http://", "")
+            .split("/")[0],
             "target": metric.get("instance", ""),
             "job": metric.get("job", ""),
             "expiry_date": expiry_date.isoformat(),
@@ -426,7 +444,7 @@ class PrometheusClient:
         """
         terminals = []
 
-        pc_info_query = 'pc_info'
+        pc_info_query = "pc_info"
         data = await self.query(pc_info_query)
 
         if data.get("status") != "success":
@@ -473,7 +491,9 @@ class PrometheusClient:
             "cpu_usage": f'pc_cpu_usage_percent{{hostname="{hostname}"}}',
         }
 
-        results = await asyncio.gather(*[self.query(q) for q in queries.values()], return_exceptions=True)
+        results = await asyncio.gather(
+            *[self.query(q) for q in queries.values()], return_exceptions=True
+        )
 
         for (key, _), data in zip(queries.items(), results, strict=True):
             if isinstance(data, Exception):

@@ -1,6 +1,7 @@
 """
 Feishu user sync API endpoints.
 """
+
 from fastapi import APIRouter, BackgroundTasks, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -47,6 +48,7 @@ async def sync_feishu_users_sync(
     This endpoint triggers an immediate sync and waits for the result.
     """
     from app.integrations.feishu.sync_service import sync_users
+
     result = await sync_users(db, crud_user)
 
     return {

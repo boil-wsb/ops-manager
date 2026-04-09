@@ -4,6 +4,7 @@ PC Client version auto-sync on startup.
 Automatically syncs PC client versions from frontend/public/pcinfo
 to database on application startup.
 """
+
 import re
 from pathlib import Path
 
@@ -56,11 +57,9 @@ async def sync_pc_versions_on_startup(db: AsyncSession) -> list[str]:
 
     synced = []
     for i, version in enumerate(versions):
-        is_active = (i == 0)
+        is_active = i == 0
 
-        result = await db.execute(
-            select(PCClientVersion).where(PCClientVersion.version == version)
-        )
+        result = await db.execute(select(PCClientVersion).where(PCClientVersion.version == version))
         existing = result.scalar_one_or_none()
 
         if existing:
@@ -73,7 +72,7 @@ async def sync_pc_versions_on_startup(db: AsyncSession) -> list[str]:
                 version=version,
                 release_notes=f"PC Client version {version}",
                 is_active=is_active,
-                download_url=f"/pcinfo/PC_{version}_modular.vbs"
+                download_url=f"/pcinfo/PC_{version}_modular.vbs",
             )
             db.add(new_version)
             await db.commit()

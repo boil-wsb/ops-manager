@@ -7,6 +7,7 @@ from app.schemas.base import BaseResponse, BaseSchema
 
 class NavigationLinkCreate(BaseSchema):
     """Schema for creating a navigation link."""
+
     category: str
     name: str
     url: str
@@ -19,6 +20,7 @@ class NavigationLinkCreate(BaseSchema):
 
 class NavigationLinkUpdate(BaseSchema):
     """Schema for updating a navigation link."""
+
     category: str | None = None
     name: str | None = None
     url: str | None = None
@@ -31,12 +33,14 @@ class NavigationLinkUpdate(BaseSchema):
 
 class RoleBrief(BaseSchema):
     """Brief role info for navigation link response."""
+
     id: int
     name: str
 
 
 class NavigationLinkResponse(BaseResponse):
     """Schema for navigation link response."""
+
     category: str
     name: str
     url: str
@@ -49,18 +53,21 @@ class NavigationLinkResponse(BaseResponse):
 
 class NavigationLinkListResponse(BaseSchema):
     """Schema for navigation link list response."""
+
     items: list[NavigationLinkResponse]
     total: int
 
 
 class NavigationLinkGrouped(BaseSchema):
     """Schema for navigation links grouped by category."""
+
     category: str
     links: list[NavigationLinkResponse]
 
 
 class NavigationLinkImport(BaseSchema):
     """Schema for importing a navigation link from CSV."""
+
     category: str
     name: str
     url: str
@@ -73,6 +80,7 @@ class NavigationLinkImport(BaseSchema):
 
 class NavigationLinkImportResult(BaseSchema):
     """Schema for import result."""
+
     success: bool
     name: str
     message: str
@@ -80,6 +88,7 @@ class NavigationLinkImportResult(BaseSchema):
 
 class NavigationImportResponse(BaseSchema):
     """Schema for bulk import response."""
+
     total: int
     success_count: int
     failed_count: int

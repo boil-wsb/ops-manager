@@ -1,6 +1,7 @@
 """
 Role management API routes.
 """
+
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -137,9 +138,7 @@ async def get_role(
         "description": role.description,
         "is_system": role.is_system,
         "is_active": role.is_active,
-        "permissions": [
-            PermissionResponse.model_validate(p) for p in role.permissions
-        ],
+        "permissions": [PermissionResponse.model_validate(p) for p in role.permissions],
         "created_at": role.created_at,
         "updated_at": role.updated_at,
     }
@@ -248,9 +247,7 @@ async def get_role_permissions(
 
     return {
         "role_id": role.id,
-        "permissions": [
-            PermissionResponse.model_validate(p) for p in role.permissions
-        ],
+        "permissions": [PermissionResponse.model_validate(p) for p in role.permissions],
         "permission_count": len(role.permissions),
     }
 
@@ -292,12 +289,12 @@ async def update_role_permissions(
         db, role=role, permission_ids=perm_update.permission_ids
     )
 
-    logger.info(f"[角色管理] 角色 '{role.name}' 权限更新成功: {old_perm_count} -> {len(role.permissions)} 个权限")
+    logger.info(
+        f"[角色管理] 角色 '{role.name}' 权限更新成功: {old_perm_count} -> {len(role.permissions)} 个权限"
+    )
 
     return {
         "role_id": role.id,
-        "permissions": [
-            PermissionResponse.model_validate(p) for p in role.permissions
-        ],
+        "permissions": [PermissionResponse.model_validate(p) for p in role.permissions],
         "permission_count": len(role.permissions),
     }

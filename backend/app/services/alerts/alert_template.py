@@ -1,6 +1,7 @@
 """
 Alert template service.
 """
+
 import re
 from datetime import datetime
 from textwrap import dedent
@@ -51,8 +52,8 @@ class AlertTemplateService:
         """Escape Go template delimiters in text to prevent interpretation."""
         # Escape {{ to {{"}}"}} but we need a simpler approach
         # Replace {{ with {{"-"}} to prevent interpretation
-        text = text.replace("{{", "{{\"-\"")
-        text = text.replace("}}", "\"}}")
+        text = text.replace("{{", '{{"-"')
+        text = text.replace("}}", '"}}')
         return text
 
     def _prepare_template(self, template_str: str) -> str:

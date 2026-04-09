@@ -1,6 +1,7 @@
 """
 Audit log CRUD operations.
 """
+
 from datetime import datetime
 
 from sqlalchemy import and_, func, or_, select
@@ -78,7 +79,7 @@ class CRUDAuditLog(CRUDBase[AuditLog, AuditLogCreate, AuditLogResponse]):
             filters.append(
                 or_(
                     AuditLog.object_name.ilike(f"%{keyword}%"),
-                    AuditLog.operator_name.ilike(f"%{keyword}%")
+                    AuditLog.operator_name.ilike(f"%{keyword}%"),
                 )
             )
 
@@ -102,12 +103,7 @@ class CRUDAuditLog(CRUDBase[AuditLog, AuditLogCreate, AuditLogResponse]):
 
         return list(items), total
 
-    async def get_by_id(
-        self,
-        db: AsyncSession,
-        *,
-        log_id: int
-    ) -> AuditLog | None:
+    async def get_by_id(self, db: AsyncSession, *, log_id: int) -> AuditLog | None:
         """Get audit log by ID.
 
         Args:
@@ -117,9 +113,7 @@ class CRUDAuditLog(CRUDBase[AuditLog, AuditLogCreate, AuditLogResponse]):
         Returns:
             Audit log or None
         """
-        result = await db.execute(
-            select(AuditLog).where(AuditLog.id == log_id)
-        )
+        result = await db.execute(select(AuditLog).where(AuditLog.id == log_id))
         return result.scalar_one_or_none()
 
 

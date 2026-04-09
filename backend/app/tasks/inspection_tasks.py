@@ -1,6 +1,7 @@
 """
 Inspection task execution.
 """
+
 import asyncio
 import subprocess
 from datetime import datetime
@@ -24,9 +25,7 @@ def run_inspection_task(self, task_id: int):
         session_local = get_celery_async_session()
 
         async with session_local() as db:
-            result = await db.execute(
-                select(InspectionTask).where(InspectionTask.id == task_id)
-            )
+            result = await db.execute(select(InspectionTask).where(InspectionTask.id == task_id))
             task = result.scalar_one_or_none()
 
             if not task or not task.is_enabled:
@@ -75,29 +74,35 @@ def run_inspection_task(self, task_id: int):
                         status = "failed"
                         report.failed_checks += 1
 
-                    report.details.append({
-                        "check_name": check_name,
-                        "status": status,
-                        "message": result.stdout if result.returncode == 0 else result.stderr,
-                        "duration_ms": None,
-                    })
+                    report.details.append(
+                        {
+                            "check_name": check_name,
+                            "status": status,
+                            "message": result.stdout if result.returncode == 0 else result.stderr,
+                            "duration_ms": None,
+                        }
+                    )
 
                 except subprocess.TimeoutExpired:
                     report.failed_checks += 1
-                    report.details.append({
-                        "check_name": check_name,
-                        "status": "failed",
-                        "message": "Check timed out",
-                        "duration_ms": timeout * 1000,
-                    })
+                    report.details.append(
+                        {
+                            "check_name": check_name,
+                            "status": "failed",
+                            "message": "Check timed out",
+                            "duration_ms": timeout * 1000,
+                        }
+                    )
                 except Exception as e:
                     report.failed_checks += 1
-                    report.details.append({
-                        "check_name": check_name,
-                        "status": "failed",
-                        "message": str(e),
-                        "duration_ms": None,
-                    })
+                    report.details.append(
+                        {
+                            "check_name": check_name,
+                            "status": "failed",
+                            "message": str(e),
+                            "duration_ms": None,
+                        }
+                    )
 
             report.status = "completed"
             report.summary = f"Passed: {report.passed_checks}, Failed: {report.failed_checks}, Warnings: {report.warning_checks}"

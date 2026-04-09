@@ -1,6 +1,7 @@
 """
 Feishu user sync service.
 """
+
 import logging
 from dataclasses import dataclass
 
@@ -17,24 +18,29 @@ FEISHU_CLIENT: "lark.Client | None" = None  # noqa: F821
 def get_lark_module():
     """Lazy import lark_oapi module."""
     import lark_oapi as lark
+
     return lark
 
 
 def get_feishu_client() -> "lark.Client":  # noqa: F821
     """Get or create Feishu client."""
     import lark_oapi as lark
+
     global FEISHU_CLIENT
     if FEISHU_CLIENT is None:
-        FEISHU_CLIENT = lark.Client.builder() \
-            .app_id(settings.feishu_app_id) \
-            .app_secret(settings.feishu_app_secret) \
+        FEISHU_CLIENT = (
+            lark.Client.builder()
+            .app_id(settings.feishu_app_id)
+            .app_secret(settings.feishu_app_secret)
             .build()
+        )
     return FEISHU_CLIENT
 
 
 @dataclass
 class FeishuUser:
     """Feishu user data."""
+
     open_id: str
     union_id: str | None
     name: str
@@ -84,7 +90,7 @@ def fetch_all_users() -> list[FeishuUser]:
 
             if resp.success() and resp.data and resp.data.items:
                 for item in resp.data.items:
-                    child_id = getattr(item, 'open_department_id', None)
+                    child_id = getattr(item, "open_department_id", None)
                     if child_id:
                         children.append(child_id)
         except Exception as e:
@@ -114,7 +120,7 @@ def fetch_all_users() -> list[FeishuUser]:
 
             if resp.success() and resp.data and resp.data.items:
                 for user in resp.data.items:
-                    uid = getattr(user, 'open_id', None)
+                    uid = getattr(user, "open_id", None)
                     if uid and uid not in all_user_ids:
                         all_user_ids.append(uid)
         except Exception as e:
@@ -125,23 +131,18 @@ def fetch_all_users() -> list[FeishuUser]:
     users = []
     for uid in all_user_ids:
         try:
-            req = (
-                GetUserRequest.builder()
-                .user_id(uid)
-                .user_id_type("open_id")
-                .build()
-            )
+            req = GetUserRequest.builder().user_id(uid).user_id_type("open_id").build()
             resp = client.contact.v3.user.get(req)
 
             if resp.success() and resp.data and resp.data.user:
                 user = resp.data.user
                 feishu_user = FeishuUser(
-                    open_id=getattr(user, 'open_id', uid) or uid,
-                    union_id=getattr(user, 'union_id', None),
-                    name=getattr(user, 'name', None) or 'Unknown',
-                    enterprise_email=getattr(user, 'enterprise_email', None),
-                    email=getattr(user, 'email', None),
-                    mobile=getattr(user, 'mobile', None),
+                    open_id=getattr(user, "open_id", uid) or uid,
+                    union_id=getattr(user, "union_id", None),
+                    name=getattr(user, "name", None) or "Unknown",
+                    enterprise_email=getattr(user, "enterprise_email", None),
+                    email=getattr(user, "email", None),
+                    mobile=getattr(user, "mobile", None),
                 )
                 users.append(feishu_user)
         except Exception as e:
@@ -156,7 +157,12 @@ async def sync_users(db, crud_user) -> dict:
     feishu_users = fetch_all_users()
 
     if not feishu_users:
-        return {"created": 0, "updated": 0, "deleted": 0, "errors": ["No users fetched from Feishu"]}
+        return {
+            "created": 0,
+            "updated": 0,
+            "deleted": 0,
+            "errors": ["No users fetched from Feishu"],
+        }
 
     feishu_open_ids = {u.open_id for u in feishu_users}
 
@@ -177,7 +183,10 @@ async def sync_users(db, crud_user) -> dict:
                 if feishu_user.name and existing_user.full_name != feishu_user.name:
                     existing_user.full_name = feishu_user.name
                     need_update = True
-                if feishu_user.enterprise_email and existing_user.email != feishu_user.enterprise_email:
+                if (
+                    feishu_user.enterprise_email
+                    and existing_user.email != feishu_user.enterprise_email
+                ):
                     existing_user.email = feishu_user.enterprise_email
                     need_update = True
 
@@ -191,11 +200,21 @@ async def sync_users(db, crud_user) -> dict:
                     )
                     updated += 1
             else:
-                username = feishu_user.enterprise_email.split('@')[0] if feishu_user.enterprise_email else feishu_user.open_id
+                username = (
+                    feishu_user.enterprise_email.split("@")[0]
+                    if feishu_user.enterprise_email
+                    else feishu_user.open_id
+                )
 
-                check_email = await crud_user.get_by_email(db, email=feishu_user.enterprise_email) if feishu_user.enterprise_email else None
+                check_email = (
+                    await crud_user.get_by_email(db, email=feishu_user.enterprise_email)
+                    if feishu_user.enterprise_email
+                    else None
+                )
                 if check_email and check_email.feishu_open_id != feishu_user.open_id:
-                    logger.warning(f"Enterprise email {feishu_user.enterprise_email} already exists for another user, using open_id as username")
+                    logger.warning(
+                        f"Enterprise email {feishu_user.enterprise_email} already exists for another user, using open_id as username"
+                    )
                     username = feishu_user.open_id
 
                 await crud_user.create_feishu_user(

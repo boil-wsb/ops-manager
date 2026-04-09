@@ -1,6 +1,7 @@
 """
 Audit log decorator for automatically logging FastAPI route operations.
 """
+
 import functools
 import inspect
 import time
@@ -157,6 +158,7 @@ async def _execute_with_audit(
         except Exception as log_error:
             # Don't let audit logging failures affect the main operation
             import logging
+
             logging.error(f"Failed to write audit log: {log_error}")
 
 
@@ -212,21 +214,20 @@ def _execute_with_audit_sync(
             )
 
             log_data = {
-                'request_id': request_id,
-                'type': operation_type,
-                'module': module,
-                'object': f"{object_type}:{object_id}" if object_type and object_id else None,
-                'object_name': object_name,
-                'operator': operator_info.get("operator_name") or f"user:{operator_info.get('operator_id')}",
-                'ip': operator_info.get("operator_ip"),
-                'status': status,
-                'duration_ms': duration_ms,
-                'error': error_message,
+                "request_id": request_id,
+                "type": operation_type,
+                "module": module,
+                "object": f"{object_type}:{object_id}" if object_type and object_id else None,
+                "object_name": object_name,
+                "operator": operator_info.get("operator_name")
+                or f"user:{operator_info.get('operator_id')}",
+                "ip": operator_info.get("operator_ip"),
+                "status": status,
+                "duration_ms": duration_ms,
+                "error": error_message,
             }
 
-            audit_logger._file_logger.info(
-                json.dumps(log_data, ensure_ascii=False, default=str)
-            )
+            audit_logger._file_logger.info(json.dumps(log_data, ensure_ascii=False, default=str))
 
 
 def _extract_request(args: tuple, kwargs: dict) -> Request | None:
@@ -259,39 +260,43 @@ def _extract_operator_info(request: Request | None, kwargs: dict = None) -> dict
 
     if request is not None:
         # Extract IP address
-        if hasattr(request, 'client') and request.client:
+        if hasattr(request, "client") and request.client:
             info["operator_ip"] = request.client.host
 
         # Try to get forwarded IP if behind proxy
-        if hasattr(request, 'headers'):
-            forwarded_for = request.headers.get('x-forwarded-for')
+        if hasattr(request, "headers"):
+            forwarded_for = request.headers.get("x-forwarded-for")
             if forwarded_for:
-                info["operator_ip"] = forwarded_for.split(',')[0].strip()
+                info["operator_ip"] = forwarded_for.split(",")[0].strip()
             elif not info["operator_ip"]:
-                info["operator_ip"] = request.headers.get('x-real-ip')
+                info["operator_ip"] = request.headers.get("x-real-ip")
 
             # Get user agent
-            info["user_agent"] = request.headers.get('user-agent')
+            info["user_agent"] = request.headers.get("user-agent")
 
         # Extract user info from request state (set by auth middleware)
-        if hasattr(request, 'state'):
+        if hasattr(request, "state"):
             state = request.state
-            if hasattr(state, 'user'):
+            if hasattr(state, "user"):
                 user = state.user
                 if isinstance(user, dict):
-                    info["operator_id"] = user.get('id')
-                    info["operator_name"] = user.get('username') or user.get('name')
+                    info["operator_id"] = user.get("id")
+                    info["operator_name"] = user.get("username") or user.get("name")
                 else:
-                    info["operator_id"] = getattr(user, 'id', None)
-                    info["operator_name"] = getattr(user, 'username', None) or getattr(user, 'name', None)
+                    info["operator_id"] = getattr(user, "id", None)
+                    info["operator_name"] = getattr(user, "username", None) or getattr(
+                        user, "name", None
+                    )
 
     # Try to extract username from credentials for login operations
     if kwargs and not info["operator_name"]:
-        credentials = kwargs.get('credentials') or kwargs.get('user_login') or kwargs.get('login_data')
-        if credentials and hasattr(credentials, 'username'):
+        credentials = (
+            kwargs.get("credentials") or kwargs.get("user_login") or kwargs.get("login_data")
+        )
+        if credentials and hasattr(credentials, "username"):
             info["operator_name"] = credentials.username
         elif credentials and isinstance(credentials, dict):
-            info["operator_name"] = credentials.get('username') or credentials.get('email')
+            info["operator_name"] = credentials.get("username") or credentials.get("email")
 
     return info
 
@@ -306,13 +311,13 @@ async def _capture_before_data(
     This attempts to fetch the existing object data.
     """
     # Try to extract object ID from kwargs
-    object_id = kwargs.get('asset_id') or kwargs.get('id') or kwargs.get('object_id')
+    object_id = kwargs.get("asset_id") or kwargs.get("id") or kwargs.get("object_id")
 
     if not object_id:
         return None
 
     # Try to get db session from kwargs
-    db = kwargs.get('db') or kwargs.get('session')
+    db = kwargs.get("db") or kwargs.get("session")
 
     if db is None:
         return None
@@ -321,9 +326,9 @@ async def _capture_before_data(
         # Try to infer the model class from the function
         # This is a best-effort approach
         func_module = inspect.getmodule(func)
-        if func_module and hasattr(func_module, 'crud'):
-            crud_obj = getattr(func_module, 'crud', None)
-            if crud_obj and hasattr(crud_obj, 'get'):
+        if func_module and hasattr(func_module, "crud"):
+            crud_obj = getattr(func_module, "crud", None)
+            if crud_obj and hasattr(crud_obj, "get"):
                 existing_obj = await crud_obj.get(db, id=object_id)
                 if existing_obj:
                     return _object_to_dict(existing_obj)
@@ -343,8 +348,8 @@ def _extract_result_data(result: Any) -> dict[str, Any] | None:
     # Handle different response types
     if isinstance(result, dict):
         # If it's a dict response, extract the data
-        if 'data' in result:
-            return _serialize_dict(_object_to_dict(result['data']))
+        if "data" in result:
+            return _serialize_dict(_object_to_dict(result["data"]))
         return _serialize_dict(result)
 
     # Handle Pydantic models and SQLAlchemy objects
@@ -374,7 +379,7 @@ def _extract_object_info(
     object_name = None
 
     # Try to get from kwargs first
-    for key in ['asset_id', 'id', 'object_id', 'user_id', 'role_id']:
+    for key in ["asset_id", "id", "object_id", "user_id", "role_id"]:
         if key in kwargs:
             object_id = str(kwargs[key])
             break
@@ -384,8 +389,10 @@ def _extract_object_info(
         result_dict = _object_to_dict(result)
         if isinstance(result_dict, dict):
             if not object_id:
-                object_id = str(result_dict.get('id', '')) if result_dict.get('id') else None
-            object_name = result_dict.get('name') or result_dict.get('username') or result_dict.get('title')
+                object_id = str(result_dict.get("id", "")) if result_dict.get("id") else None
+            object_name = (
+                result_dict.get("name") or result_dict.get("username") or result_dict.get("title")
+            )
 
     return object_id, object_name
 
@@ -401,23 +408,23 @@ def _object_to_dict(obj: Any) -> Any:
         return obj
 
     # Handle Pydantic models (v1 and v2)
-    if hasattr(obj, 'model_dump'):
+    if hasattr(obj, "model_dump"):
         try:
             return obj.model_dump()
         except Exception:
             pass
-    elif hasattr(obj, 'dict'):
+    elif hasattr(obj, "dict"):
         try:
             return obj.dict()
         except Exception:
             pass
 
     # Handle SQLAlchemy models - use __dict__ to avoid lazy loading issues
-    if hasattr(obj, '__table__'):
+    if hasattr(obj, "__table__"):
         try:
             obj_dict = {}
             for key, value in obj.__dict__.items():
-                if not key.startswith('_'):
+                if not key.startswith("_"):
                     obj_dict[key] = _serialize_value(value)
             return obj_dict
         except Exception:

@@ -13,56 +13,32 @@ from app.schemas.permission import PermissionCreate, PermissionUpdate
 class CRUDPermission(CRUDBase[Permission, PermissionCreate, PermissionUpdate]):
     """Permission CRUD operations."""
 
-    async def get_by_code(
-        self,
-        db: AsyncSession,
-        *,
-        code: str
-    ) -> Permission | None:
+    async def get_by_code(self, db: AsyncSession, *, code: str) -> Permission | None:
         """Get permission by code."""
-        result = await db.execute(
-            select(Permission).where(Permission.code == code)
-        )
+        result = await db.execute(select(Permission).where(Permission.code == code))
         return result.scalar_one_or_none()
 
     async def get_by_module(
-        self,
-        db: AsyncSession,
-        *,
-        module: str,
-        skip: int = 0,
-        limit: int = 100
+        self, db: AsyncSession, *, module: str, skip: int = 0, limit: int = 100
     ) -> list[Permission]:
         """Get permissions by module."""
         result = await db.execute(
-            select(Permission)
-            .where(Permission.module == module)
-            .offset(skip)
-            .limit(limit)
+            select(Permission).where(Permission.module == module).offset(skip).limit(limit)
         )
         return result.scalars().all()
 
     async def get_active_permissions(
-        self,
-        db: AsyncSession,
-        *,
-        skip: int = 0,
-        limit: int = 100
+        self, db: AsyncSession, *, skip: int = 0, limit: int = 100
     ) -> list[Permission]:
         """Get active permissions."""
         result = await db.execute(
-            select(Permission)
-            .where(Permission.is_active)
-            .offset(skip)
-            .limit(limit)
+            select(Permission).where(Permission.is_active).offset(skip).limit(limit)
         )
         return result.scalars().all()
 
     async def get_modules(self, db: AsyncSession) -> list[str]:
         """Get all distinct permission modules."""
-        result = await db.execute(
-            select(Permission.module).distinct()
-        )
+        result = await db.execute(select(Permission.module).distinct())
         return result.scalars().all()
 
     async def get_multi_with_filters(
@@ -72,7 +48,7 @@ class CRUDPermission(CRUDBase[Permission, PermissionCreate, PermissionUpdate]):
         module: str | None = None,
         is_active: bool | None = None,
         skip: int = 0,
-        limit: int = 100
+        limit: int = 100,
     ) -> tuple[list[Permission], int]:
         """Get permissions with filters and total count."""
         query = select(Permission)

@@ -1,6 +1,7 @@
 """
 Alert management schemas.
 """
+
 from datetime import datetime
 from typing import Any, Literal
 
@@ -10,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 # AlertSilence schemas
 class AlertSilenceBase(BaseModel):
     """Base alert silence schema."""
+
     name: str = Field(..., min_length=1, max_length=200)
     match_labels: dict[str, Any] = {}
     match_pattern: str | None = None
@@ -20,11 +22,13 @@ class AlertSilenceBase(BaseModel):
 
 class AlertSilenceCreate(AlertSilenceBase):
     """Alert silence creation schema."""
+
     created_by: int | None = None
 
 
 class AlertSilenceUpdate(BaseModel):
     """Alert silence update schema."""
+
     name: str | None = Field(None, min_length=1, max_length=200)
     match_labels: dict[str, Any] | None = None
     match_pattern: str | None = None
@@ -35,6 +39,7 @@ class AlertSilenceUpdate(BaseModel):
 
 class AlertSilenceResponse(AlertSilenceBase):
     """Alert silence response schema."""
+
     id: int
     created_by: int | None
     created_at: datetime
@@ -44,6 +49,7 @@ class AlertSilenceResponse(AlertSilenceBase):
 # AlertTemplate schemas
 class AlertTemplateBase(BaseModel):
     """Base alert template schema."""
+
     model_config = ConfigDict(from_attributes=True)
 
     name: str = Field(..., min_length=1, max_length=200)
@@ -57,11 +63,13 @@ class AlertTemplateBase(BaseModel):
 
 class AlertTemplateCreate(AlertTemplateBase):
     """Alert template creation schema."""
+
     pass
 
 
 class AlertTemplateUpdate(BaseModel):
     """Alert template update schema."""
+
     model_config = ConfigDict(from_attributes=True)
 
     name: str | None = Field(None, min_length=1, max_length=200)
@@ -75,6 +83,7 @@ class AlertTemplateUpdate(BaseModel):
 
 class AlertTemplateResponse(AlertTemplateBase):
     """Alert template response schema."""
+
     id: int
     created_at: datetime
     updated_at: datetime
@@ -82,6 +91,7 @@ class AlertTemplateResponse(AlertTemplateBase):
 
 class AlertTemplatePreview(BaseModel):
     """Alert template preview schema."""
+
     labels: dict[str, str] = {}
     annotations: dict[str, str] = {}
 
@@ -93,6 +103,7 @@ AlertHistorySeverity = Literal["info", "warning", "critical", "middle"]
 
 class AlertHistoryResponse(BaseModel):
     """Alert history response schema."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -111,6 +122,7 @@ class AlertHistoryResponse(BaseModel):
 
 class AlertHistoryListParams(BaseModel):
     """Alert history list query parameters."""
+
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
     alertname: str | None = None
@@ -123,6 +135,7 @@ class AlertHistoryListParams(BaseModel):
 
 class AlertHistoryListResponse(BaseModel):
     """Alert history list response."""
+
     total: int
     page: int
     page_size: int
@@ -132,6 +145,7 @@ class AlertHistoryListResponse(BaseModel):
 # Alertmanager webhook payload schemas (Alertmanager v4 format)
 class AlertmanagerWebhookCommon(BaseModel):
     """Common fields for Alertmanager webhook payload."""
+
     version: str | None = None
     groupKey: str | None = None
     truncatedAlerts: int | None = None
@@ -139,6 +153,7 @@ class AlertmanagerWebhookCommon(BaseModel):
 
 class AlertmanagerAlert(BaseModel):
     """Single alert from Alertmanager webhook payload."""
+
     status: str | None = None
     labels: dict[str, Any] = {}
     annotations: dict[str, Any] = {}
@@ -150,6 +165,7 @@ class AlertmanagerAlert(BaseModel):
 
 class AlertmanagerWebhookPayload(BaseModel):
     """Alertmanager v4 webhook payload schema."""
+
     receiver: str | None = None
     status: str | None = None
     alerts: list[AlertmanagerAlert] = []
@@ -160,6 +176,7 @@ class AlertmanagerWebhookPayload(BaseModel):
 
     class Config:
         """Pydantic config."""
+
         json_schema_extra = {
             "example": {
                 "receiver": "webhook",
@@ -170,20 +187,20 @@ class AlertmanagerWebhookPayload(BaseModel):
                         "labels": {
                             "alertname": "HighMemoryUsage",
                             "severity": "critical",
-                            "instance": "server-01"
+                            "instance": "server-01",
                         },
                         "annotations": {
                             "summary": "High memory usage detected",
-                            "description": "Memory usage is above 90%"
+                            "description": "Memory usage is above 90%",
                         },
                         "startsAt": "2024-01-01T00:00:00Z",
                         "endsAt": "0001-01-01T00:00:00Z",
-                        "generatorURL": "http://prometheus:9090/graph?..."
+                        "generatorURL": "http://prometheus:9090/graph?...",
                     }
                 ],
                 "groupLabels": {"alertname": "HighMemoryUsage"},
                 "commonLabels": {"severity": "critical"},
                 "commonAnnotations": {"summary": "High memory usage detected"},
-                "externalURL": "http://alertmanager:9093"
+                "externalURL": "http://alertmanager:9093",
             }
         }

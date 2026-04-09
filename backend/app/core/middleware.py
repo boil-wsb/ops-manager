@@ -1,6 +1,7 @@
 """
 Request logging middleware.
 """
+
 import logging
 import time
 from collections.abc import Callable
@@ -48,19 +49,25 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         duration_ms = round(duration * 1000, 2)
 
         user_info = None
-        if hasattr(request.state, 'user'):
+        if hasattr(request.state, "user"):
             user = request.state.user
-            if hasattr(user, 'username'):
+            if hasattr(user, "username"):
                 user_info = user.username
             elif isinstance(user, dict):
-                user_info = user.get('username', None)
+                user_info = user.get("username", None)
 
         user_str = f"用户: {user_info} | " if user_info else ""
         if response.status_code < 400:
-            logger.info(f"[响应] {method} {path} | {user_str}状态: {response.status_code} | 耗时: {duration_ms}ms")
+            logger.info(
+                f"[响应] {method} {path} | {user_str}状态: {response.status_code} | 耗时: {duration_ms}ms"
+            )
         elif response.status_code < 500:
-            logger.warning(f"[响应] {method} {path} | {user_str}状态: {response.status_code} | 耗时: {duration_ms}ms | 客户端错误")
+            logger.warning(
+                f"[响应] {method} {path} | {user_str}状态: {response.status_code} | 耗时: {duration_ms}ms | 客户端错误"
+            )
         else:
-            logger.error(f"[响应] {method} {path} | {user_str}状态: {response.status_code} | 耗时: {duration_ms}ms | 服务器错误")
+            logger.error(
+                f"[响应] {method} {path} | {user_str}状态: {response.status_code} | 耗时: {duration_ms}ms | 服务器错误"
+            )
 
         return response

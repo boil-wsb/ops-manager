@@ -1,6 +1,7 @@
 """
 User model.
 """
+
 from datetime import datetime
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Table
@@ -31,17 +32,16 @@ class User(BaseModel):
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    feishu_open_id: Mapped[str | None] = mapped_column(String(64), unique=True, index=True, nullable=True)
+    feishu_open_id: Mapped[str | None] = mapped_column(
+        String(64), unique=True, index=True, nullable=True
+    )
     feishu_union_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     feishu_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_feishu_user: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Relationships
     roles: Mapped[list["Role"]] = relationship(
-        "Role",
-        secondary=user_roles,
-        back_populates="users",
-        lazy="selectin"
+        "Role", secondary=user_roles, back_populates="users", lazy="selectin"
     )
 
     def __repr__(self) -> str:

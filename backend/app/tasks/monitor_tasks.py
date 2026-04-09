@@ -1,6 +1,7 @@
 """
 Monitor check tasks.
 """
+
 import asyncio
 import contextlib
 import socket
@@ -30,7 +31,7 @@ async def check_ping(target: str, timeout: int = 10) -> tuple[bool, str | None, 
             ["ping", count_flag, "1", "-W", str(timeout), target],
             capture_output=True,
             text=True,
-            timeout=timeout + 2
+            timeout=timeout + 2,
         )
 
         elapsed_ms = int((time.time() - start_time) * 1000)
@@ -53,7 +54,7 @@ async def check_http(
     body: str | None = None,
     expected_status: int | None = None,
     expected_content: str | None = None,
-    timeout: int = 10
+    timeout: int = 10,
 ) -> tuple[bool, str | None, int | None]:
     """Check HTTP endpoint.
 
@@ -82,7 +83,7 @@ async def check_http(
                 return (
                     False,
                     f"Unexpected status code: {response.status_code} (expected {expected_status})",
-                    elapsed_ms
+                    elapsed_ms,
                 )
 
             if expected_content and expected_content not in response.text:
@@ -98,7 +99,9 @@ async def check_http(
         return False, f"HTTP error: {str(e)}", None
 
 
-async def check_tcp(target: str, port: int, timeout: int = 10) -> tuple[bool, str | None, int | None]:
+async def check_tcp(
+    target: str, port: int, timeout: int = 10
+) -> tuple[bool, str | None, int | None]:
     """Check TCP port.
 
     Returns: (success, message, response_time_ms)
@@ -107,8 +110,7 @@ async def check_tcp(target: str, port: int, timeout: int = 10) -> tuple[bool, st
         start_time = time.time()
 
         reader, writer = await asyncio.wait_for(
-            asyncio.open_connection(target, port),
-            timeout=timeout
+            asyncio.open_connection(target, port), timeout=timeout
         )
 
         elapsed_ms = int((time.time() - start_time) * 1000)
@@ -126,7 +128,9 @@ async def check_tcp(target: str, port: int, timeout: int = 10) -> tuple[bool, st
         return False, f"TCP error: {str(e)}", None
 
 
-async def check_udp(target: str, port: int, timeout: int = 10) -> tuple[bool, str | None, int | None]:
+async def check_udp(
+    target: str, port: int, timeout: int = 10
+) -> tuple[bool, str | None, int | None]:
     """Check UDP port.
 
     Returns: (success, message, response_time_ms)
@@ -168,7 +172,7 @@ async def perform_check(monitor) -> tuple[bool, str | None, int | None]:
             body=monitor.http_body,
             expected_status=monitor.expected_status_code,
             expected_content=monitor.expected_response_content,
-            timeout=timeout
+            timeout=timeout,
         )
 
     elif monitor_type == "tcp":
@@ -202,9 +206,7 @@ def check_monitor(self, monitor_id: int):
         session_local = get_celery_async_session()
 
         async with session_local() as db:
-            result = await db.execute(
-                select(Monitor).where(Monitor.id == monitor_id)
-            )
+            result = await db.execute(select(Monitor).where(Monitor.id == monitor_id))
             monitor = result.scalar_one_or_none()
 
             if not monitor or not monitor.is_enabled:
@@ -231,17 +233,14 @@ def check_monitor(self, monitor_id: int):
                     message=message,
                     metric_name="response_time",
                     metric_value=duration_ms,
-                    started_at=datetime.utcnow()
+                    started_at=datetime.utcnow(),
                 )
                 db.add(alert)
                 await db.commit()
 
             if old_status == MonitorStatus.DOWN and new_status == MonitorStatus.UP:
                 result = await db.execute(
-                    select(Alert).where(
-                        Alert.monitor_id == monitor.id,
-                        Alert.status == "firing"
-                    )
+                    select(Alert).where(Alert.monitor_id == monitor.id, Alert.status == "firing")
                 )
                 alert = result.scalar_one_or_none()
                 if alert:
@@ -271,9 +270,7 @@ def check_all_monitors():
         session_local = get_celery_async_session()
 
         async with session_local() as db:
-            result = await db.execute(
-                select(Monitor).where(Monitor.is_enabled is True)
-            )
+            result = await db.execute(select(Monitor).where(Monitor.is_enabled is True))
             monitors = result.scalars().all()
 
             logger.info(f"Checking {len(monitors)} monitors")

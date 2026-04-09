@@ -1,6 +1,7 @@
 """
 Monitoring and alerting schemas.
 """
+
 from datetime import datetime
 from typing import Any
 
@@ -10,6 +11,7 @@ from pydantic import BaseModel, Field
 # Monitor schemas
 class MonitorBase(BaseModel):
     """Base monitor schema."""
+
     name: str = Field(..., min_length=1, max_length=200)
     monitor_type: str = Field(..., pattern="^(ping|http|tcp|udp)$")
     target: str = Field(..., min_length=1, max_length=500)
@@ -32,11 +34,13 @@ class MonitorBase(BaseModel):
 
 class MonitorCreate(MonitorBase):
     """Monitor creation schema."""
+
     asset_id: int | None = None
 
 
 class MonitorUpdate(BaseModel):
     """Monitor update schema."""
+
     name: str | None = Field(None, min_length=1, max_length=200)
     target: str | None = Field(None, min_length=1, max_length=500)
     interval_seconds: int | None = Field(None, ge=10)
@@ -53,6 +57,7 @@ class MonitorUpdate(BaseModel):
 
 class MonitorResponse(MonitorBase):
     """Monitor response schema."""
+
     id: int
     is_enabled: bool
     current_status: str
@@ -66,6 +71,7 @@ class MonitorResponse(MonitorBase):
 
 class MonitorListResponse(BaseModel):
     """Monitor list response."""
+
     total: int
     items: list[MonitorResponse]
 
@@ -73,6 +79,7 @@ class MonitorListResponse(BaseModel):
 # Alert schemas
 class AlertBase(BaseModel):
     """Base alert schema."""
+
     title: str = Field(..., min_length=1, max_length=500)
     message: str | None = None
     severity: str = Field(default="warning", pattern="^(info|warning|critical)$")
@@ -80,6 +87,7 @@ class AlertBase(BaseModel):
 
 class AlertCreate(AlertBase):
     """Alert creation schema."""
+
     monitor_id: int
     alert_rule_id: int | None = None
     metric_name: str | None = None
@@ -89,6 +97,7 @@ class AlertCreate(AlertBase):
 
 class AlertResponse(AlertBase):
     """Alert response schema."""
+
     id: int
     monitor_id: int
     monitor_name: str
@@ -107,12 +116,14 @@ class AlertResponse(AlertBase):
 
 class AlertAction(BaseModel):
     """Alert action schema."""
+
     action: str = Field(..., pattern="^(acknowledge|resolve|suppress)$")
     comment: str | None = None
 
 
 class AlertListResponse(BaseModel):
     """Alert list response."""
+
     total: int
     items: list[AlertResponse]
 
@@ -120,6 +131,7 @@ class AlertListResponse(BaseModel):
 # Alert rule schemas
 class AlertRuleBase(BaseModel):
     """Base alert rule schema."""
+
     name: str = Field(..., min_length=1, max_length=200)
     description: str | None = None
     condition_expression: str = Field(..., min_length=1)
@@ -130,12 +142,14 @@ class AlertRuleBase(BaseModel):
 
 class AlertRuleCreate(AlertRuleBase):
     """Alert rule creation schema."""
+
     notification_template: str | None = None
     suppress_interval_minutes: int = 0
 
 
 class AlertRuleUpdate(BaseModel):
     """Alert rule update schema."""
+
     name: str | None = Field(None, min_length=1, max_length=200)
     description: str | None = None
     condition_expression: str | None = None
@@ -147,6 +161,7 @@ class AlertRuleUpdate(BaseModel):
 
 class AlertRuleResponse(AlertRuleBase):
     """Alert rule response schema."""
+
     id: int
     notification_template: str | None
     suppress_interval_minutes: int
@@ -158,17 +173,20 @@ class AlertRuleResponse(AlertRuleBase):
 # Notification channel schemas
 class NotificationChannelBase(BaseModel):
     """Base notification channel schema."""
+
     name: str = Field(..., min_length=1, max_length=100)
     channel_type: str = Field(..., pattern="^(email|webhook|sms)$")
 
 
 class NotificationChannelCreate(NotificationChannelBase):
     """Notification channel creation schema."""
+
     config: dict[str, Any] = {}
 
 
 class NotificationChannelUpdate(BaseModel):
     """Notification channel update schema."""
+
     name: str | None = Field(None, min_length=1, max_length=100)
     config: dict[str, Any] | None = None
     is_enabled: bool | None = None
@@ -176,6 +194,7 @@ class NotificationChannelUpdate(BaseModel):
 
 class NotificationChannelResponse(NotificationChannelBase):
     """Notification channel response schema."""
+
     id: int
     config: dict[str, Any]
     is_enabled: bool
@@ -187,6 +206,7 @@ class NotificationChannelResponse(NotificationChannelBase):
 
 class MonitorTerminalResponse(BaseModel):
     """Monitor terminal response schema for user's terminals."""
+
     id: int
     name: str
     asset_id: str
@@ -201,5 +221,6 @@ class MonitorTerminalResponse(BaseModel):
 
 class MonitorTerminalListResponse(BaseModel):
     """Monitor terminal list response with pagination."""
+
     total: int
     items: list[MonitorTerminalResponse]

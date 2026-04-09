@@ -1,6 +1,7 @@
 """
 Audit logger for recording operations to both database and file.
 """
+
 import json
 import logging
 import os
@@ -53,18 +54,17 @@ class AuditLogger:
             filename=settings.audit_log_file_path,
             maxBytes=max_bytes,
             backupCount=settings.audit_log_backup_count,
-            encoding='utf-8'
+            encoding="utf-8",
         )
 
         # Set formatter
         formatter = logging.Formatter(
-            fmt='%(asctime)s | AUDIT | %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
+            fmt="%(asctime)s | AUDIT | %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
         )
         file_handler.setFormatter(formatter)
 
         # Create logger
-        self._file_logger = logging.getLogger('audit_logger')
+        self._file_logger = logging.getLogger("audit_logger")
         self._file_logger.setLevel(logging.INFO)
         self._file_logger.handlers = []  # Clear existing handlers
         self._file_logger.addHandler(file_handler)
@@ -74,15 +74,15 @@ class AuditLogger:
         """Parse file size string to bytes."""
         size_str = size_str.upper().strip()
         multipliers = {
-            'GB': 1024 * 1024 * 1024,
-            'MB': 1024 * 1024,
-            'KB': 1024,
-            'B': 1,
+            "GB": 1024 * 1024 * 1024,
+            "MB": 1024 * 1024,
+            "KB": 1024,
+            "B": 1,
         }
 
         for suffix, multiplier in multipliers.items():
             if size_str.endswith(suffix):
-                number_part = size_str[:-len(suffix)].strip()
+                number_part = size_str[: -len(suffix)].strip()
                 return int(number_part) * multiplier
 
         # Default to bytes if no suffix
@@ -189,21 +189,21 @@ class AuditLogger:
 
         # Build log message
         log_data = {
-            'request_id': request_id,
-            'type': operation_type,
-            'module': operation_module,
-            'object': f"{object_type}:{object_id}" if object_type and object_id else None,
-            'object_name': object_name,
-            'operator': operator_name or f"user:{operator_id}",
-            'ip': operator_ip,
-            'status': status,
-            'duration_ms': duration_ms,
-            'error': error_message,
+            "request_id": request_id,
+            "type": operation_type,
+            "module": operation_module,
+            "object": f"{object_type}:{object_id}" if object_type and object_id else None,
+            "object_name": object_name,
+            "operator": operator_name or f"user:{operator_id}",
+            "ip": operator_ip,
+            "status": status,
+            "duration_ms": duration_ms,
+            "error": error_message,
         }
 
         # Add data changes summary
         if before_data or after_data:
-            log_data['changes'] = self._summarize_changes(before_data, after_data)
+            log_data["changes"] = self._summarize_changes(before_data, after_data)
 
         # Convert to JSON string
         log_message = json.dumps(log_data, ensure_ascii=False, default=str)
@@ -212,9 +212,7 @@ class AuditLogger:
         self._file_logger.info(log_message)
 
     def _summarize_changes(
-        self,
-        before_data: dict | None,
-        after_data: dict | None
+        self, before_data: dict | None, after_data: dict | None
     ) -> dict[str, Any]:
         """Summarize changes between before and after data."""
         summary = {}
@@ -227,12 +225,12 @@ class AuditLogger:
                 before = before_data.get(key)
                 after = after_data.get(key)
                 if before != after:
-                    changed[key] = {'from': before, 'to': after}
-            summary['changed_fields'] = changed
+                    changed[key] = {"from": before, "to": after}
+            summary["changed_fields"] = changed
         elif after_data:
-            summary['created'] = list(after_data.keys())
+            summary["created"] = list(after_data.keys())
         elif before_data:
-            summary['deleted'] = list(before_data.keys())
+            summary["deleted"] = list(before_data.keys())
 
         return summary
 
@@ -256,6 +254,7 @@ class AuditLogger:
     ) -> AuditLog:
         """Log to database."""
         from app.db.session import get_session_maker
+
         session_maker = get_session_maker()
         async with session_maker() as db:
             audit_log = AuditLog(

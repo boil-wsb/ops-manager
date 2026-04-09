@@ -1,6 +1,7 @@
 """
 Feishu user sync tasks for Celery.
 """
+
 import asyncio
 from typing import Any
 

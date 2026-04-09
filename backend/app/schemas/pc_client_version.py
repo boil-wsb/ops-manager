@@ -1,6 +1,7 @@
 """
 Pydantic schemas for PC Client Version.
 """
+
 from datetime import datetime
 from typing import Annotated
 

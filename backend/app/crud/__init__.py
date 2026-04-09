@@ -1,6 +1,7 @@
 """
 CRUD operations package.
 """
+
 from app.crud.audit_log import crud_audit_log
 from app.crud.base import CRUDBase
 from app.crud.crud_alert import (

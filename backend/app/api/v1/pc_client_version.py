@@ -1,6 +1,7 @@
 """
 PC Client version management API.
 """
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
@@ -57,10 +58,7 @@ async def download_personalized_pc_client(
     logger.info(f"Download endpoint called by user: {current_user.username}")
 
     pcinfo_dir = (
-        Path(__file__).parent.parent.parent.parent.parent
-        / "frontend"
-        / "public"
-        / "pcinfo"
+        Path(__file__).parent.parent.parent.parent.parent / "frontend" / "public" / "pcinfo"
     )
 
     conf_path = pcinfo_dir / "Conf.json"
@@ -88,9 +86,7 @@ async def download_personalized_pc_client(
     return StreamingResponse(
         iter([zip_buffer.getvalue()]),
         media_type="application/zip",
-        headers={
-            "Content-Disposition": f"attachment; filename=pcinfo_{username}.zip"
-        },
+        headers={"Content-Disposition": f"attachment; filename=pcinfo_{username}.zip"},
     )
 
 
@@ -138,6 +134,7 @@ async def get_version(
     version = await crud_pc_client_version.get(db, id=version_id)
     if not version:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=404, detail="Version not found")
     return version
 
@@ -156,10 +153,9 @@ async def update_version(
     version = await crud_pc_client_version.get(db, id=version_id)
     if not version:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=404, detail="Version not found")
-    version = await crud_pc_client_version.update(
-        db, db_obj=version, obj_in=version_in
-    )
+    version = await crud_pc_client_version.update(db, db_obj=version, obj_in=version_in)
     return version
 
 
@@ -176,5 +172,6 @@ async def delete_version(
     version = await crud_pc_client_version.get(db, id=version_id)
     if not version:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=404, detail="Version not found")
     await crud_pc_client_version.remove(db, id=version_id)
