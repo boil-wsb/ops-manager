@@ -28,7 +28,9 @@ class TerminalMetric(BaseModel):
 
     cpu_usage: Mapped[float | None] = mapped_column(Float, nullable=True)
     memory_usage: Mapped[float | None] = mapped_column(Float, nullable=True)
+    memory_total_gb: Mapped[float | None] = mapped_column(Float, nullable=True)
     disk_usage: Mapped[float | None] = mapped_column(Float, nullable=True)
+    disk_total_gb: Mapped[float | None] = mapped_column(Float, nullable=True)
     network_in: Mapped[float | None] = mapped_column(Float, nullable=True)
     network_out: Mapped[float | None] = mapped_column(Float, nullable=True)
     uptime_hours: Mapped[int | None] = mapped_column(Integer, nullable=True)

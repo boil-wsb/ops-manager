@@ -18,6 +18,8 @@ export interface TerminalMetric {
   cpuUsage: number | null;
   memoryUsage: number | null;
   diskUsage: number | null;
+  memoryTotalGb: number | null;
+  diskTotalGb: number | null;
   networkIn: number | null;
   networkOut: number | null;
   uptimeHours: number | null;

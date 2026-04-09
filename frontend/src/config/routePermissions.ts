@@ -11,6 +11,7 @@ export const routePermissions: Record<string, string | string[]> = {
   '/system/roles': 'role:read',
   '/system/navigation': 'navigation:read',
   '/system/notification-groups': 'notification_group:read',
+  '/system/notification-records': 'notification_group:read',
   '/profile': [],
   '/alerts/alertmanager': 'alert:read',
   '/alerts/alertmanager/silences': 'alert:manage_silence',

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Table, Button, Space, Card, DatePicker, Select, Input, Tag, Modal } from 'antd';
+import { Table, Button, Space, Card, DatePicker, Select, Input, Tag, Modal, Segmented } from 'antd';
 import { EyeOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import type { AlertHistory as AlertHistoryType, AlertHistoryStatus } from '../../types/alert';
@@ -9,11 +9,19 @@ import type { Dayjs } from 'dayjs';
 const { RangePicker } = DatePicker;
 const { Search } = Input;
 
+type ViewMode = 'structured' | 'json';
+
 const statusOptions = [
   { value: 'firing', label: '触发中' },
   { value: 'resolved', label: '已解决' },
   { value: 'suppressed', label: '已抑制' },
 ];
+
+const severityColorMap: Record<string, string> = {
+  critical: 'red',
+  warning: 'orange',
+  info: 'blue',
+};
 
 const AlertHistoryPage = () => {
   const [params, setParams] = useState({
@@ -26,6 +34,7 @@ const AlertHistoryPage = () => {
   });
   const [selectedRecord, setSelectedRecord] = useState<AlertHistoryType | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('structured');
 
   const { data, isLoading } = useQuery({
     queryKey: ['alertHistory', params],
@@ -67,8 +76,150 @@ const AlertHistoryPage = () => {
 
   const handleShowDetail = (record: AlertHistoryType) => {
     setSelectedRecord(record);
+    setViewMode('structured');
     setDetailVisible(true);
   };
+
+  const renderLabelTag = (key: string, value: string) => {
+    if (key === 'severity') {
+      return <Tag key={key} color={severityColorMap[value] || 'default'}>{key}={value}</Tag>;
+    }
+    return <Tag key={key}>{key}={value}</Tag>;
+  };
+
+  const sectionStyle: React.CSSProperties = {
+    background: 'var(--bg-tertiary)',
+    borderRadius: 8,
+    padding: '12px 16px',
+    marginBottom: 12,
+  };
+
+  const sectionTitleStyle: React.CSSProperties = {
+    fontSize: 12,
+    fontWeight: 600,
+    color: 'var(--text-secondary)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
+    marginBottom: 10,
+    paddingBottom: 6,
+    borderBottom: '1px solid var(--border-color)',
+  };
+
+  const fieldStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 8,
+    fontSize: 13,
+  };
+
+  const fieldLabelStyle: React.CSSProperties = {
+    color: 'var(--text-secondary)',
+    minWidth: 72,
+    flexShrink: 0,
+    paddingTop: 2,
+  };
+
+  const fieldValueStyle: React.CSSProperties = {
+    color: 'var(--text-primary)',
+    flex: 1,
+    wordBreak: 'break-word',
+  };
+
+  const preStyle: React.CSSProperties = {
+    background: 'var(--bg-elevated)',
+    color: 'var(--text-primary)',
+    border: '1px solid var(--border-color)',
+    padding: 10,
+    borderRadius: 6,
+    fontSize: 12,
+    margin: 0,
+    flex: 1,
+    wordBreak: 'break-all',
+    whiteSpace: 'pre-wrap' as const,
+    maxHeight: 100,
+    overflow: 'auto' as const,
+  };
+
+  const renderStructuredView = (record: AlertHistoryType) => (
+    <div style={{ color: 'var(--text-primary)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div>
+          <div style={sectionStyle}>
+            <div style={sectionTitleStyle}>基本信息</div>
+            <div style={fieldStyle}>
+              <span style={fieldLabelStyle}>告警名称</span>
+              <span style={{ ...fieldValueStyle, fontWeight: 600 }}>{record.alertname}</span>
+            </div>
+            <div style={fieldStyle}>
+              <span style={fieldLabelStyle}>状态</span>
+              <Tag color={record.status === 'firing' ? 'red' : record.status === 'resolved' ? 'green' : 'default'}>
+                {record.status === 'firing' ? '触发中' : record.status === 'resolved' ? '已解决' : '已抑制'}
+              </Tag>
+            </div>
+            <div style={fieldStyle}>
+              <span style={fieldLabelStyle}>级别</span>
+              <Tag color={severityColorMap[record.severity] || 'default'}>{record.severity}</Tag>
+            </div>
+            <div style={fieldStyle}>
+              <span style={fieldLabelStyle}>实例</span>
+              <span style={fieldValueStyle}>{record.labels?.instance || '-'}</span>
+            </div>
+            <div style={{ ...fieldStyle, marginBottom: 0 }}>
+              <span style={fieldLabelStyle}>开始时间</span>
+              <span style={fieldValueStyle}>{record.startsAt ? new Date(record.startsAt).toLocaleString() : '-'}</span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div style={sectionStyle}>
+            <div style={sectionTitleStyle}>处理信息</div>
+            <div style={fieldStyle}>
+              <span style={fieldLabelStyle}>结束时间</span>
+              <span style={fieldValueStyle}>{record.endsAt ? new Date(record.endsAt).toLocaleString() : '-'}</span>
+            </div>
+            <div style={fieldStyle}>
+              <span style={fieldLabelStyle}>是否被抑制</span>
+              <span style={fieldValueStyle}>{record.isSuppressed ? '是' : '否'}</span>
+            </div>
+            <div style={{ ...fieldStyle, marginBottom: 0 }}>
+              <span style={fieldLabelStyle}>通知已发送</span>
+              <span style={fieldValueStyle}>{record.notificationSent ? '是' : '否'}</span>
+            </div>
+          </div>
+          <div style={sectionStyle}>
+            <div style={sectionTitleStyle}>标签</div>
+            <Space wrap size={[4, 4]}>
+              {record.labels && Object.entries(record.labels).map(([k, v]) => renderLabelTag(k, v))}
+            </Space>
+          </div>
+        </div>
+      </div>
+      <div style={{ ...sectionStyle, marginTop: 0 }}>
+        <div style={sectionTitleStyle}>注解</div>
+        <pre style={preStyle}>
+          {JSON.stringify(record.annotations, null, 2)}
+        </pre>
+      </div>
+    </div>
+  );
+
+  const renderJsonView = (record: AlertHistoryType) => (
+    <div style={{ color: 'var(--text-primary)' }}>
+      <div style={{ ...sectionStyle, marginBottom: 8 }}>
+        <div style={sectionTitleStyle}>labels</div>
+        <pre style={preStyle}>
+          {JSON.stringify(record.labels, null, 2)}
+        </pre>
+      </div>
+      <div style={{ ...sectionStyle, marginTop: 0 }}>
+        <div style={sectionTitleStyle}>annotations</div>
+        <pre style={preStyle}>
+          {JSON.stringify(record.annotations, null, 2)}
+        </pre>
+      </div>
+    </div>
+  );
 
   const columns = [
     {
@@ -76,12 +227,14 @@ const AlertHistoryPage = () => {
       dataIndex: 'alertname',
       key: 'alertname',
       width: 150,
+      sorter: (a: AlertHistoryType, b: AlertHistoryType) => a.alertname.localeCompare(b.alertname),
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
       width: 100,
+      sorter: (a: AlertHistoryType, b: AlertHistoryType) => a.status.localeCompare(b.status),
       render: (status: string) => {
         const colorMap: Record<string, string> = {
           firing: 'red',
@@ -101,6 +254,10 @@ const AlertHistoryPage = () => {
       dataIndex: 'severity',
       key: 'severity',
       width: 80,
+      sorter: (a: AlertHistoryType, b: AlertHistoryType) => {
+        const order: Record<string, number> = { critical: 0, warning: 1, info: 2 };
+        return (order[a.severity] ?? 3) - (order[b.severity] ?? 3);
+      },
       render: (severity: string) => {
         const colorMap: Record<string, string> = {
           info: 'blue',
@@ -115,6 +272,8 @@ const AlertHistoryPage = () => {
       dataIndex: 'labels',
       key: 'instance',
       width: 150,
+      sorter: (a: AlertHistoryType, b: AlertHistoryType) =>
+        (a.labels?.instance || '').localeCompare(b.labels?.instance || ''),
       render: (labels: Record<string, string>) => labels?.instance || '-',
     },
     {
@@ -122,6 +281,8 @@ const AlertHistoryPage = () => {
       dataIndex: 'startsAt',
       key: 'startsAt',
       width: 180,
+      sorter: (a: AlertHistoryType, b: AlertHistoryType) =>
+        new Date(a.startsAt || 0).getTime() - new Date(b.startsAt || 0).getTime(),
       render: (time: string) => time ? new Date(time).toLocaleString() : '-',
     },
     {
@@ -129,6 +290,8 @@ const AlertHistoryPage = () => {
       dataIndex: 'notificationSent',
       key: 'notificationSent',
       width: 100,
+      sorter: (a: AlertHistoryType, b: AlertHistoryType) =>
+        Number(a.notificationSent) - Number(b.notificationSent),
       render: (sent: boolean) => (
         <Tag color={sent ? 'green' : 'default'}>{sent ? '是' : '否'}</Tag>
       ),
@@ -192,34 +355,25 @@ const AlertHistoryPage = () => {
         open={detailVisible}
         onCancel={() => setDetailVisible(false)}
         footer={[
+          <Segmented
+            key="viewToggle"
+            options={[
+              { label: '结构化', value: 'structured' },
+              { label: 'JSON', value: 'json' },
+            ]}
+            value={viewMode}
+            onChange={(val) => setViewMode(val as ViewMode)}
+          />,
           <Button key="close" onClick={() => setDetailVisible(false)}>
             关闭
           </Button>,
         ]}
-        width={600}
+        width={700}
       >
         {selectedRecord && (
-          <div>
-            <p><strong>告警名称:</strong> {selectedRecord.alertname}</p>
-            <p><strong>状态:</strong> {
-              selectedRecord.status === 'firing' ? '触发中' :
-              selectedRecord.status === 'resolved' ? '已解决' : '已抑制'
-            }</p>
-            <p><strong>级别:</strong> {selectedRecord.severity}</p>
-            <p><strong>实例:</strong> {selectedRecord.labels?.instance || '-'}</p>
-            <p><strong>开始时间:</strong> {selectedRecord.startsAt ? new Date(selectedRecord.startsAt).toLocaleString() : '-'}</p>
-            <p><strong>结束时间:</strong> {selectedRecord.endsAt ? new Date(selectedRecord.endsAt).toLocaleString() : '-'}</p>
-            <p><strong>是否被抑制:</strong> {selectedRecord.isSuppressed ? '是' : '否'}</p>
-            <p><strong>通知已发送:</strong> {selectedRecord.notificationSent ? '是' : '否'}</p>
-            <p><strong>标签:</strong></p>
-            <pre style={{ background: '#f5f5f5', padding: 8, borderRadius: 4 }}>
-              {JSON.stringify(selectedRecord.labels, null, 2)}
-            </pre>
-            <p><strong>注解:</strong></p>
-            <pre style={{ background: '#f5f5f5', padding: 8, borderRadius: 4 }}>
-              {JSON.stringify(selectedRecord.annotations, null, 2)}
-            </pre>
-          </div>
+          viewMode === 'structured'
+            ? renderStructuredView(selectedRecord)
+            : renderJsonView(selectedRecord)
         )}
       </Modal>
     </div>

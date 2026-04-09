@@ -13,6 +13,12 @@ from app.schemas.alert import (
     AlertTemplateResponse,
     AlertTemplateUpdate,
 )
+from app.schemas.notification_record import (
+    NotificationRecordCreate,
+    NotificationRecordListResponse,
+    NotificationRecordResponse,
+    NotificationRecordUpdate,
+)
 
 __all__ = [
     "AlertSilenceCreate",
@@ -25,4 +31,8 @@ __all__ = [
     "AlertHistoryListParams",
     "AlertHistoryListResponse",
     "AlertmanagerWebhookPayload",
+    "NotificationRecordCreate",
+    "NotificationRecordUpdate",
+    "NotificationRecordResponse",
+    "NotificationRecordListResponse",
 ]

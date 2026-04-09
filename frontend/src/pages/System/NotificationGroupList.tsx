@@ -8,7 +8,6 @@ import {
   Input,
   message,
   Popconfirm,
-  Typography,
   Tooltip,
   Modal,
   Form,
@@ -26,7 +25,6 @@ import { notificationGroupApi, type NotificationGroup, type NotificationGroupCre
 import { userApi } from '../../services/users';
 import type { User } from '../../types';
 
-const { Title } = Typography;
 const { Search } = Input;
 
 const NOTIFICATION_TYPE_OPTIONS = [
@@ -265,10 +263,7 @@ const NotificationGroupList = () => {
     <div>
       <Card
         title={
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Title level={4} style={{ margin: 0 }}>
-              通知组管理
-            </Title>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
             <Space>
               <Select
                 placeholder="筛选通知类型"

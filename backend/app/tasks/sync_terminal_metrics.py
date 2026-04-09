@@ -86,6 +86,10 @@ def sync_terminal_metrics_task(self) -> dict[str, Any]:
                     disk_usage = terminal.get("disk_usage", 0)
                     memory_usage = terminal.get("memory_usage", 0)
                     cpu_usage = terminal.get("cpu_usage", 0)
+                    disk_total_bytes = terminal.get("disk_total", 0)
+                    memory_total_bytes = terminal.get("memory_total", 0)
+                    disk_total_gb = round(disk_total_bytes / (1024**3), 1) if disk_total_bytes else None
+                    memory_total_gb = round(memory_total_bytes / (1024**3), 1) if memory_total_bytes else None
 
                     asset_id = await get_or_create_asset(
                         db, hostname, instance, customer
@@ -99,7 +103,9 @@ def sync_terminal_metrics_task(self) -> dict[str, Any]:
                         ip_address=instance.split(":")[0] if instance else None,
                         cpu_usage=cpu_usage,
                         memory_usage=memory_usage,
+                        memory_total_gb=memory_total_gb,
                         disk_usage=disk_usage,
+                        disk_total_gb=disk_total_gb,
                         network_in=None,
                         network_out=None,
                         uptime_hours=None,

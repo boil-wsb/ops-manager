@@ -8,7 +8,6 @@ import {
   Input,
   App,
   Popconfirm,
-  Typography,
   Tooltip,
 } from 'antd';
 import {
@@ -22,7 +21,6 @@ import { roleApi, type Role } from '../../services/permissions';
 import RoleFormModal from './RoleFormModal';
 import RolePermissionModal from './RolePermissionModal';
 
-const { Title } = Typography;
 const { Search } = Input;
 
 const RoleList = () => {
@@ -224,10 +222,7 @@ const RoleList = () => {
     <div>
       <Card
         title={
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Title level={4} style={{ margin: 0 }}>
-              角色管理
-            </Title>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
             <Space>
               <Search
                 placeholder="搜索角色名称或描述"

@@ -8,7 +8,6 @@ import {
   Input,
   message,
   Popconfirm,
-  Typography,
   Tooltip,
   Modal,
   Form,
@@ -35,7 +34,6 @@ import {
 } from '@ant-design/icons';
 import { navigationApi, type NavigationLink, type NavigationLinkCreate, type NavigationLinkUpdate, type NavigationImportResponse } from '../../services/navigation';
 
-const { Title } = Typography;
 const { Search } = Input;
 
 interface Role {
@@ -347,10 +345,7 @@ const NavigationList = () => {
     <div>
       <Card
         title={
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Title level={4} style={{ margin: 0 }}>
-              导航链接管理
-            </Title>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
             <Space>
               <Select
                 placeholder="筛选分类"

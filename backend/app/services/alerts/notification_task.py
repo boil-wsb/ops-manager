@@ -284,6 +284,11 @@ async def _send_notification_by_instance(
                                 severity=severity,
                                 message_id=message_id,
                             )
+                        await _update_alert_history_notification_sent(
+                            db=db,
+                            alertname=alertname,
+                            instance=instance,
+                        )
                         logger.info(f"P2P Feishu card sent to asset owner for instance={instance}")
                     else:
                         logger.warning(f"Failed to send P2P Feishu card to asset owner for instance={instance}")
@@ -376,7 +381,7 @@ async def _update_resolved_alert_card(
 
         if update_result.get("success"):
             await db.execute(
-                text("UPDATE alert_history SET status = 'resolved' WHERE id = :id"),
+                text("UPDATE alert_history SET status = 'resolved', notification_sent = True WHERE id = :id"),
                 {"id": history_id}
             )
             await db.commit()
@@ -386,6 +391,42 @@ async def _update_resolved_alert_card(
 
     except Exception as exc:
         logger.error(f"Error updating resolved alert card: {str(exc)}")
+
+
+async def _update_alert_history_notification_sent(
+    db: AsyncSession,
+    alertname: str,
+    instance: str,
+) -> None:
+    """Update AlertHistory.notification_sent to True for a specific alert.
+
+    Args:
+        db: Database session
+        alertname: Alert name
+        instance: Instance identifier
+    """
+    from sqlalchemy import text
+
+    try:
+        result = await db.execute(
+            text("SELECT id FROM alert_history WHERE alertname = :name AND labels->>'instance' = :instance AND status = 'firing'"),
+            {"name": alertname, "instance": instance}
+        )
+        row = result.fetchone()
+
+        if row:
+            history_id = row[0]
+            await db.execute(
+                text("UPDATE alert_history SET notification_sent = True WHERE id = :id"),
+                {"id": history_id}
+            )
+            await db.commit()
+            logger.info(f"Updated notification_sent=True for AlertHistory: id={history_id}, alertname={alertname}, instance={instance}")
+        else:
+            logger.warning(f"No firing AlertHistory found for notification_sent update: alertname={alertname}, instance={instance}")
+
+    except Exception as exc:
+        logger.error(f"Error updating notification_sent: {str(exc)}")
 
 
 async def _get_asset_owner_open_id(db: AsyncSession, instance: str) -> str | None:

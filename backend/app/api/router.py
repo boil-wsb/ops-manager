@@ -12,12 +12,14 @@ from app.api.v1 import (
     audit_logs,
     auth,
     dashboard,
+    feishu_notifications,
     feishu_sync,
     it_feedback,
     it_feedback_notifications,
     monitor,
     navigation,
     notification_groups,
+    notification_records,
     ops,
     pc_client_version,
     permissions,
@@ -42,6 +44,8 @@ api_router.include_router(it_feedback.router, prefix="/v1", tags=["IT反馈"])
 api_router.include_router(it_feedback_notifications.router, prefix="/v1", tags=["IT反馈通知"])
 api_router.include_router(pc_client_version.router, prefix="/v1", tags=["PC客户端版本"])
 api_router.include_router(feishu_sync.router, prefix="/v1", tags=["飞书同步"])
+api_router.include_router(feishu_notifications.router, prefix="/v1", tags=["飞书通知"])
+api_router.include_router(notification_records.router, prefix="/v1", tags=["通知记录"])
 api_router.include_router(alerts.router, prefix="/v1", tags=["告警中心"])
 api_router.include_router(alert_silences.router, prefix="/v1/alert", tags=["告警中心"])
 api_router.include_router(alert_templates.router, prefix="/v1/alert", tags=["告警中心"])

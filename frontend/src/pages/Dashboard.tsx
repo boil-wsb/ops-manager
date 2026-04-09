@@ -1,4 +1,4 @@
-import { Row, Col, Card, Statistic, Table, Tag, Space, Button, Tooltip, Tabs } from 'antd';
+import { Row, Col, Card, Statistic, Table, Tag, Space, Button, Tooltip, Tabs, Progress } from 'antd';
 import { LinkOutlined, MonitorOutlined, CloudUploadOutlined, DatabaseOutlined, CloudOutlined, SettingOutlined, DashboardOutlined, SafetyOutlined, ApiOutlined, DesktopOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { monitorApi } from '../services/monitor';
@@ -192,151 +192,173 @@ const Dashboard = () => {
           </>
         )}
 
-        <Col xs={24} sm={12} lg={isViewer ? 24 : 6}>
-          <Card loading={assetLoading}>
-            <Statistic
-              title={isViewer ? "我的资产" : "资产总数"}
-              value={assetStats?.total || 0}
-              suffix="个"
-              style={{ color: '#13c2c2' }}
-            />
-            <div style={{ marginTop: 8 }}>
-              <Tag color="blue">服务器: {assetStats?.servers || 0}</Tag>
-              <Tag color="purple">域名: {assetStats?.domains || 0}</Tag>
-            </div>
-          </Card>
-        </Col>
+        {!isViewer && (
+          <Col xs={24} sm={12} lg={6}>
+            <Card loading={assetLoading}>
+              <Statistic
+                title="资产总数"
+                value={assetStats?.total || 0}
+                suffix="个"
+                style={{ color: '#13c2c2' }}
+              />
+              <div style={{ marginTop: 8 }}>
+                <Tag color="blue">服务器: {assetStats?.servers || 0}</Tag>
+                <Tag color="purple">域名: {assetStats?.domains || 0}</Tag>
+              </div>
+            </Card>
+          </Col>
+        )}
       </Row>
 
       {isViewer && terminalMetrics && (
-        <>
-          <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-            <Col xs={24} sm={12} lg={6}>
-              <Card loading={terminalLoading}>
-                <Statistic
-                  title="终端总数"
-                  value={terminalMetrics.summary.totalCount}
-                  suffix="个"
-                  style={{ color: '#1890ff' }}
-                />
-                <div style={{ marginTop: 8 }}>
-                  <Tag color="green">在线: {terminalMetrics.summary.onlineCount}</Tag>
-                  <Tag color="red">离线: {terminalMetrics.summary.offlineCount}</Tag>
-                </div>
-              </Card>
-            </Col>
+        <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+          <Col xs={12}>
+            <Card loading={assetLoading}>
+              <Statistic
+                title="我的资产"
+                value={assetStats?.total || 0}
+                suffix="个"
+                style={{ color: '#13c2c2' }}
+              />
+              <div style={{ marginTop: 8 }}>
+                <Tag color="blue">服务器: {assetStats?.servers || 0}</Tag>
+                <Tag color="purple">域名: {assetStats?.domains || 0}</Tag>
+              </div>
+            </Card>
+          </Col>
 
-            <Col xs={24} sm={12} lg={6}>
-              <Card loading={terminalLoading}>
-                <Statistic
-                  title="活跃告警"
-                  value={terminalMetrics.summary.alertCount}
-                  suffix="个"
-                  style={{ color: terminalMetrics.summary.alertCount > 0 ? '#ff4d4f' : '#52c41a' }}
-                />
-              </Card>
-            </Col>
+          <Col xs={12}>
+            <Card loading={terminalLoading}>
+              <Statistic
+                title="终端总数"
+                value={terminalMetrics.summary.totalCount}
+                suffix="个"
+                style={{ color: '#1890ff' }}
+              />
+              <div style={{ marginTop: 8 }}>
+                <Tag color="green">在线: {terminalMetrics.summary.onlineCount}</Tag>
+                <Tag color="red">离线: {terminalMetrics.summary.offlineCount}</Tag>
+              </div>
+            </Card>
+          </Col>
+        </Row>
+      )}
 
-            <Col xs={24} sm={12} lg={6}>
-              <Card loading={terminalLoading}>
-                <Statistic
-                  title="平均 CPU"
-                  value={terminalMetrics.summary.avgCpuUsage}
-                  suffix="%"
-                  style={{ color: '#13c2c2' }}
-                />
-              </Card>
-            </Col>
+      {isViewer && terminalMetrics && (
+        <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+          <Col xs={24}>
+            <Card
+              title="终端详情"
+              loading={terminalLoading}
+              styles={{ body: { padding: terminalLoading ? 24 : 12 } }}
+            >
+                <Row gutter={[12, 12]}>
+                  {(terminalMetrics.terminals || []).map((terminal) => {
+                    const statusColor: Record<string, string> = {
+                      online: '#52c41a',
+                      offline: '#ff4d4f',
+                      unknown: '#d9d9d9',
+                    };
+                    const statusLabel: Record<string, string> = {
+                      online: '在线',
+                      offline: '离线',
+                      unknown: '未知',
+                    };
+                    return (
+                      <Col xs={24} sm={12} lg={8} key={terminal.id}>
+                        <Card
+                          size="small"
+                          style={{
+                            borderTop: `3px solid ${statusColor[terminal.currentStatus] || '#d9d9d9'}`,
+                            background: 'var(--bg-tertiary)',
+                          }}
+                          styles={{ body: { padding: '12px 16px' } }}
+                        >
+                          <div style={{ marginBottom: 10 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                              <DesktopOutlined style={{ color: 'var(--text-secondary)' }} />
+                              <Tooltip title={terminal.hostname}>
+                                <div style={{ fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>
+                                  {terminal.hostname}
+                                </div>
+                              </Tooltip>
+                              <span style={{ fontSize: 12, color: 'var(--text-secondary)', marginLeft: 4 }}>
+                                {terminal.ipAddress || '-'}
+                              </span>
+                              <Tag
+                                color={statusColor[terminal.currentStatus]}
+                                style={{ marginLeft: 'auto', fontSize: 11, padding: '0 6px' }}
+                              >
+                                {statusLabel[terminal.currentStatus]}
+                              </Tag>
+                            </div>
+                          </div>
 
-            <Col xs={24} sm={12} lg={6}>
-              <Card loading={terminalLoading}>
-                <Statistic
-                  title="平均内存"
-                  value={terminalMetrics.summary.avgMemoryUsage}
-                  suffix="%"
-                  style={{ color: '#722ed1' }}
-                />
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            <div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>CPU</span>
+                                <span style={{ fontWeight: 500 }}>{terminal.cpuUsage !== null ? `${terminal.cpuUsage}%` : '-'}</span>
+                              </div>
+                              <Progress
+                                percent={terminal.cpuUsage ?? 0}
+                                showInfo={false}
+                                strokeColor={terminal.cpuUsage !== null ? (terminal.cpuUsage > 80 ? '#ff4d4f' : terminal.cpuUsage > 60 ? '#faad14' : '#1890ff') : '#d9d9d9'}
+                                trailColor="var(--border-color)"
+                                size={['100%', 6]}
+                              />
+                            </div>
+                            <div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>内存</span>
+                                <span style={{ fontWeight: 500 }}>
+                                  {terminal.memoryUsage !== null && terminal.memoryTotalGb !== null
+                                    ? `${((terminal.memoryUsage / 100) * terminal.memoryTotalGb).toFixed(1)} / ${terminal.memoryTotalGb} GB`
+                                    : terminal.memoryUsage !== null ? `${terminal.memoryUsage}%` : '-'}
+                                </span>
+                              </div>
+                              <Progress
+                                percent={terminal.memoryUsage ?? 0}
+                                showInfo={false}
+                                strokeColor={terminal.memoryUsage !== null ? (terminal.memoryUsage > 80 ? '#ff4d4f' : terminal.memoryUsage > 60 ? '#faad14' : '#722ed1') : '#d9d9d9'}
+                                trailColor="var(--border-color)"
+                                size={['100%', 6]}
+                              />
+                            </div>
+                            <div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>磁盘</span>
+                                <span style={{ fontWeight: 500 }}>
+                                  {terminal.diskUsage !== null && terminal.diskTotalGb !== null
+                                    ? `${((terminal.diskUsage / 100) * terminal.diskTotalGb).toFixed(1)} / ${terminal.diskTotalGb} GB`
+                                    : terminal.diskUsage !== null ? `${terminal.diskUsage}%` : '-'}
+                                </span>
+                              </div>
+                              <Progress
+                                percent={terminal.diskUsage ?? 0}
+                                showInfo={false}
+                                strokeColor={terminal.diskUsage !== null ? (terminal.diskUsage > 80 ? '#ff4d4f' : terminal.diskUsage > 60 ? '#faad14' : '#fa8c16') : '#d9d9d9'}
+                                trailColor="var(--border-color)"
+                                size={['100%', 6]}
+                              />
+                            </div>
+                          </div>
+
+                          {terminal.alertCount > 0 && (
+                            <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid var(--border-color)' }}>
+                              <Tag color="red" style={{ fontSize: 11 }}>
+                                告警 {terminal.alertCount} 个{terminal.alertSeverity ? ` · ${terminal.alertSeverity}` : ''}
+                              </Tag>
+                            </div>
+                          )}
+                        </Card>
+                      </Col>
+                    );
+                  })}
+                </Row>
               </Card>
             </Col>
           </Row>
-
-          <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-            <Col xs={24}>
-              <Card
-                title="终端详情"
-                loading={terminalLoading}
-              >
-                <Table
-                  dataSource={terminalMetrics.terminals}
-                  rowKey="id"
-                  pagination={{ pageSize: 10 }}
-                  size="small"
-                  columns={[
-                    {
-                      title: '主机名',
-                      dataIndex: 'hostname',
-                      key: 'hostname',
-                      width: 150,
-                    },
-                    {
-                      title: 'IP 地址',
-                      dataIndex: 'ipAddress',
-                      key: 'ipAddress',
-                      width: 130,
-                    },
-                    {
-                      title: 'CPU',
-                      dataIndex: 'cpuUsage',
-                      key: 'cpuUsage',
-                      width: 80,
-                      render: (val: number | null) => val !== null ? `${val}%` : '-',
-                    },
-                    {
-                      title: '内存',
-                      dataIndex: 'memoryUsage',
-                      key: 'memoryUsage',
-                      width: 80,
-                      render: (val: number | null) => val !== null ? `${val}%` : '-',
-                    },
-                    {
-                      title: '磁盘',
-                      dataIndex: 'diskUsage',
-                      key: 'diskUsage',
-                      width: 80,
-                      render: (val: number | null) => val !== null ? `${val}%` : '-',
-                    },
-                    {
-                      title: '状态',
-                      dataIndex: 'currentStatus',
-                      key: 'currentStatus',
-                      width: 80,
-                      render: (status: string) => {
-                        const colorMap: Record<string, string> = {
-                          online: 'green',
-                          offline: 'red',
-                          unknown: 'default',
-                        };
-                        const labelMap: Record<string, string> = {
-                          online: '在线',
-                          offline: '离线',
-                          unknown: '未知',
-                        };
-                        return <Tag color={colorMap[status] || 'default'}>{labelMap[status] || status}</Tag>;
-                      },
-                    },
-                    {
-                      title: '告警',
-                      dataIndex: 'alertCount',
-                      key: 'alertCount',
-                      width: 80,
-                      render: (count: number) => count > 0 ? <Tag color="red">{count}</Tag> : '-',
-                    },
-                  ]}
-                />
-              </Card>
-            </Col>
-          </Row>
-        </>
       )}
 
       {!isViewer && (

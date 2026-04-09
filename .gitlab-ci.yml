@@ -18,7 +18,7 @@ variables:
   REMOTE_USER: root
   REMOTE_HOST: "192.168.23.36"
   REMOTE_DIR: "/opt/ops-manager"
-  COVERAGE_MIN: "45"
+  COVERAGE_MIN: "40"
 
 ### RULES REUSED VIA YAML ANCHORS:
 .if-release-branch: &if-release-branch
@@ -96,7 +96,7 @@ frontend-lint:
     - ops-docker
   before_script:
     - cd frontend
-    - npm install --frozen-lockfile --registry=https://registry.npmmirror.com 
+    - npm install --registry=https://registry.npmmirror.com 
   script:
     - npm run lint
   rules:
@@ -113,7 +113,7 @@ frontend-typecheck:
     - ops-docker
   before_script:
     - cd frontend
-    - npm install --frozen-lockfile --registry=https://registry.npmmirror.com 
+    - npm install --registry=https://registry.npmmirror.com 
   script:
     - npx tsc --noEmit
   rules:

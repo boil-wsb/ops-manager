@@ -40,6 +40,18 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         )
         return result.scalar_one_or_none()
 
+    async def get_by_full_name(
+        self,
+        db: AsyncSession,
+        *,
+        full_name: str
+    ) -> User | None:
+        """Get user by full_name."""
+        result = await db.execute(
+            select(User).where(User.full_name == full_name)
+        )
+        return result.scalar_one_or_none()
+
     async def get_by_feishu_open_id(
         self,
         db: AsyncSession,

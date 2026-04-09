@@ -24,6 +24,7 @@ import UserList from './pages/Users/UserList';
 import Profile from './pages/Profile/Profile';
 import NavigationList from './pages/System/NavigationList';
 import NotificationGroupList from './pages/System/NotificationGroupList';
+import NotificationRecordList from './pages/System/NotificationRecordList';
 import Forbidden from './pages/Forbidden';
 import AlertManager from './pages/Alerts/AlertManager';
 import AlertSilenceList from './pages/Alerts/AlertSilenceList';
@@ -111,6 +112,7 @@ function App() {
                 <Route path="system/roles" element={<RoleList />} />
                 <Route path="system/navigation" element={<NavigationList />} />
                 <Route path="system/notification-groups" element={<NotificationGroupList />} />
+                <Route path="system/notification-records" element={<NotificationRecordList />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="alerts/alertmanager" element={<AlertManager />} />
                 <Route path="alerts/alertmanager/silences" element={<AlertSilenceList />} />

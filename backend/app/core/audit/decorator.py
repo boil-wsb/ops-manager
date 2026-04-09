@@ -357,7 +357,7 @@ def _serialize_dict(data: Any) -> Any:
         return None
     if isinstance(data, dict):
         return {k: _serialize_dict(v) for k, v in data.items()}
-    if isinstance(data, (list, tuple)):
+    if isinstance(data, list | tuple):
         return [_serialize_dict(item) for item in data]
     return _serialize_value(data)
 
@@ -439,7 +439,7 @@ def _serialize_value(value: Any) -> Any:
 
     if value is None:
         return None
-    if isinstance(value, (str, int, float, bool)):
+    if isinstance(value, str | int | float | bool):
         return value
     if isinstance(value, datetime):
         return value.isoformat()

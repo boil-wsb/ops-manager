@@ -112,6 +112,7 @@ const Layout = () => {
           { key: '/system/roles', label: '角色管理', permission: 'role:read' },
           { key: '/system/navigation', label: '导航管理', permission: 'navigation:read' },
           { key: '/system/notification-groups', label: '通知组管理', permission: 'notification_group:read' },
+          { key: '/system/notification-records', label: '通知记录', permission: 'notification_group:read' },
         ],
       },
     ],

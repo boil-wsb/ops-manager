@@ -84,7 +84,9 @@ class CRUDBerminalMetric(CRUDBase[TerminalMetric, Any, Any]):
         ip_address: str | None = None,
         cpu_usage: float | None = None,
         memory_usage: float | None = None,
+        memory_total_gb: float | None = None,
         disk_usage: float | None = None,
+        disk_total_gb: float | None = None,
         network_in: float | None = None,
         network_out: float | None = None,
         uptime_hours: int | None = None,
@@ -107,7 +109,9 @@ class CRUDBerminalMetric(CRUDBase[TerminalMetric, Any, Any]):
             metric.ip_address = ip_address
             metric.cpu_usage = cpu_usage
             metric.memory_usage = memory_usage
+            metric.memory_total_gb = memory_total_gb
             metric.disk_usage = disk_usage
+            metric.disk_total_gb = disk_total_gb
             metric.network_in = network_in
             metric.network_out = network_out
             metric.uptime_hours = uptime_hours
@@ -126,7 +130,9 @@ class CRUDBerminalMetric(CRUDBase[TerminalMetric, Any, Any]):
                 ip_address=ip_address,
                 cpu_usage=cpu_usage,
                 memory_usage=memory_usage,
+                memory_total_gb=memory_total_gb,
                 disk_usage=disk_usage,
+                disk_total_gb=disk_total_gb,
                 network_in=network_in,
                 network_out=network_out,
                 uptime_hours=uptime_hours,

@@ -482,12 +482,20 @@ class PrometheusClient:
             if data.get("status") == "success":
                 result_list = data.get("data", {}).get("result", [])
                 if result_list:
-                    value = result_list[0].get("value", [])
-                    if len(value) >= 2:
-                        try:
-                            metrics[key] = float(value[1])
-                        except (ValueError, TypeError):
-                            metrics[key] = value[1]
+                    if key in ("disk_total", "memory_total"):
+                        total = sum(
+                            float(r.get("value", [0, 0])[1])
+                            for r in result_list
+                            if r.get("value") and len(r["value"]) >= 2
+                        )
+                        metrics[key] = total
+                    else:
+                        value = result_list[0].get("value", [])
+                        if len(value) >= 2:
+                            try:
+                                metrics[key] = float(value[1])
+                            except (ValueError, TypeError):
+                                metrics[key] = value[1]
 
         return metrics
 

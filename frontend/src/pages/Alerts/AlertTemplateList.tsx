@@ -44,6 +44,18 @@ const AlertTemplateList = () => {
     },
   });
 
+  const setDefaultMutation = useMutation({
+    mutationFn: ({ id, isDefault }: { id: number; isDefault: boolean }) =>
+      alertApi.updateTemplate(id, { is_default: isDefault } as never),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['alert-templates'] });
+      message.success('已设为默认模板');
+    },
+    onError: () => {
+      message.error('设置默认模板失败');
+    },
+  });
+
   const handleEdit = (record: AlertTemplate) => {
     setEditingTemplate(record);
     setFormVisible(true);
@@ -91,11 +103,8 @@ const AlertTemplateList = () => {
       render: (isDefault: boolean, record: AlertTemplate) => (
         <Switch
           checked={isDefault}
-          disabled={isDefault}
           onChange={(checked) => {
-            if (checked && !record.isDefault) {
-              // setDefaultMutation.mutate(record.id);
-            }
+            setDefaultMutation.mutate({ id: record.id, isDefault: checked });
           }}
         />
       ),
@@ -137,8 +146,7 @@ const AlertTemplateList = () => {
 
   return (
     <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
-        <h2>模板配置</h2>
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
         <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
           创建模板
         </Button>
@@ -183,7 +191,7 @@ const AlertTemplateList = () => {
               <strong>类型：</strong> {previewData.template.templateType}
             </p>
 
-            <h4 style={{ marginTop: 16 }}>输入数据</h4>
+            <div style={{ fontSize: 16, fontWeight: 500, marginTop: 16 }}>输入数据</div>
             <div style={{ marginBottom: 16 }}>
               <p>
                 <strong>Labels：</strong>
