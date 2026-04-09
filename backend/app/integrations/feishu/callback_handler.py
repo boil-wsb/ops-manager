@@ -402,7 +402,7 @@ def _get_alert_id_by_open_message_id(open_message_id: str) -> str | None:
         with engine.connect() as conn:
             result = conn.execute(
                 text(
-                    "SELECT alertname, labels->>'instance' as instance FROM alert_history WHERE feishu_open_message_id = :open_message_id AND status = 'firing'"
+                    "SELECT alertname, labels->>'instance' as instance FROM alert_history WHERE feishu_open_message_id = :open_message_id AND status = 'firing' ORDER BY id DESC LIMIT 1"
                 ),
                 {"open_message_id": open_message_id},
             )
@@ -438,7 +438,7 @@ def _acknowledge_alert(alert_id: str, open_message_id: str | None) -> None:
             if open_message_id:
                 result = conn.execute(
                     text(
-                        "SELECT id, alertname, severity, labels->>'instance' as instance FROM alert_history WHERE feishu_open_message_id = :msg_id AND status = 'firing'"
+                        "SELECT id, alertname, severity, labels->>'instance' as instance FROM alert_history WHERE feishu_open_message_id = :msg_id AND status = 'firing' ORDER BY id DESC LIMIT 1"
                     ),
                     {"msg_id": open_message_id},
                 )
@@ -448,7 +448,7 @@ def _acknowledge_alert(alert_id: str, open_message_id: str | None) -> None:
                     alertname_part, instance_part = parts
                     result = conn.execute(
                         text(
-                            "SELECT id, alertname, severity, labels->>'instance' as instance FROM alert_history WHERE alertname = :name AND labels->>'instance' = :instance AND status = 'firing'"
+                            "SELECT id, alertname, severity, labels->>'instance' as instance FROM alert_history WHERE alertname = :name AND labels->>'instance' = :instance AND status = 'firing' ORDER BY id DESC LIMIT 1"
                         ),
                         {"name": alertname_part, "instance": instance_part.replace("_", ".")},
                     )
@@ -496,7 +496,7 @@ def _transfer_alert_to_it(alert_id: str, open_message_id: str | None) -> None:
             if open_message_id:
                 result = conn.execute(
                     text(
-                        "SELECT id, alertname, severity, labels->>'instance' as instance FROM alert_history WHERE feishu_open_message_id = :msg_id AND status = 'firing'"
+                        "SELECT id, alertname, severity, labels->>'instance' as instance FROM alert_history WHERE feishu_open_message_id = :msg_id AND status = 'firing' ORDER BY id DESC LIMIT 1"
                     ),
                     {"msg_id": open_message_id},
                 )
@@ -506,7 +506,7 @@ def _transfer_alert_to_it(alert_id: str, open_message_id: str | None) -> None:
                     alertname_part, instance_part = parts
                     result = conn.execute(
                         text(
-                            "SELECT id, alertname, severity, labels->>'instance' as instance FROM alert_history WHERE alertname = :name AND labels->>'instance' = :instance AND status = 'firing'"
+                            "SELECT id, alertname, severity, labels->>'instance' as instance FROM alert_history WHERE alertname = :name AND labels->>'instance' = :instance AND status = 'firing' ORDER BY id DESC LIMIT 1"
                         ),
                         {"name": alertname_part, "instance": instance_part.replace("_", ".")},
                     )
@@ -549,7 +549,7 @@ def _resolve_alert_sync(alert_id: str, notes: str, open_message_id: str | None =
             if open_message_id:
                 result = conn.execute(
                     text(
-                        "SELECT id, alertname, labels->>'instance' as instance, feishu_open_message_id, severity FROM alert_history WHERE feishu_open_message_id = :msg_id AND status = 'firing'"
+                        "SELECT id, alertname, labels->>'instance' as instance, feishu_open_message_id, severity FROM alert_history WHERE feishu_open_message_id = :msg_id AND status = 'firing' ORDER BY id DESC LIMIT 1"
                     ),
                     {"msg_id": open_message_id},
                 )
@@ -570,7 +570,7 @@ def _resolve_alert_sync(alert_id: str, notes: str, open_message_id: str | None =
                     instance = instance_part.replace("_", ".")
                     result = conn.execute(
                         text(
-                            "SELECT id, feishu_open_message_id, severity FROM alert_history WHERE alertname = :name AND labels->>'instance' = :instance AND status = 'firing'"
+                            "SELECT id, feishu_open_message_id, severity FROM alert_history WHERE alertname = :name AND labels->>'instance' = :instance AND status = 'firing' ORDER BY id DESC LIMIT 1"
                         ),
                         {"name": alertname_part, "instance": instance},
                     )

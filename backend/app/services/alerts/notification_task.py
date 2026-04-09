@@ -336,7 +336,7 @@ async def _save_firing_alert_message_id(
     try:
         result = await db.execute(
             text(
-                "SELECT id FROM alert_history WHERE alertname = :name AND labels->>'instance' = :instance AND status = 'firing'"
+                "SELECT id FROM alert_history WHERE alertname = :name AND labels->>'instance' = :instance AND status = 'firing' ORDER BY id DESC LIMIT 1"
             ),
             {"name": alertname, "instance": instance},
         )
@@ -350,7 +350,7 @@ async def _save_firing_alert_message_id(
             )
             await db.commit()
             logger.info(
-                f"Saved feishu_open_message_id for firing alert: alertname={alertname}, instance={instance}"
+                f"Saved feishu_open_message_id for firing alert: alertname={alertname}, instance={instance}, history_id={history_id}"
             )
         else:
             logger.warning(

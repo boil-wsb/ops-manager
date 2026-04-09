@@ -20,7 +20,7 @@ RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
 # Install Python dependencies
 COPY requirements/base.txt requirements/base.txt
 COPY requirements/prod.txt requirements/prod.txt
-RUN pip install --no-cache-dir --user -r requirements/prod.txt
+RUN pip install --no-cache-dir --user -r requirements/prod.txt -q
 
 # Production stage
 FROM 192.168.100.213:8083/devops/python:3.12-slim
