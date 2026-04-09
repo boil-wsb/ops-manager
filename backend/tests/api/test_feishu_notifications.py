@@ -63,8 +63,9 @@ class MockFeishuService:
 @pytest.mark.asyncio
 async def test_send_feishu_card_notification_user_not_found(client: AsyncClient):
     """Test sending card notification when user does not exist."""
-    with patch("app.crud.crud_user.CRUDUser.get_by_username", new_callable=AsyncMock) as mock_get_by_username, \
-         patch("app.crud.crud_user.CRUDUser.get_by_full_name", new_callable=AsyncMock) as mock_get_by_full_name:
+    with patch("app.api.v1.feishu_notifications.crud_user.get_by_username", new_callable=AsyncMock) as mock_get_by_username, \
+         patch("app.api.v1.feishu_notifications.crud_user.get_by_full_name", new_callable=AsyncMock) as mock_get_by_full_name, \
+         patch("app.api.v1.feishu_notifications.get_feishu_service") as mock_get_service:
 
         mock_get_by_username.return_value = None
         mock_get_by_full_name.return_value = None
@@ -135,12 +136,12 @@ async def test_send_feishu_card_notification_success_by_full_name(client: AsyncC
     mock_user.username = "admin"
     mock_user.feishu_open_id = "ou_test456"
 
-    with patch("app.crud.crud_user.CRUDUser.get_by_username", new_callable=AsyncMock) as mock_get_by_username, \
-         patch("app.crud.crud_user.CRUDUser.get_by_full_name", new_callable=AsyncMock) as mock_get_by_full_name, \
+    with patch("app.api.v1.feishu_notifications.crud_user.get_by_username", new_callable=AsyncMock) as mock_get_by_username, \
+         patch("app.api.v1.feishu_notifications.db.execute", new_callable=AsyncMock) as mock_execute, \
          patch("app.api.v1.feishu_notifications.get_feishu_service") as mock_get_service:
 
         mock_get_by_username.return_value = None
-        mock_get_by_full_name.return_value = mock_user
+        mock_execute.return_value.scalar_one_or_none.return_value = mock_user
         mock_service = MockFeishuService(should_succeed=True)
         mock_get_service.return_value = mock_service
 
@@ -199,7 +200,6 @@ async def test_send_feishu_card_notification_runtime_error(client: AsyncClient):
         mock_get_by_username.return_value = mock_user
         mock_get_by_full_name.return_value = None
         mock_get_service.side_effect = RuntimeError("Feishu integration is not enabled")
-        mock_get_service.return_value = mock_service
 
         response = await client.post(
             "/api/v1/feishu/notify",

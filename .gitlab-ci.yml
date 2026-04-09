@@ -74,13 +74,21 @@ backend-lint:
   image: $PYTHON_IMAGE
   tags:
     - ops-docker
+  cache:
+    key: "pip-backend-$CI_COMMIT_REF_SLUG"
+    paths:
+      - /root/.cache/pip
+      - backend/.venv
+    policy: pull-push
   before_script:
     - pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
     - pip config set global.trusted-host mirrors.aliyun.com
     - cd backend
     - export PYTHONPATH=$PWD:$PYTHONPATH
+    - python -m venv .venv && source .venv/bin/activate
     - pip install -r requirements/dev.txt -q
   script:
+    - source .venv/bin/activate
     - ruff check app/
     - ruff format --check app/
   rules:
@@ -129,6 +137,12 @@ backend-test:
   image: $PYTHON_IMAGE
   tags:
     - ops-docker
+  cache:
+    key: "pip-backend-$CI_COMMIT_REF_SLUG"
+    paths:
+      - /root/.cache/pip
+      - backend/.venv
+    policy: pull-push
   before_script:
     - pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
     - pip config set global.trusted-host mirrors.aliyun.com
@@ -139,8 +153,10 @@ backend-test:
     - export DATABASE_URL=postgresql+asyncpg://opsmanager:opsmanager@192.168.23.36:15432/opsmanager_test
     - export REDIS_URL=redis://192.168.23.36:16379/0
     - export DISABLE_RATE_LIMIT=true
+    - python -m venv .venv && source .venv/bin/activate
     - pip install -r requirements/dev.txt -q
   script:
+    - source .venv/bin/activate
     - pytest tests/ -v --cov=app --cov-report=xml --cov-report=html --cov-fail-under=$COVERAGE_MIN
   coverage: '/(?i)TOTAL.*\s+(\d+\.\d+\%)/'
   artifacts:
@@ -163,12 +179,20 @@ backend-security:
   image: $PYTHON_IMAGE
   tags:
     - ops-docker
+  cache:
+    key: "pip-backend-$CI_COMMIT_REF_SLUG"
+    paths:
+      - /root/.cache/pip
+      - backend/.venv
+    policy: pull-push
   before_script:
     - pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
     - pip config set global.trusted-host mirrors.aliyun.com
     - cd backend
+    - python -m venv .venv && source .venv/bin/activate
     - pip install safety bandit -q || true
   script:
+    - source .venv/bin/activate
     - safety check --json || true
     - bandit -r app/ -f json -o bandit-report.json || true
   rules:
