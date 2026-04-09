@@ -75,10 +75,10 @@ backend-lint:
   tags:
     - ops-docker
   before_script:
-    - pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
-    - pip config set global.extra-index-url https://mirrors.aliyun.com/pypi/simple
-    - pip config set global.trusted-host pypi.tuna.tsinghua.edu.cn
+    - pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
+    - pip config set global.extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
     - pip config set global.trusted-host mirrors.aliyun.com
+    - pip config set global.trusted-host pypi.tuna.tsinghua.edu.cn
     - cd backend
     - export PYTHONPATH=$PWD:$PYTHONPATH
     - pip install -r requirements/dev.txt -q
@@ -132,10 +132,10 @@ backend-test:
   tags:
     - ops-docker
   before_script:
-    - pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
-    - pip config set global.extra-index-url https://mirrors.aliyun.com/pypi/simple
-    - pip config set global.trusted-host pypi.tuna.tsinghua.edu.cn
+    - pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
+    - pip config set global.extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
     - pip config set global.trusted-host mirrors.aliyun.com
+    - pip config set global.trusted-host pypi.tuna.tsinghua.edu.cn
     - cd backend
     - export PYTHONPATH=$PWD:$PYTHONPATH
     - export SECRET_KEY=test-secret-key-for-ci-only-min-32-chars
@@ -168,10 +168,10 @@ backend-security:
   tags:
     - ops-docker
   before_script:
-    - pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
-    - pip config set global.extra-index-url https://mirrors.aliyun.com/pypi/simple
-    - pip config set global.trusted-host pypi.tuna.tsinghua.edu.cn
+    - pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
+    - pip config set global.extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
     - pip config set global.trusted-host mirrors.aliyun.com
+    - pip config set global.trusted-host pypi.tuna.tsinghua.edu.cn
     - cd backend
     - pip install safety bandit -q || true
   script:
