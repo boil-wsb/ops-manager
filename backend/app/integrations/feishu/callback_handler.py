@@ -2,6 +2,7 @@
 Feishu callback handler for long connection (WebSocket) mode.
 """
 
+import json
 import logging
 import threading
 from typing import Any
@@ -9,6 +10,8 @@ from typing import Any
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+NOTIFICATION_TYPE_ALERT_TRANSFERRED_TO_IT = "alert_transferred_to_it"
 
 _lark = None
 _callback_thread: threading.Thread | None = None
@@ -476,6 +479,65 @@ def _acknowledge_alert(alert_id: str, open_message_id: str | None) -> None:
         logger.error(f"Error acknowledging alert {alert_id}: {e}")
 
 
+def _send_transfer_notification(alert_id: str, alertname: str, severity: str, instance: str) -> None:
+    """Send notification to IT team members when alert is transferred."""
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.orm import selectinload
+
+    from app.config import settings
+
+    try:
+        sync_db_url = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
+        engine = create_engine(sync_db_url, pool_pre_ping=True)
+
+        with engine.connect() as conn:
+            result = conn.execute(
+                text(
+                    "SELECT u.feishu_open_id FROM users u "
+                    "JOIN notification_group_members ngm ON u.id = ngm.user_id "
+                    "JOIN notification_groups ng ON ngm.notification_group_id = ng.id "
+                    "WHERE ng.notification_type = :notif_type AND ng.is_active = true "
+                    "AND u.feishu_open_id IS NOT NULL"
+                ),
+                {"notif_type": NOTIFICATION_TYPE_ALERT_TRANSFERRED_TO_IT}
+            )
+            rows = result.fetchall()
+
+        for row in rows:
+            user_id = row[0]
+            if user_id:
+                _send_transfer_card_to_user(user_id, alert_id, alertname, severity, instance)
+    except Exception as e:
+        logger.error(f"Error sending transfer notification: {e}")
+
+
+def _send_transfer_card_to_user(
+    user_id: str, alert_id: str, alertname: str, severity: str, instance: str
+) -> None:
+    """Send alert transferred notification card to a single user."""
+    try:
+        tags = [
+            {"label": "告警名称", "value": alertname or "未知"},
+            {"label": "严重程度", "value": severity or "info"},
+            {"label": "故障主机", "value": instance or "未知"},
+        ]
+
+        feishu = get_feishu_service()
+        result = feishu.send_interactive_message(
+            user_id=user_id,
+            title=f"【{severity}】告警转交 IT 处理",
+            content="",
+            tags=tags,
+            header_template="orange",
+        )
+        if isinstance(result, dict) and result.get("message_id"):
+            logger.info(f"Transfer notification sent to {user_id}, message_id={result.get('message_id')}")
+        else:
+            logger.warning(f"Failed to send transfer notification to {user_id}")
+    except Exception as e:
+        logger.error(f"Error sending transfer card to {user_id}: {e}")
+
+
 def _transfer_alert_to_it(alert_id: str, open_message_id: str | None) -> None:
     """Transfer alert to IT and update card to show transferred status."""
     from sqlalchemy import create_engine, text
@@ -530,6 +592,8 @@ def _transfer_alert_to_it(alert_id: str, open_message_id: str | None) -> None:
                 instance=instance,
             )
             logger.info(f"Alert card {alert_id} updated to transferred status")
+
+        _send_transfer_notification(alert_id, alertname, severity, instance)
     except Exception as e:
         logger.error(f"Error transferring alert {alert_id} to IT: {e}")
 
@@ -634,6 +698,8 @@ def _start_callback_client() -> None:
         .register_p2_card_action_trigger(_do_card_action_trigger)
         .register_p2_im_message_receive_v1(_do_im_message_receive_v1)
         .register_p2_im_chat_access_event_bot_p2p_chat_entered_v1(_do_bot_p2p_chat_entered)
+        .register_p2_im_message_reaction_created_v1(_do_im_message_reaction_created_v1)
+        .register_p2_im_message_message_read_v1(_do_im_message_message_read_v1)
         .build()
     )
 
@@ -686,10 +752,24 @@ def _do_bot_p2p_chat_entered(data: Any) -> None:
     return None
 
 
+def _do_im_message_reaction_created_v1(data: Any) -> None:
+    """Handle im.message.reaction.created_v1 event."""
+    lark = _get_lark_module()
+    logger.info(f"Message reaction created: {lark.JSON.marshal(data)}")
+    return None
+
+
+def _do_im_message_message_read_v1(data: Any) -> None:
+    """Handle im.message.message_read_v1 event."""
+    lark = _get_lark_module()
+    logger.info(f"Message read event: {lark.JSON.marshal(data)}")
+    return None
+
+
 def _do_im_message_receive_v1(data: Any) -> Any:
     """Handle im.message.receive_v1 event - receive user messages."""
-    lark = _get_lark_module()
     try:
+        lark = _get_lark_module()
         message_content = lark.JSON.marshal(data)
         logger.info(f"Message received: {message_content[:500]}...")
 
@@ -703,10 +783,13 @@ def _do_im_message_receive_v1(data: Any) -> Any:
                     sender_id, "user_id", None
                 )
 
-        content = getattr(event, "content", None)
+        message = getattr(event, "message", None)
+        message_id = getattr(message, "message_id", None) if message else None
+
+        content = getattr(message, "content", None) if message else None
         if content:
             try:
-                msg_dict = lark.JSON.unmarshal(content) if isinstance(content, str) else content
+                msg_dict = json.loads(content) if isinstance(content, str) else content
                 msg_type = msg_dict.get("msg_type", "") if isinstance(msg_dict, dict) else ""
                 text_content = msg_dict.get("text", "") if isinstance(msg_dict, dict) else ""
 
@@ -719,19 +802,27 @@ def _do_im_message_receive_v1(data: Any) -> Any:
             except Exception as e:
                 logger.error(f"Error parsing message content: {e}")
 
-        from lark_oapi.event.callback.model.p2_im_message_receive_v1 import (
-            P2ImMessageReceiveResponse,
-        )
-
-        return P2ImMessageReceiveResponse(None)
+        if message_id:
+            _send_salute_reaction(message_id)
+        return None
 
     except Exception as e:
         logger.error(f"Error processing message: {e}")
-        from lark_oapi.event.callback.model.p2_im_message_receive_v1 import (
-            P2ImMessageReceiveResponse,
-        )
+        return None
 
-        return P2ImMessageReceiveResponse(None)
+
+def _send_salute_reaction(message_id: str | None) -> None:
+    """Add salute emoji reaction to the message."""
+    if not message_id:
+        return
+    try:
+        from app.integrations.feishu.service import get_feishu_service
+
+        feishu = get_feishu_service()
+        feishu.add_message_reaction(message_id, emoji_type="Typing")
+        logger.info(f"Added salute reaction to message {message_id}")
+    except Exception as e:
+        logger.error(f"Error adding salute reaction: {e}")
 
 
 def _handle_text_message(sender_id: str | None, text: str) -> None:

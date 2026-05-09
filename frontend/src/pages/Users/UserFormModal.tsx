@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Modal, Form, Input, Select, Switch, App } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { userApi } from '../../services/users';
@@ -30,6 +30,14 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ open, onClose, user }) =>
   const initialRoleIds = useMemo(() => user?.roles?.map((r) => r.id) || [], [user]);
 
   const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>(initialRoleIds);
+
+  useEffect(() => {
+    if (user?.roles) {
+      setSelectedRoleIds(user.roles.map((r) => r.id));
+    } else {
+      setSelectedRoleIds([]);
+    }
+  }, [user]);
 
   const initialValues = useMemo(() => {
     if (user) {
@@ -162,7 +170,6 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ open, onClose, user }) =>
           name="isActive"
           label="状态"
           valuePropName="checked"
-          initialValue={true}
         >
           <Switch checkedChildren="启用" unCheckedChildren="禁用" />
         </Form.Item>
@@ -172,7 +179,6 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ open, onClose, user }) =>
             name="isSuperuser"
             label="超级管理员"
             valuePropName="checked"
-            initialValue={false}
           >
             <Switch checkedChildren="是" unCheckedChildren="否" />
           </Form.Item>

@@ -82,3 +82,6 @@ build/
 *.bak
 *.tmp
 *.temp
+
+# Virtuos
+Virtuos/

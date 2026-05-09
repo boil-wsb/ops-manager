@@ -7,6 +7,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_db, require_permissions
 from app.core.audit import audit_log
@@ -31,7 +32,7 @@ async def list_users(
     """Get user list with filters."""
     skip = (page - 1) * page_size
 
-    query = select(User)
+    query = select(User).options(selectinload(User.roles))
 
     if keyword:
         query = query.where(
@@ -65,7 +66,7 @@ async def list_users(
                 "updated_at": u.updated_at,
                 "feishu_open_id": u.feishu_open_id,
                 "permissions": [],
-                "roles": [],
+                "roles": [{"id": r.id, "name": r.name} for r in u.roles],
             }
             for u in users
         ],

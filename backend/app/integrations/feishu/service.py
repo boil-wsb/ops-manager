@@ -95,6 +95,58 @@ class FeishuService:
             content={"text": text},
         )
 
+    def add_message_reaction(self, message_id: str, emoji_type: str = "SMILE") -> dict[str, Any]:
+        import lark_oapi as lark
+        from lark_oapi.api.im.v1 import CreateMessageReactionRequest, CreateMessageReactionRequestBody, Emoji
+
+        self._check_enabled()
+        client = self._get_client()
+
+        request: CreateMessageReactionRequest = (
+            CreateMessageReactionRequest.builder()
+            .message_id(message_id)
+            .request_body(
+                CreateMessageReactionRequestBody.builder()
+                .reaction_type(
+                    Emoji.builder()
+                    .emoji_type(emoji_type)
+                    .build()
+                )
+                .build()
+            )
+            .build()
+        )
+
+        response = client.im.v1.message_reaction.create(request)
+
+        if not response.success():
+            logger.error(
+                f"[Feishu] Failed to add reaction - message_id={message_id}, emoji_type={emoji_type}, code={response.code}, msg={response.msg}"
+            )
+            return {
+                "reaction_id": None,
+                "code": response.code,
+                "msg": response.msg,
+            }
+
+        logger.info(
+            f"[Feishu] Reaction added successfully - message_id={message_id}, emoji_type={emoji_type}"
+        )
+
+        if response.data:
+            reaction_id = getattr(response.data, "reaction_id", None)
+            return {
+                "reaction_id": reaction_id,
+                "code": 0,
+                "msg": "success",
+            }
+
+        return {
+            "reaction_id": None,
+            "code": 0,
+            "msg": "success",
+        }
+
     def send_interactive_message(
         self,
         user_id: str,

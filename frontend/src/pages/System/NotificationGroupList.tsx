@@ -30,6 +30,7 @@ const { Search } = Input;
 const NOTIFICATION_TYPE_OPTIONS = [
   { value: 'it_feedback_created', label: 'IT反馈创建通知' },
   { value: 'it_feedback_resolved', label: 'IT反馈解决通知' },
+  { value: 'alert_transferred_to_it', label: 'IT事件处理' },
 ];
 
 const NotificationGroupList = () => {
