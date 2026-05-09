@@ -186,15 +186,16 @@ backend-security:
       - backend/.venv
     policy: pull-push
   before_script:
-    - pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
+    - pip config set global.index.url https://mirrors.aliyun.com/pypi/simple
     - pip config set global.trusted-host mirrors.aliyun.com
     - cd backend
     - python -m venv .venv && source .venv/bin/activate
-    - pip install safety bandit -q || true
+    - pip install safety bandit pip-audit -q || true
   script:
     - source .venv/bin/activate
-    - safety check --json || true
+    - safety scan --json || true
     - bandit -r app/ -f json -o bandit-report.json || true
+    - pip-audit --format=json || true
   rules:
     - <<: *if-merge-request
     - <<: *if-master-branch
