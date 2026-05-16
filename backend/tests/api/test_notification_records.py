@@ -32,6 +32,10 @@ class MockCrudNotificationRecord:
         record.user = obj_in.user
         record.matched_user = obj_in.matched_user
         record.feishu_open_id = obj_in.feishu_open_id
+        record.chat_id = getattr(obj_in, "chat_id", None)
+        record.receive_type = getattr(obj_in, "receive_type", "open_id")
+        record.callback_id = getattr(obj_in, "callback_id", None)
+        record.open_message_id = getattr(obj_in, "open_message_id", None)
         record.card_content = obj_in.card_content
         record.success = obj_in.success
         record.error = obj_in.error
@@ -85,6 +89,10 @@ class TestNotificationRecordsAPI:
         mock_record.user = "test_user"
         mock_record.matched_user = "test_user"
         mock_record.feishu_open_id = "ou_test123"
+        mock_record.chat_id = None
+        mock_record.receive_type = "open_id"
+        mock_record.callback_id = None
+        mock_record.open_message_id = None
         mock_record.card_content = {"schema": "2.0"}
         mock_record.message_id = "msg_123"
         mock_record.success = True
@@ -110,6 +118,10 @@ class TestNotificationRecordsAPI:
         mock_record1.user = "user_a"
         mock_record1.matched_user = "user_a"
         mock_record1.feishu_open_id = "ou_1"
+        mock_record1.chat_id = None
+        mock_record1.receive_type = "open_id"
+        mock_record1.callback_id = None
+        mock_record1.open_message_id = None
         mock_record1.card_content = {}
         mock_record1.message_id = None
         mock_record1.success = False
@@ -121,6 +133,10 @@ class TestNotificationRecordsAPI:
         mock_record2.user = "user_b"
         mock_record2.matched_user = "user_b"
         mock_record2.feishu_open_id = "ou_2"
+        mock_record2.chat_id = None
+        mock_record2.receive_type = "open_id"
+        mock_record2.callback_id = None
+        mock_record2.open_message_id = None
         mock_record2.card_content = {}
         mock_record2.message_id = None
         mock_record2.success = True
@@ -146,6 +162,10 @@ class TestNotificationRecordsAPI:
         mock_record1.user = "user_a"
         mock_record1.matched_user = "user_a"
         mock_record1.feishu_open_id = "ou_1"
+        mock_record1.chat_id = None
+        mock_record1.receive_type = "open_id"
+        mock_record1.callback_id = None
+        mock_record1.open_message_id = None
         mock_record1.card_content = {}
         mock_record1.message_id = "msg_1"
         mock_record1.success = True
@@ -157,6 +177,10 @@ class TestNotificationRecordsAPI:
         mock_record2.user = "user_b"
         mock_record2.matched_user = "user_b"
         mock_record2.feishu_open_id = "ou_2"
+        mock_record2.chat_id = None
+        mock_record2.receive_type = "open_id"
+        mock_record2.callback_id = None
+        mock_record2.open_message_id = None
         mock_record2.card_content = {}
         mock_record2.message_id = None
         mock_record2.success = False
@@ -183,6 +207,10 @@ class TestNotificationRecordsAPI:
         mock_record.user = "test_user"
         mock_record.matched_user = "test_user"
         mock_record.feishu_open_id = "ou_test123"
+        mock_record.chat_id = None
+        mock_record.receive_type = "open_id"
+        mock_record.callback_id = None
+        mock_record.open_message_id = None
         mock_record.card_content = {"schema": "2.0"}
         mock_record.message_id = "msg_123"
         mock_record.success = True
@@ -213,6 +241,10 @@ class TestNotificationRecordsAPI:
         mock_record.user = "test_user"
         mock_record.matched_user = "test_user"
         mock_record.feishu_open_id = "ou_test123"
+        mock_record.chat_id = None
+        mock_record.receive_type = "open_id"
+        mock_record.callback_id = None
+        mock_record.open_message_id = None
         mock_record.card_content = {}
         mock_record.message_id = None
         mock_record.success = False
@@ -245,6 +277,10 @@ class TestNotificationRecordSchemaConversion:
             "user": "test_user",
             "matchedUser": "test_user",
             "feishuOpenId": "ou_123",
+            "chatId": None,
+            "receiveType": "open_id",
+            "callbackId": None,
+            "openMessageId": None,
             "cardContent": {"schema": "2.0"},
             "messageId": "msg_123",
             "success": True,
@@ -253,10 +289,18 @@ class TestNotificationRecordSchemaConversion:
         }
         assert "matchedUser" in response_data
         assert "feishuOpenId" in response_data
+        assert "chatId" in response_data
+        assert "receiveType" in response_data
+        assert "callbackId" in response_data
+        assert "openMessageId" in response_data
         assert "messageId" in response_data
         assert "createdAt" in response_data
         assert "matched_user" not in response_data
         assert "feishu_open_id" not in response_data
+        assert "chat_id" not in response_data
+        assert "receive_type" not in response_data
+        assert "callback_id" not in response_data
+        assert "open_message_id" not in response_data
         assert "message_id" not in response_data
         assert "created_at" not in response_data
 
@@ -266,13 +310,25 @@ class TestNotificationRecordSchemaConversion:
             "user": "test_user",
             "matched_user": "test_user",
             "feishu_open_id": "ou_123",
+            "chat_id": None,
+            "receive_type": "open_id",
+            "callback_id": None,
+            "open_message_id": None,
             "card_content": {"schema": "2.0"},
             "success": True
         }
         assert "user" in request_data
         assert "matched_user" in request_data
         assert "feishu_open_id" in request_data
+        assert "chat_id" in request_data
+        assert "receive_type" in request_data
+        assert "callback_id" in request_data
+        assert "open_message_id" in request_data
         assert "card_content" in request_data
         assert "success" in request_data
         assert "matchedUser" not in request_data
         assert "feishuOpenId" not in request_data
+        assert "chatId" not in request_data
+        assert "receiveType" not in request_data
+        assert "callbackId" not in request_data
+        assert "openMessageId" not in request_data

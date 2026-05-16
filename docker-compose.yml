@@ -68,11 +68,10 @@ services:
       - TZ=Asia/Shanghai
     volumes:
       - ./logs:/app/logs
-      - ./celery_beat:/app/celerybeat
     depends_on:
       - postgres
       - redis
-    command: celery -A app.tasks.celery_app worker -B -l info -c 4
+    command: celery -A app.tasks.celery_app worker -l info -c 4
     networks:
       - ops-network
     restart: unless-stopped
