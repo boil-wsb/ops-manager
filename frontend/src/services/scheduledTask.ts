@@ -1,5 +1,4 @@
 import api from './api';
-import type { TaskExecutionLog } from '../types';
 
 export interface ScheduledTaskListParams {
   skip?: number;
