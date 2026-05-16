@@ -55,13 +55,13 @@ class OptimizedAssetSyncService:
             节点列表
         """
         if not force_refresh and self._node_cache and self._node_cache.is_valid():
-            logger.info(f"Using cached nodes ({len(self._node_cache.nodes)} nodes)")
+            logger.debug(f"Using cached nodes ({len(self._node_cache.nodes)} nodes)")
             return self._node_cache.nodes
 
-        logger.info("Fetching nodes from Prometheus...")
+        logger.debug("Fetching nodes from Prometheus...")
         nodes = await self.prometheus_client.get_all_nodes()
         self._node_cache = NodeCache(nodes=nodes, timestamp=datetime.utcnow())
-        logger.info(f"Cached {len(nodes)} nodes from Prometheus")
+        logger.debug(f"Cached {len(nodes)} nodes from Prometheus")
         return nodes
 
     async def _get_node_details(self, instance: str, node: dict[str, Any]) -> dict[str, Any]:
@@ -104,7 +104,7 @@ class OptimizedAssetSyncService:
         }
 
         try:
-            logger.info(f"Starting optimized sync for instance: {instance}")
+            logger.debug(f"Starting optimized sync for instance: {instance}")
 
             # 从缓存获取节点列表
             nodes = await self._get_cached_nodes(force_refresh=force_refresh)
@@ -126,7 +126,7 @@ class OptimizedAssetSyncService:
 
             # 映射数据
             asset_data = self._map_prometheus_node_to_asset_data(node)
-            logger.info(f"Mapped asset data: {asset_data}")
+            logger.debug(f"Mapped asset data: {asset_data}")
 
             # 检查是否已存在
             existing_asset = await self._get_asset_by_ip(asset_data["ip_address"])
@@ -169,7 +169,7 @@ class OptimizedAssetSyncService:
             "errors": [],
         }
 
-        logger.info(f"Starting batch sync for {len(instances)} instances")
+        logger.debug(f"Starting batch sync for {len(instances)} instances")
 
         # 先刷新缓存，确保数据最新
         await self._get_cached_nodes(force_refresh=True)
@@ -191,7 +191,7 @@ class OptimizedAssetSyncService:
                 results["failed"] += 1
                 results["errors"].append(f"{instance}: {str(e)}")
 
-        logger.info(f"Batch sync completed: {results}")
+        logger.debug(f"Batch sync completed: {results}")
         return results
 
     async def sync_all_assets(self) -> dict[str, Any]:
@@ -215,7 +215,7 @@ class OptimizedAssetSyncService:
             nodes = await self._get_cached_nodes(force_refresh=True)
             stats["total"] = len(nodes)
 
-            logger.info(f"Starting sync for {len(nodes)} nodes from Prometheus")
+            logger.debug(f"Starting sync for {len(nodes)} nodes from Prometheus")
 
             for node in nodes:
                 instance = node.get("instance", "")
@@ -393,7 +393,7 @@ class OptimizedAssetSyncService:
 
         await self.db.commit()
         await self.db.refresh(existing_asset)
-        logger.info(f"Updated asset: {existing_asset.asset_id}")
+        logger.debug(f"Updated asset: {existing_asset.asset_id}")
 
     async def _create_asset(
         self, asset_data: dict[str, Any], node: dict[str, Any], instance: str
@@ -421,5 +421,5 @@ class OptimizedAssetSyncService:
         self.db.add(new_asset)
         await self.db.commit()
         await self.db.refresh(new_asset)
-        logger.info(f"Created asset: {new_asset.asset_id}")
+        logger.debug(f"Created asset: {new_asset.asset_id}")
         return new_asset

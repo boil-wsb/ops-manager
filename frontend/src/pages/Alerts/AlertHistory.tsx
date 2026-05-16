@@ -3,6 +3,7 @@ import { Table, Button, Space, Card, DatePicker, Select, Input, Tag, Modal, Segm
 import { EyeOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import type { AlertHistory as AlertHistoryType, AlertHistoryStatus } from '../../types/alert';
+import { fuzzyFilterOption } from '../../utils/selectFilter';
 import alertApi from '../../services/alert';
 import type { Dayjs } from 'dayjs';
 
@@ -321,6 +322,8 @@ const AlertHistoryPage = () => {
             onChange={handleStatusChange}
             style={{ width: 120 }}
             allowClear
+            showSearch
+            filterOption={fuzzyFilterOption}
             options={statusOptions}
           />
           <Search

@@ -3,6 +3,7 @@ import { Table, Button, Select, Tag, Space, Card } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { PlusOutlined } from '@ant-design/icons';
 import { opsApi } from '../../services/ops';
+import { fuzzyFilterOption } from '../../utils/selectFilter';
 import StatusTag from '../../components/StatusTag';
 
 const DeploymentList = () => {
@@ -106,6 +107,8 @@ const DeploymentList = () => {
             onChange={(value) => setFilter({ ...filter, environment: value })}
             style={{ width: 120 }}
             allowClear
+            showSearch
+            filterOption={fuzzyFilterOption}
           >
             <Select.Option value="dev">开发</Select.Option>
             <Select.Option value="test">测试</Select.Option>
@@ -118,6 +121,8 @@ const DeploymentList = () => {
             onChange={(value) => setFilter({ ...filter, status: value })}
             style={{ width: 120 }}
             allowClear
+            showSearch
+            filterOption={fuzzyFilterOption}
           >
             <Select.Option value="pending">等待中</Select.Option>
             <Select.Option value="running">发布中</Select.Option>

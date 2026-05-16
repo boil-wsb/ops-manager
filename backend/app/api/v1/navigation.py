@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_current_user_optional, get_db
 from app.core.audit import audit_log
+from app.core.cache import cache_delete_pattern, cache_get_or_set
 from app.core.permissions import require_permissions
 from app.crud.crud_navigation import navigation_link
 from app.models.permission import Role
@@ -39,9 +40,19 @@ async def get_public_navigation_links(
     """Get active navigation links grouped by category, filtered by user roles."""
     if current_user and not current_user.is_superuser:
         user_role_ids = {role.id for role in current_user.roles}
-        grouped = await navigation_link.get_grouped_links_for_user(db, user_role_ids)
+        cache_key = f"nav:public:user:{','.join(str(rid) for rid in sorted(user_role_ids))}"
+        grouped = await cache_get_or_set(
+            cache_key,
+            lambda: navigation_link.get_grouped_links_for_user(db, user_role_ids),
+            ttl=300,
+        )
     else:
-        grouped = await navigation_link.get_grouped_links(db)
+        cache_key = "nav:public:all"
+        grouped = await cache_get_or_set(
+            cache_key,
+            lambda: navigation_link.get_grouped_links(db),
+            ttl=300,
+        )
 
     result = []
     for category, links in grouped.items():
@@ -171,6 +182,21 @@ async def import_navigation_links(
     success_count = 0
     failed_count = 0
 
+    all_role_names = set()
+    for link_in in links_in:
+        if link_in.role_names:
+            role_names = [
+                name.strip() for name in link_in.role_names.split(",") if name.strip()
+            ]
+            if role_names and role_names[0].lower() != "public":
+                all_role_names.update(role_names)
+
+    role_map = {}
+    if all_role_names:
+        role_result = await db.execute(select(Role).where(Role.name.in_(all_role_names)))
+        for r in role_result.scalars().all():
+            role_map[r.name] = r
+
     for link_in in links_in:
         try:
             role_ids = []
@@ -179,10 +205,8 @@ async def import_navigation_links(
                     name.strip() for name in link_in.role_names.split(",") if name.strip()
                 ]
                 if role_names and role_names[0].lower() != "public":
-                    role_result = await db.execute(select(Role).where(Role.name.in_(role_names)))
-                    roles = list(role_result.scalars().all())
-                    if len(roles) != len(role_names):
-                        missing = set(role_names) - {r.name for r in roles}
+                    missing = set(role_names) - set(role_map.keys())
+                    if missing:
                         results.append(
                             NavigationLinkImportResult(
                                 success=False,
@@ -192,7 +216,7 @@ async def import_navigation_links(
                         )
                         failed_count += 1
                         continue
-                    role_ids = [role.id for role in roles]
+                    role_ids = [role_map[name].id for name in role_names]
 
             nav_create = NavigationLinkCreate(
                 category=link_in.category,
@@ -220,6 +244,8 @@ async def import_navigation_links(
 
     logger.info(f"[导航管理] 导入完成，成功 {success_count} 条，失败 {failed_count} 条")
 
+    await cache_delete_pattern("nav:public:*")
+
     return NavigationImportResponse(
         total=len(links_in),
         success_count=success_count,
@@ -246,6 +272,8 @@ async def create_navigation_link(
 
     link = await navigation_link.create_with_roles(db, obj_in=link_in, role_ids=role_ids)
     logger.info(f"[导航管理] 导航链接 '{link.name}' 创建成功，ID: {link.id}")
+
+    await cache_delete_pattern("nav:public:*")
 
     return NavigationLinkResponse.model_validate(link)
 
@@ -312,6 +340,8 @@ async def update_navigation_link(
     )
     logger.info(f"[导航管理] 导航链接 '{link.name}' 更新成功")
 
+    await cache_delete_pattern("nav:public:*")
+
     return NavigationLinkResponse.model_validate(link)
 
 
@@ -336,5 +366,7 @@ async def delete_navigation_link(
 
     await navigation_link.delete(db, id=link_id)
     logger.info(f"[导航管理] 导航链接 ID={link_id} 删除成功")
+
+    await cache_delete_pattern("nav:public:*")
 
     return None

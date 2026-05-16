@@ -3,6 +3,7 @@ import { Table, Button, Select, Tag, Space, Card, App } from 'antd';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { ReloadOutlined, SyncOutlined } from '@ant-design/icons';
 import { opsApi } from '../../services/ops';
+import { fuzzyFilterOption } from '../../utils/selectFilter';
 import StatusTag from '../../components/StatusTag';
 import type { Certificate } from '../../types';
 
@@ -125,6 +126,8 @@ const CertificateList = () => {
             onChange={(value) => setFilter({ ...filter, status: value })}
             style={{ width: 120 }}
             allowClear
+            showSearch
+            filterOption={fuzzyFilterOption}
           >
             <Select.Option value="active">有效</Select.Option>
             <Select.Option value="expired">已过期</Select.Option>
@@ -136,6 +139,8 @@ const CertificateList = () => {
             onChange={(value) => setFilter({ ...filter, expiringSoon: value })}
             style={{ width: 120 }}
             allowClear
+            showSearch
+            filterOption={fuzzyFilterOption}
           >
             <Select.Option value={true}>30天内</Select.Option>
             <Select.Option value={false}>30天外</Select.Option>

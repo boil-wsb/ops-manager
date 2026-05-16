@@ -33,6 +33,7 @@ import {
   DownloadOutlined,
 } from '@ant-design/icons';
 import { navigationApi, type NavigationLink, type NavigationLinkCreate, type NavigationLinkUpdate, type NavigationImportResponse } from '../../services/navigation';
+import { fuzzyFilterOption } from '../../utils/selectFilter';
 
 const { Search } = Input;
 
@@ -353,6 +354,8 @@ const NavigationList = () => {
                 style={{ width: 150 }}
                 value={categoryFilter}
                 onChange={(value) => setCategoryFilter(value)}
+                showSearch
+                filterOption={fuzzyFilterOption}
               >
                 {categories.map((cat) => (
                   <Select.Option key={cat} value={cat}>

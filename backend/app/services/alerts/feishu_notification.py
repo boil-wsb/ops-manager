@@ -79,13 +79,37 @@ class FeishuNotificationService:
                 logger.info(
                     f"P2P card message sent to open_id: {open_id}, message_id: {message_id}"
                 )
+                self._record_outbound_interaction(
+                    feishu_open_id=open_id,
+                    message_id=message_id,
+                    msg_type="interactive",
+                    content=card_content,
+                    related_type="alert",
+                    status="success",
+                )
                 return {"success": True, "message_id": message_id}
             else:
                 logger.error(f"Failed to send P2P card: code={response.code}, msg={response.msg}")
+                self._record_outbound_interaction(
+                    feishu_open_id=open_id,
+                    msg_type="interactive",
+                    content=card_content,
+                    related_type="alert",
+                    status="failed",
+                    error=f"{response.code} - {response.msg}",
+                )
                 return {"success": False, "message_id": None}
 
         except Exception as exc:
             logger.error(f"Error sending P2P card message: {str(exc)}")
+            self._record_outbound_interaction(
+                feishu_open_id=open_id,
+                msg_type="interactive",
+                content=card_content,
+                related_type="alert",
+                status="failed",
+                error=str(exc),
+            )
             return {"success": False, "message_id": None}
 
     def send_p2p_text_message(
@@ -117,14 +141,64 @@ class FeishuNotificationService:
 
             if response.success():
                 logger.info(f"P2P text message sent to open_id: {open_id}")
+                self._record_outbound_interaction(
+                    feishu_open_id=open_id,
+                    msg_type="text",
+                    content={"text": text},
+                    related_type="alert",
+                    status="success",
+                )
                 return True
             else:
                 logger.error(f"Failed to send P2P text: code={response.code}, msg={response.msg}")
+                self._record_outbound_interaction(
+                    feishu_open_id=open_id,
+                    msg_type="text",
+                    content={"text": text},
+                    related_type="alert",
+                    status="failed",
+                    error=f"{response.code} - {response.msg}",
+                )
                 return False
 
         except Exception as exc:
             logger.error(f"Error sending P2P text message: {str(exc)}")
+            self._record_outbound_interaction(
+                feishu_open_id=open_id,
+                msg_type="text",
+                content={"text": text},
+                related_type="alert",
+                status="failed",
+                error=str(exc),
+            )
             return False
+
+    @staticmethod
+    def _record_outbound_interaction(
+        *,
+        feishu_open_id: str | None = None,
+        message_id: str | None = None,
+        msg_type: str | None = None,
+        content: Any = None,
+        related_type: str | None = None,
+        status: str = "success",
+        error: str | None = None,
+    ) -> None:
+        try:
+            from app.crud.crud_feishu_interaction import record_interaction_sync
+            record_interaction_sync(
+                direction="outbound",
+                interaction_type="message",
+                feishu_open_id=feishu_open_id,
+                message_id=message_id,
+                msg_type=msg_type,
+                content=content if isinstance(content, dict) else None,
+                related_type=related_type,
+                status=status,
+                error=error,
+            )
+        except Exception as e:
+            logger.error(f"Failed to record outbound interaction: {e}")
 
     def build_alert_card(
         self,

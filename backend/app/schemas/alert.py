@@ -98,7 +98,7 @@ class AlertTemplatePreview(BaseModel):
 
 # AlertHistory schemas
 AlertHistoryStatus = Literal["firing", "resolved", "suppressed"]
-AlertHistorySeverity = Literal["info", "warning", "critical", "middle"]
+AlertHistorySeverity = Literal["info", "warning", "critical", "middle", "low"]
 
 
 class AlertHistoryResponse(BaseModel):
@@ -127,7 +127,7 @@ class AlertHistoryListParams(BaseModel):
     page_size: int = Field(default=20, ge=1, le=100)
     alertname: str | None = None
     status: str | None = Field(None, pattern="^(firing|resolved|suppressed)$")
-    severity: str | None = Field(None, pattern="^(info|warning|critical)$")
+    severity: str | None = Field(None, pattern="^(info|warning|critical|middle|low)$")
     is_suppressed: bool | None = None
     start_time: datetime | None = None
     end_time: datetime | None = None

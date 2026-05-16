@@ -1,9 +1,4 @@
-"""
-Celery application configuration.
-"""
-
 from celery import Celery
-from celery.schedules import crontab
 
 from app.config import settings
 
@@ -20,6 +15,7 @@ celery_app = Celery(
         "app.tasks.certificate_sync_tasks",
         "app.tasks.feishu_sync_tasks",
         "app.tasks.sync_terminal_metrics",
+        "app.tasks.ansible_tasks",
     ],
 )
 
@@ -38,64 +34,3 @@ celery_app.conf.update(
     result_backend=settings.celery_result_backend,
     beat_schedule={},
 )
-
-
-def setup_periodic_tasks(sender, **kwargs):
-    """Setup periodic tasks."""
-    from app.tasks.asset_sync_tasks import get_sync_interval, sync_assets_from_prometheus_task
-    from app.tasks.audit_log_cleanup import cleanup_audit_logs_db, cleanup_audit_logs_file
-    from app.tasks.certificate_sync_tasks import sync_certificates_from_prometheus_task
-    from app.tasks.feishu_sync_tasks import sync_feishu_users_task
-    from app.tasks.monitor_tasks import check_all_monitors
-    from app.tasks.sync_terminal_metrics import get_sync_interval as get_terminal_sync_interval
-    from app.tasks.sync_terminal_metrics import sync_terminal_metrics_task
-
-    sender.add_periodic_task(
-        60.0,
-        check_all_monitors.s(),
-        name="check-all-monitors",
-    )
-
-    sender.add_periodic_task(
-        crontab(hour=3, minute=0),
-        cleanup_audit_logs_db.s(),
-        name="cleanup-audit-logs-db",
-    )
-
-    sender.add_periodic_task(
-        crontab(hour=3, minute=30),
-        cleanup_audit_logs_file.s(),
-        name="cleanup-audit-logs-file",
-    )
-
-    sender.add_periodic_task(
-        crontab(hour=2, minute=0),
-        sync_feishu_users_task.s(),
-        name="sync-feishu-users",
-    )
-
-    sync_interval = get_sync_interval()
-    sender.add_periodic_task(
-        sync_interval,
-        sync_assets_from_prometheus_task.s(),
-        name="sync-assets-from-prometheus",
-    )
-
-    sender.add_periodic_task(
-        crontab(hour=3, minute=0),
-        sync_certificates_from_prometheus_task.s(),
-        name="sync-certificates-from-prometheus",
-    )
-
-    terminal_sync_interval = get_terminal_sync_interval()
-    sender.add_periodic_task(
-        terminal_sync_interval,
-        sync_terminal_metrics_task.s(),
-        name="sync-terminal-metrics-from-prometheus",
-    )
-
-
-@celery_app.on_after_configure.connect
-def configure_tasks(sender, **kwargs):
-    """Configure tasks after Celery is initialized."""
-    setup_periodic_tasks(sender, **kwargs)

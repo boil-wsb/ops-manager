@@ -3,6 +3,7 @@ import { Modal, Form, Input, Select, InputNumber, App, Alert, Space, Tag, Toolti
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LockOutlined, CloudOutlined } from '@ant-design/icons';
 import { assetApi, type OwnerUser } from '../../services/assets';
+import { fuzzyFilterOption } from '../../utils/selectFilter';
 import type { Asset, Label } from '../../types';
 
 const { Option } = Select;
@@ -278,9 +279,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ open, onClose, asset })
                 showSearch
                 placeholder="请输入或选择负责人"
                 allowClear
-                filterOption={(input, option) =>
-                  (option?.label?.toLowerCase() ?? '').includes(input.toLowerCase())
-                }
+                filterOption={fuzzyFilterOption}
                 onSearch={(value) => {
                   form.setFieldValue('ownerName', value);
                 }}

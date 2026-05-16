@@ -58,7 +58,7 @@ def sync_terminal_metrics_task(self) -> dict[str, Any]:
 
     每 5 分钟执行一次，同步终端性能指标到 terminal_metrics 表
     """
-    logger.info("Starting scheduled terminal metrics sync from Prometheus")
+    logger.debug("Starting scheduled terminal metrics sync from Prometheus")
     start_time = datetime.utcnow()
 
     async def _sync():
@@ -71,7 +71,7 @@ def sync_terminal_metrics_task(self) -> dict[str, Any]:
                 client = PrometheusClient()
 
                 terminals = await client.get_all_terminals_with_metrics()
-                logger.info(f"Found {len(terminals)} terminals from Prometheus")
+                logger.debug(f"Found {len(terminals)} terminals from Prometheus")
 
                 synced_count = 0
                 for terminal in terminals:
@@ -132,7 +132,7 @@ def sync_terminal_metrics_task(self) -> dict[str, Any]:
                     "synced": synced_count,
                 }
 
-                logger.info(
+                logger.debug(
                     f"Terminal metrics sync completed in {duration:.2f}s: "
                     f"total={task_result['total_terminals']}, synced={task_result['synced']}"
                 )
@@ -149,7 +149,7 @@ def sync_terminal_metrics_task(self) -> dict[str, Any]:
         logger.error(f"Terminal metrics sync task failed: {exc}")
 
         if self.request.retries < self.max_retries:
-            logger.info(
+            logger.debug(
                 f"Retrying terminal metrics sync task (attempt {self.request.retries + 1}/{self.max_retries})"
             )
             raise self.retry(exc=exc) from exc

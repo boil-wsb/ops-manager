@@ -5,13 +5,15 @@ Role management API routes.
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
 from app.core.audit import audit_log
+from app.core.cache import cache_delete_pattern, cache_get_or_set
 from app.core.permissions import require_permissions
-from app.crud.crud_permission import crud_permission
 from app.crud.crud_role import crud_role
+from app.models.permission import Permission
 from app.models.user import User
 from app.schemas.permission import (
     PermissionResponse,
@@ -40,34 +42,32 @@ async def list_roles(
 
     skip = (page - 1) * page_size
 
-    roles, total = await crud_role.get_multi_with_filters(
-        db,
-        is_active=is_active,
-        skip=skip,
-        limit=page_size,
-    )
+    cache_key = f"roles:list:{is_active}:{page}:{page_size}"
 
-    items = []
-    for role in roles:
-        role_dict = {
-            "id": role.id,
-            "name": role.name,
-            "description": role.description,
-            "is_system": role.is_system,
-            "is_active": role.is_active,
-            "permission_count": len(role.permissions),
-            "user_count": len(role.users),
-            "created_at": role.created_at,
-            "updated_at": role.updated_at,
-        }
-        items.append(role_dict)
+    async def _fetch_roles():
+        roles, total = await crud_role.get_multi_with_filters(
+            db,
+            is_active=is_active,
+            skip=skip,
+            limit=page_size,
+        )
+        items = []
+        for role in roles:
+            role_dict = {
+                "id": role.id,
+                "name": role.name,
+                "description": role.description,
+                "is_system": role.is_system,
+                "is_active": role.is_active,
+                "permission_count": len(role.permissions),
+                "user_count": len(role.users),
+                "created_at": role.created_at,
+                "updated_at": role.updated_at,
+            }
+            items.append(role_dict)
+        return {"items": items, "total": total, "page": page, "page_size": page_size}
 
-    return {
-        "items": items,
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-    }
+    return await cache_get_or_set(cache_key, _fetch_roles, ttl=120)
 
 
 @router.post("", response_model=RoleResponse, status_code=status.HTTP_201_CREATED)
@@ -91,16 +91,19 @@ async def create_role(
         )
 
     if role_in.permission_ids:
-        for perm_id in role_in.permission_ids:
-            perm = await crud_permission.get(db, id=perm_id)
-            if not perm:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"权限ID {perm_id} 不存在",
-                )
+        perms_result = await db.execute(select(Permission).where(Permission.id.in_(role_in.permission_ids)))
+        found_ids = {p.id for p in perms_result.scalars().all()}
+        missing_ids = set(role_in.permission_ids) - found_ids
+        if missing_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"权限ID {', '.join(str(i) for i in missing_ids)} 不存在",
+            )
 
     role = await crud_role.create_with_permissions(db, obj_in=role_in)
     logger.info(f"[角色管理] 角色 '{role.name}' 创建成功，ID: {role.id}")
+
+    await cache_delete_pattern("roles:list:*")
 
     return {
         "id": role.id,
@@ -180,6 +183,8 @@ async def update_role(
 
     role = await crud_role.update(db, db_obj=role, obj_in=role_in)
 
+    await cache_delete_pattern("roles:list:*")
+
     return {
         "id": role.id,
         "name": role.name,
@@ -225,6 +230,7 @@ async def delete_role(
         )
 
     await crud_role.delete(db, id=role_id)
+    await cache_delete_pattern("roles:list:*")
     return None
 
 
@@ -277,13 +283,14 @@ async def update_role_permissions(
     old_perm_count = len(role.permissions)
 
     if perm_update.permission_ids:
-        for perm_id in perm_update.permission_ids:
-            perm = await crud_permission.get(db, id=perm_id)
-            if not perm:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"权限ID {perm_id} 不存在",
-                )
+        perms_result = await db.execute(select(Permission).where(Permission.id.in_(perm_update.permission_ids)))
+        found_ids = {p.id for p in perms_result.scalars().all()}
+        missing_ids = set(perm_update.permission_ids) - found_ids
+        if missing_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"权限ID {', '.join(str(i) for i in missing_ids)} 不存在",
+            )
 
     role = await crud_role.update_permissions(
         db, role=role, permission_ids=perm_update.permission_ids
@@ -292,6 +299,8 @@ async def update_role_permissions(
     logger.info(
         f"[角色管理] 角色 '{role.name}' 权限更新成功: {old_perm_count} -> {len(role.permissions)} 个权限"
     )
+
+    await cache_delete_pattern("roles:list:*")
 
     return {
         "role_id": role.id,

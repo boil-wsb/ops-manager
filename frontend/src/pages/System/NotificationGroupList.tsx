@@ -23,6 +23,7 @@ import {
 } from '@ant-design/icons';
 import { notificationGroupApi, type NotificationGroup, type NotificationGroupCreate, type NotificationGroupUpdate } from '../../services/notification_group';
 import { userApi } from '../../services/users';
+import { fuzzyFilterOption } from '../../utils/selectFilter';
 import type { User } from '../../types';
 
 const { Search } = Input;
@@ -272,6 +273,8 @@ const NotificationGroupList = () => {
                 style={{ width: 180 }}
                 value={notificationTypeFilter}
                 onChange={(value) => setNotificationTypeFilter(value)}
+                showSearch
+                filterOption={fuzzyFilterOption}
               >
                 {NOTIFICATION_TYPE_OPTIONS.map((opt) => (
                   <Select.Option key={opt.value} value={opt.value}>

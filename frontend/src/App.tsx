@@ -19,6 +19,7 @@ import MonitorList from './pages/Monitor/MonitorList';
 import DeploymentList from './pages/Ops/DeploymentList';
 import CertificateList from './pages/Ops/CertificateList';
 import ITManagement from './pages/Ops/ITManagement';
+import ScheduledTaskList from './pages/Ops/ScheduledTaskList';
 import RoleList from './pages/Roles/RoleList';
 import UserList from './pages/Users/UserList';
 import Profile from './pages/Profile/Profile';
@@ -108,6 +109,7 @@ function App() {
                 <Route path="monitor/domains" element={<CertificateList />} />
                 <Route path="ops/deployments" element={<DeploymentList />} />
                 <Route path="ops/it-management" element={<ITManagement />} />
+                <Route path="ops/scheduled-tasks" element={<ScheduledTaskList />} />
                 <Route path="system/users" element={<UserList />} />
                 <Route path="system/roles" element={<RoleList />} />
                 <Route path="system/navigation" element={<NavigationList />} />

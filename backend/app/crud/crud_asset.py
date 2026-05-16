@@ -6,6 +6,7 @@ from typing import Any
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.crud.base import CRUDBase
 from app.models.asset import Asset, AssetHistory, AssetStatus, AssetType, Label
@@ -34,7 +35,10 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
         owner_id: int | None = None,
     ) -> tuple[list[Asset], int]:
         """Get assets with filters and pagination."""
-        query = select(Asset)
+        query = select(Asset).options(
+            selectinload(Asset.labels),
+            selectinload(Asset.owner),
+        )
 
         filters = []
         if asset_type:
@@ -57,8 +61,9 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
         if filters:
             query = query.where(and_(*filters))
 
-        # Get total count
-        count_query = select(func.count()).select_from(query.subquery())
+        count_query = select(func.count(Asset.id))
+        if filters:
+            count_query = count_query.where(and_(*filters))
         total_result = await db.execute(count_query)
         total = total_result.scalar()
 

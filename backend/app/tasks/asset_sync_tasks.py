@@ -33,7 +33,7 @@ def sync_assets_from_prometheus_task(self) -> dict[str, Any]:
         logger.info("Asset sync from Prometheus is disabled")
         return {"status": "skipped", "reason": "sync_disabled"}
 
-    logger.info("Starting scheduled asset sync from Prometheus")
+    logger.debug("Starting scheduled asset sync from Prometheus")
     start_time = datetime.utcnow()
 
     async def _sync():
@@ -79,7 +79,7 @@ def sync_assets_from_prometheus_task(self) -> dict[str, Any]:
         logger.error(f"Asset sync task failed: {exc}")
 
         if self.request.retries < self.max_retries:
-            logger.info(
+            logger.debug(
                 f"Retrying asset sync task (attempt {self.request.retries + 1}/{self.max_retries})"
             )
             raise self.retry(exc=exc) from exc
@@ -105,7 +105,7 @@ def sync_single_asset_task(self, instance: str) -> dict[str, Any]:
     Args:
         instance: Prometheus 实例标识 (IP:Port)
     """
-    logger.info(f"Starting single asset sync for instance: {instance}")
+    logger.debug(f"Starting single asset sync for instance: {instance}")
 
     async def _sync():
         session_local = get_celery_async_session()
@@ -116,7 +116,7 @@ def sync_single_asset_task(self, instance: str) -> dict[str, Any]:
                 result = await service.sync_single_asset(instance)
 
                 if result["success"]:
-                    logger.info(f"Successfully synced asset: {instance}")
+                    logger.debug(f"Successfully synced asset: {instance}")
                     return {
                         "status": "success",
                         "instance": instance,

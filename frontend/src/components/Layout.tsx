@@ -100,6 +100,7 @@ const Layout = () => {
         children: [
           { key: '/ops/deployments', label: '部署管理', permission: 'deployment:read' },
           { key: '/ops/it-management', label: 'IT管理', permission: 'it:read' },
+          { key: '/ops/scheduled-tasks', label: '定时任务', permission: 'ops:read' },
         ],
       },
       {
@@ -277,16 +278,16 @@ const Layout = () => {
         </Header>
         <Content
           style={{
-            margin: 24,
-            padding: 24,
+            margin: '12px 16px',
+            padding: 16,
             background: 'var(--bg-card)',
             borderRadius: 'var(--radius-lg)',
-            minHeight: 'calc(100vh - 112px)',
+            minHeight: 'calc(100vh - 88px)',
             boxShadow: 'var(--shadow-sm)',
             overflow: 'auto',
           }}
         >
-          <div className="animate-fade-in">
+          <div className="animate-fade-in-up">
             <Outlet />
           </div>
         </Content>

@@ -4,7 +4,7 @@ Alert CRUD operations.
 
 from datetime import datetime
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.base import CRUDBase
@@ -118,12 +118,11 @@ class CRUDAlertHistory(CRUDBase):
         if end_time:
             query = query.where(AlertHistory.ends_at <= end_time)
 
-        from sqlalchemy import func
-
-        count_result = await db.execute(select(func.count()).select_from(AlertHistory))
+        count_query = select(func.count()).select_from(query.subquery())
+        count_result = await db.execute(count_query)
         total = count_result.scalar() or 0
 
-        query = query.offset(skip).limit(limit).order_by(AlertHistory.created_at.desc())
+        query = query.offset(skip).limit(limit).order_by(AlertHistory.starts_at.desc())
 
         result = await db.execute(query)
         items = list(result.scalars().all())

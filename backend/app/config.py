@@ -90,6 +90,45 @@ class Settings(BaseSettings):
     feishu_app_secret: str | None = Field(default=None, alias="FEISHU_APP_SECRET")
     feishu_enable: bool = Field(default=False, alias="FEISHU_ENABLE")
 
+    # MinIO Configuration
+    minio_endpoint: str = Field(default="192.168.23.36:9000", alias="MINIO_ENDPOINT")
+    minio_access_key: str = Field(default="minioadmin", alias="MINIO_ACCESS_KEY")
+    minio_secret_key: str = Field(default="minioadmin", alias="MINIO_SECRET_KEY")
+    minio_secure: bool = Field(default=False, alias="MINIO_SECURE")
+
+    # IT Reporter Configuration
+    itreporter_chat_id: str = Field(default="", alias="ITREPORTER_CHAT_ID")
+    itreporter_minio_bucket: str = Field(default="reports", alias="ITREPORTER_MINIO_BUCKET")
+    itreporter_presigned_url_expires_hours: int = Field(default=2, alias="ITREPORTER_PRESIGNED_URL_EXPIRES_HOURS")
+    itreporter_report_path: str = Field(default="devops-scripts/{date}-health-check.html", alias="ITREPORTER_REPORT_PATH")
+
+    # Ansible SSH Configuration
+    ansible_ssh_host: str = Field(default="192.168.23.38", alias="ANSIBLE_SSH_HOST")
+    ansible_ssh_port: int = Field(default=22, alias="ANSIBLE_SSH_PORT")
+    ansible_ssh_username: str = Field(default="root", alias="ANSIBLE_SSH_USERNAME")
+    ansible_ssh_password: str = Field(default="P@ssw0rd123", alias="ANSIBLE_SSH_PASSWORD")
+    ansible_ssh_key_path: str | None = Field(default=None, alias="ANSIBLE_SSH_KEY_PATH")
+    ansible_command: str = Field(
+        default="cd /home/shdy/.ansible && ansible-playbook -i inventory/incloud_all/hosts playbooks/site.yml -l all",
+        alias="ANSIBLE_COMMAND",
+    )
+    ansible_script: str | None = Field(
+        default=None,
+        alias="ANSIBLE_SCRIPT",
+        description="Shell script content to execute on remote server. If set, this takes precedence over ansible_command.",
+    )
+    ansible_local_script_path: str | None = Field(
+        default=None,
+        alias="ANSIBLE_LOCAL_SCRIPT_PATH",
+        description="Local script file path to read and execute on remote server. Takes precedence over ansible_script and ansible_command.",
+    )
+    ansible_schedule_hour: int = Field(default=12, alias="ANSIBLE_SCHEDULE_HOUR")
+    ansible_schedule_minute: int = Field(default=0, alias="ANSIBLE_SCHEDULE_MINUTE")
+
+    # Auth Whitelist Configuration
+    auth_excluded_paths: str = Field(default="", alias="AUTH_EXCLUDED_PATHS")
+    auth_trusted_networks: str = Field(default="", alias="AUTH_TRUSTED_NETWORKS")
+
     @property
     def cors_origins(self) -> list[str]:
         """Parse CORS origins from string."""

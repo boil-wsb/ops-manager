@@ -12,7 +12,7 @@ psycopg2-binary==2.9.9
 # Redis
 redis==5.2.1
 
-# Celery
+# Celery (optional - only for immediate task queue, not for scheduling)
 celery==5.4.0
 
 # Authentication and Security

@@ -57,6 +57,7 @@ export const menuPermissionConfig: MenuItemConfig[] = [
     children: [
       { key: '/ops/deployments', label: '部署管理', permission: 'deployment:read' },
       { key: '/ops/it-management', label: 'IT管理', permission: 'it:read' },
+      { key: '/ops/scheduled-tasks', label: '定时任务', permission: 'ops:read' },
     ],
   },
   {

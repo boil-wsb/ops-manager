@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>IT系统健康巡检报告 - 2026-05-14</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .summary-item { display: inline-block; padding: 20px; margin: 10px; border-radius: 8px; }
+        .summary-item.ok { background-color: #e6f4ea; border: 2px solid #34a853; }
+        .summary-item.warning { background-color: #fef7e0; border: 2px solid #fbbc04; }
+        .summary-item.critical { background-color: #fce8e6; border: 2px solid #ea4335; }
+        .summary-number { font-size: 32px; font-weight: bold; display: block; }
+        .summary-label { font-size: 14px; color: #666; }
+        .host-card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin: 12px 0; }
+        .host-name { font-weight: bold; font-size: 16px; color: #333; }
+        .host-status { font-size: 14px; margin-top: 4px; }
+        .host-status.ok { color: #34a853; }
+        .host-status.warning { color: #fbbc04; }
+        .host-status.critical { color: #ea4335; }
+        .check-item { padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
+        .check-name { font-size: 14px; }
+        .check-details { font-size: 12px; color: #666; margin-top: 2px; }
+        .check-status { font-size: 12px; font-weight: bold; }
+        .check-status.ok { color: #34a853; }
+        .check-status.warning { color: #fbbc04; }
+        .check-status.critical { color: #ea4335; }
+        .footer { margin-top: 40px; padding-top: 20px; border-top: 2px solid #eee; color: #999; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>📊 IT系统健康巡检报告</h1>
+    <p>巡检时间：2026-05-14 09:00:00</p>
+
+    <h2>巡检概览</h2>
+    <div class="summary-item ok">
+        <span class="summary-number">12</span>
+        <span class="summary-label">正常</span>
+    </div>
+    <div class="summary-item warning">
+        <span class="summary-number">3</span>
+        <span class="summary-label">警告</span>
+    </div>
+    <div class="summary-item critical">
+        <span class="summary-number">1</span>
+        <span class="summary-label">严重</span>
+    </div>
+
+    <h2>异常主机详情</h2>
+
+    <!-- 严重告警主机 -->
+    <div class="host-card">
+        <div class="host-name">192.168.1.101 - 生产数据库主库</div>
+        <div class="host-status critical">🔴 严重</div>
+        <div class="check-item">
+            <div class="check-name">CPU 使用率</div>
+            <div class="check-details">当前: 98%, 阈值: 80%</div>
+            <div class="check-status critical">🔴 严重</div>
+        </div>
+        <div class="check-item">
+            <div class="check-name">磁盘空间 /data</div>
+            <div class="check-details">已用 92%, 剩余 8GB</div>
+            <div class="check-status critical">🔴 严重</div>
+        </div>
+    </div>
+
+    <!-- 警告主机 1 -->
+    <div class="host-card">
+        <div class="host-name">192.168.1.55 - 缓存服务器</div>
+        <div class="host-status warning">⚠️ 警告</div>
+        <div class="check-item">
+            <div class="check-name">内存使用率</div>
+            <div class="check-details">当前: 87%, 阈值: 80%</div>
+            <div class="check-status warning">⚠️ 警告</div>
+        </div>
+        <div class="check-item">
+            <div class="check-name">Redis 响应时间</div>
+            <div class="check-details">当前: 250ms, 阈值: 200ms</div>
+            <div class="check-status warning">⚠️ 警告</div>
+        </div>
+    </div>
+
+    <!-- 警告主机 2 -->
+    <div class="host-card">
+        <div class="host-name">192.168.1.88 - API 网关</div>
+        <div class="host-status warning">⚠️ 警告</div>
+        <div class="check-item">
+            <div class="check-name">HTTP 5xx 错误率</div>
+            <div class="check-details">当前: 3.2%, 阈值: 2%</div>
+            <div class="check-status warning">⚠️ 警告</div>
+        </div>
+    </div>
+
+    <!-- 警告主机 3 -->
+    <div class="host-card">
+        <div class="host-name">192.168.1.201 - 备份存储</div>
+        <div class="host-status warning">⚠️ 警告</div>
+        <div class="check-item">
+            <div class="check-name">备份任务状态</div>
+            <div class="check-details">上次备份失败: 2026-05-14 02:00:00</div>
+            <div class="check-status warning">⚠️ 警告</div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>生成时间: 2026-05-14T09:00:00Z</p>
+        <p>报告生成器: IT健康检查系统 v2.1</p>
+    </div>
+</body>
+</html>

@@ -5,6 +5,9 @@ export interface NotificationRecord {
   user: string;
   matchedUser?: string;
   feishuOpenId?: string;
+  chatId?: string;
+  receiveType: string;
+  callbackId?: string;
   cardContent?: Record<string, unknown>;
   messageId?: string;
   success: boolean;

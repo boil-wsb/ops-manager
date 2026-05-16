@@ -259,6 +259,37 @@ export interface InspectionReport {
   createdAt: string;
 }
 
+export interface ScheduledTask {
+  id: number;
+  taskId: string;
+  name: string;
+  taskFunction: string;
+  triggerType: string;
+  triggerConfig: Record<string, unknown>;
+  isEnabled: boolean;
+  description: string | null;
+  category: string;
+  lastRunAt: string | null;
+  lastRunStatus: string | null;
+  lastRunDuration: number | null;
+  nextRunTime: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaskExecutionLog {
+  id: number;
+  taskId: string;
+  status: string;
+  startedAt: string;
+  finishedAt: string | null;
+  duration: number | null;
+  errorMessage: string | null;
+  resultSummary: string | null;
+  triggerType: string;
+  triggeredBy: string | null;
+}
+
 // Alert types (re-export from alert.ts)
 export type {
   AlertReceiver,

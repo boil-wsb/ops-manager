@@ -15,6 +15,7 @@ from app.crud.crud_asset import crud_asset, crud_label
 from app.models.user import User
 from app.schemas.asset import (
     AssetCreate,
+    AssetListItemResponse,
     AssetResponse,
     AssetTreeNode,
     AssetUpdate,
@@ -65,7 +66,7 @@ async def list_assets(
         owner_id=owner_id_filter,
     )
     serialized_items = [
-        AssetResponse.model_validate(item).model_dump(by_alias=True) for item in items
+        AssetListItemResponse.model_validate(item).model_dump() for item in items
     ]
     return api_response(data={"total": total, "items": serialized_items})
 
@@ -264,7 +265,7 @@ async def list_terminals(
         owner_id=owner_id_filter,
     )
     serialized_items = [
-        AssetResponse.model_validate(item).model_dump(by_alias=True) for item in items
+        AssetListItemResponse.model_validate(item).model_dump() for item in items
     ]
     return api_response(data={"total": total, "items": serialized_items})
 

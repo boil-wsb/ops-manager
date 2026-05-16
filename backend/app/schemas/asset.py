@@ -111,6 +111,45 @@ class AssetUpdate(BaseModel):
     label_ids: list[int] | None = None
 
 
+class AssetListItemResponse(BaseModel):
+    """Lightweight asset response for list view (excludes large JSON fields)."""
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: int
+    asset_id: str
+    name: str
+    asset_type: str
+    status: str
+    ip_address: str | None = None
+    private_ip: str | None = None
+    mac_address: str | None = None
+    cpu_cores: int | None = None
+    memory_gb: int | None = None
+    disk_gb: int | None = None
+    os_type: str | None = None
+    os_version: str | None = None
+    arch: str | None = None
+    hostname: str | None = None
+    serial_number: str | None = None
+    uuid: str | None = None
+    customer: str | None = None
+    idc: str | None = None
+    region: str | None = None
+    rack: str | None = None
+    description: str | None = None
+    labels: list[LabelResponse] = []
+    owner_id: int | None = None
+    owner: OwnerResponse | None = None
+    owner_name: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    source: str | None = None
+    prometheus_instance: str | None = None
+    last_sync_time: datetime | None = None
+    sync_status: str | None = None
+
+
 class AssetResponse(AssetBase):
     """Asset response schema."""
 
@@ -146,7 +185,7 @@ class AssetListResponse(BaseModel):
     """Asset list response with pagination."""
 
     total: int
-    items: list[AssetResponse]
+    items: list[AssetListItemResponse]
 
 
 class AssetHistoryResponse(BaseModel):

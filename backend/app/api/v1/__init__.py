@@ -11,6 +11,7 @@ from app.api.v1 import (
     audit_logs,
     auth,
     dashboard,
+    feishu_interactions,
     feishu_notifications,
     feishu_sync,
     it_feedback,
@@ -23,6 +24,7 @@ from app.api.v1 import (
     pc_client_version,
     permissions,
     roles,
+    scheduled_tasks,
     users,
 )
 
@@ -31,6 +33,7 @@ __all__ = [
     "audit_logs",
     "auth",
     "dashboard",
+    "feishu_interactions",
     "feishu_notifications",
     "feishu_sync",
     "it_feedback",
@@ -48,4 +51,5 @@ __all__ = [
     "alert_silences",
     "alert_templates",
     "alert_history",
+    "scheduled_tasks",
 ]

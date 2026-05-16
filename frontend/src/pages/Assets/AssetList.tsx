@@ -3,6 +3,7 @@ import { Table, Button, Input, Select, Tag, Space, Card, Popconfirm, Tooltip, Ta
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PlusOutlined, SearchOutlined, DeleteOutlined, EditOutlined, SyncOutlined, CloudOutlined, CompassOutlined, UserOutlined, DesktopOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { fuzzyFilterOption } from '../../utils/selectFilter';
 import { assetApi } from '../../services/assets';
 import { PermissionGuard } from '../../components/PermissionGuard';
 import StatusTag from '../../components/StatusTag';
@@ -405,7 +406,7 @@ const AssetList = () => {
         <>
           <Card style={{ marginBottom: 16 }}>
             <Space wrap>
-              <Input
+              <Input.Search
                 placeholder="搜索资产名称/IP"
                 prefix={<SearchOutlined />}
                 value={searchParams.keyword}
@@ -425,6 +426,8 @@ const AssetList = () => {
                 }}
                 style={{ width: 120 }}
                 allowClear
+                showSearch
+                filterOption={fuzzyFilterOption}
               >
                 <Option value="ACTIVE">运行中</Option>
                 <Option value="OFFLINE">离线</Option>
@@ -487,7 +490,7 @@ const AssetList = () => {
         <>
           <Card style={{ marginBottom: 16 }}>
             <Space wrap>
-              <Input
+              <Input.Search
                 placeholder="搜索主机名/序列号"
                 prefix={<SearchOutlined />}
                 value={searchParams.keyword}
@@ -507,6 +510,8 @@ const AssetList = () => {
                 }}
                 style={{ width: 120 }}
                 allowClear
+                showSearch
+                filterOption={fuzzyFilterOption}
               >
                 <Option value="ACTIVE">在线</Option>
                 <Option value="OFFLINE">离线</Option>

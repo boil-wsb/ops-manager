@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, Table, Tag, Button, Space, Input, Select, Modal, Form, App, Popconfirm } from 'antd';
 import { itFeedbackApi, type ITFeedback } from '../../services/itFeedback';
+import { fuzzyFilterOption } from '../../utils/selectFilter';
 
 const { TextArea } = Input;
 
@@ -259,6 +260,8 @@ const ITManagement = () => {
             value={filters.status}
             onChange={(status) => setFilters({ ...filters, status })}
             allowClear
+            showSearch
+            filterOption={fuzzyFilterOption}
           >
             <Select.Option value="pending">待处理</Select.Option>
             <Select.Option value="resolved">已解决</Select.Option>
@@ -269,6 +272,8 @@ const ITManagement = () => {
             value={filters.lagLevel}
             onChange={(lagLevel) => setFilters({ ...filters, lagLevel })}
             allowClear
+            showSearch
+            filterOption={fuzzyFilterOption}
           >
             <Select.Option value="1">轻微</Select.Option>
             <Select.Option value="2">一般</Select.Option>

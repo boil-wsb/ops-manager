@@ -41,6 +41,7 @@ class FeishuService:
         user_id: str,
         msg_type: str,
         content: str | dict[str, Any],
+        receive_id_type: str = "open_id",
     ) -> dict[str, Any]:
         import lark_oapi as lark
         from lark_oapi.api.im.v1 import CreateMessageRequest, CreateMessageRequestBody
@@ -52,7 +53,7 @@ class FeishuService:
 
         request: CreateMessageRequest = (
             CreateMessageRequest.builder()
-            .receive_id_type("open_id")
+            .receive_id_type(receive_id_type)
             .request_body(
                 CreateMessageRequestBody.builder()
                 .receive_id(user_id)
@@ -69,14 +70,34 @@ class FeishuService:
             logger.error(
                 f"[Feishu] Failed to send message - user_id={user_id}, code={response.code}, msg={response.msg}"
             )
+            self._record_outbound_interaction(
+                feishu_open_id=user_id if receive_id_type == "open_id" else None,
+                chat_id=user_id if receive_id_type == "chat_id" else None,
+                msg_type=msg_type,
+                content=message_content,
+                status="failed",
+                error=f"{response.code} - {response.msg}",
+            )
             raise RuntimeError(f"Failed to send message: {response.msg}")
 
         logger.info(
             f"[Feishu] Message sent successfully - user_id={user_id}, message_id={response.data.message_id if response.data else None}"
         )
 
+        msg_id = None
         if response.data:
             msg_id = getattr(response.data, "message_id", None)
+
+        self._record_outbound_interaction(
+            feishu_open_id=user_id if receive_id_type == "open_id" else None,
+            chat_id=user_id if receive_id_type == "chat_id" else None,
+            message_id=msg_id,
+            msg_type=msg_type,
+            content=message_content,
+            status="success",
+        )
+
+        if response.data:
             return {
                 "message_id": msg_id,
                 "code": response.code,
@@ -87,6 +108,33 @@ class FeishuService:
             "code": response.code,
             "msg": response.msg,
         }
+
+    @staticmethod
+    def _record_outbound_interaction(
+        *,
+        feishu_open_id: str | None = None,
+        chat_id: str | None = None,
+        message_id: str | None = None,
+        msg_type: str | None = None,
+        content: Any = None,
+        status: str = "success",
+        error: str | None = None,
+    ) -> None:
+        try:
+            from app.crud.crud_feishu_interaction import record_interaction_sync
+            record_interaction_sync(
+                direction="outbound",
+                interaction_type="message",
+                feishu_open_id=feishu_open_id,
+                chat_id=chat_id,
+                message_id=message_id,
+                msg_type=msg_type,
+                content=content if isinstance(content, dict) else None,
+                status=status,
+                error=error,
+            )
+        except Exception as e:
+            logger.error(f"Failed to record outbound interaction: {e}")
 
     def send_text_message(self, user_id: str, text: str) -> dict[str, Any]:
         return self.send_message_to_user(
@@ -211,29 +259,27 @@ class FeishuService:
         if buttons:
             elements.append({"tag": "hr"})
 
-            btn_column_elements = []
+            form_elements = []
             for btn in buttons:
                 btn_text = btn.get("text", "按钮")
                 btn_value = str(btn.get("value", btn_text))
                 btn_type = btn.get("type", "primary")
 
-                btn_column_elements.append(
+                form_elements.append(
                     {
                         "tag": "button",
                         "text": {"tag": "plain_text", "content": btn_text},
                         "type": btn_type,
                         "width": "fill",
-                        "behaviors": [{"type": "callback", "value": {"action": btn_value}}],
+                        "value": {"action": btn_value},
                     }
                 )
 
             elements.append(
                 {
-                    "tag": "column_set",
-                    "flex_mode": "right_to_left",
-                    "columns": [
-                        {"tag": "column", "width": "stretch", "elements": btn_column_elements}
-                    ],
+                    "tag": "form",
+                    "name": "button_form",
+                    "elements": form_elements,
                 }
             )
 
@@ -379,6 +425,9 @@ class FeishuService:
         import lark_oapi as lark
 
         try:
+            self._check_enabled()
+            client = self._get_client()
+
             request = (
                 lark.im.v1.PatchMessageRequest.builder()
                 .message_id(open_message_id)
@@ -390,12 +439,7 @@ class FeishuService:
                 .build()
             )
 
-            response = (
-                lark.Client.builder()
-                .app_id(settings.feishu_app_id)
-                .app_secret(settings.feishu_app_secret)
-                .build()
-            ).im.v1.message.patch(request)
+            response = client.im.v1.message.patch(request)
 
             if response.success():
                 logger.info(f"[Feishu] Card updated successfully - message_id={open_message_id}")
@@ -410,6 +454,22 @@ class FeishuService:
                 f"[Feishu] Error patching message - message_id={open_message_id}, error={e}"
             )
             return {"success": False, "error": str(e)}
+
+    def update_card_message(
+        self,
+        open_message_id: str,
+        card_content: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Update a Feishu interactive card message.
+
+        Args:
+            open_message_id: The Feishu message ID
+            card_content: Updated card JSON content
+
+        Returns:
+            dict with 'success' bool and optional 'error' message
+        """
+        return self._patch_message(open_message_id, card_content)
 
     def send_it_feedback_resolved(
         self,

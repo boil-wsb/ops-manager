@@ -5,14 +5,15 @@ User management API routes.
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_db, require_permissions
 from app.core.audit import audit_log
-from app.crud.crud_role import crud_role
+from app.core.cache import cache_delete_pattern, cache_get_or_set
 from app.crud.crud_user import crud_user
+from app.models.permission import Role
 from app.models.user import User
 from app.schemas.user import UserCreate, UserResponse, UserUpdate
 
@@ -32,48 +33,53 @@ async def list_users(
     """Get user list with filters."""
     skip = (page - 1) * page_size
 
-    query = select(User).options(selectinload(User.roles))
+    cache_key = f"users:list:{keyword}:{is_active}:{page}:{page_size}"
 
-    if keyword:
-        query = query.where(
-            (User.username.ilike(f"%{keyword}%"))
-            | (User.email.ilike(f"%{keyword}%"))
-            | (User.full_name.ilike(f"%{keyword}%"))
-        )
+    async def _fetch_users():
+        query = select(User).options(selectinload(User.roles))
 
-    if is_active is not None:
-        query = query.where(User.is_active == is_active)
+        if keyword:
+            query = query.where(
+                (User.username.ilike(f"%{keyword}%"))
+                | (User.email.ilike(f"%{keyword}%"))
+                | (User.full_name.ilike(f"%{keyword}%"))
+            )
 
-    count_query = select(func.count()).select_from(query.subquery())
-    total_result = await db.execute(count_query)
-    total = total_result.scalar()
+        if is_active is not None:
+            query = query.where(User.is_active == is_active)
 
-    query = query.offset(skip).limit(page_size)
-    result = await db.execute(query)
-    users = result.scalars().all()
+        count_query = select(func.count()).select_from(query.subquery())
+        total_result = await db.execute(count_query)
+        total = total_result.scalar()
 
-    return {
-        "items": [
-            {
-                "id": u.id,
-                "username": u.username,
-                "email": u.email,
-                "full_name": u.full_name,
-                "is_active": u.is_active,
-                "is_superuser": u.is_superuser,
-                "last_login": u.last_login,
-                "created_at": u.created_at,
-                "updated_at": u.updated_at,
-                "feishu_open_id": u.feishu_open_id,
-                "permissions": [],
-                "roles": [{"id": r.id, "name": r.name} for r in u.roles],
-            }
-            for u in users
-        ],
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-    }
+        query = query.offset(skip).limit(page_size)
+        result = await db.execute(query)
+        users = result.scalars().all()
+
+        return {
+            "items": [
+                {
+                    "id": u.id,
+                    "username": u.username,
+                    "email": u.email,
+                    "full_name": u.full_name,
+                    "is_active": u.is_active,
+                    "is_superuser": u.is_superuser,
+                    "last_login": u.last_login,
+                    "created_at": u.created_at,
+                    "updated_at": u.updated_at,
+                    "feishu_open_id": u.feishu_open_id,
+                    "permissions": [],
+                    "roles": [{"id": r.id, "name": r.name} for r in u.roles],
+                }
+                for u in users
+            ],
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+        }
+
+    return await cache_get_or_set(cache_key, _fetch_users, ttl=30)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -106,6 +112,8 @@ async def create_user(
 
     user = await crud_user.create(db, obj_in=user_in)
     logger.info(f"[用户管理] 用户 '{user_in.username}' 创建成功，ID: {user.id}")
+
+    await cache_delete_pattern("users:list:*")
 
     return UserResponse.model_validate(user)
 
@@ -165,6 +173,8 @@ async def update_user(
     user = await crud_user.update(db, db_obj=user, obj_in=user_in)
     logger.info(f"[用户管理] 用户 '{user.username}' 更新成功")
 
+    await cache_delete_pattern("users:list:*")
+
     return UserResponse.model_validate(user)
 
 
@@ -191,6 +201,8 @@ async def delete_user(
     await crud_user.delete(db, id=user_id)
     logger.info(f"[用户管理] 用户 '{username}' 删除成功")
 
+    await cache_delete_pattern("users:list:*")
+
     return {"success": True}
 
 
@@ -211,20 +223,22 @@ async def assign_user_roles(
             detail="用户不存在",
         )
 
-    roles = []
-    for role_id in role_ids:
-        role = await crud_role.get(db, id=role_id)
-        if not role:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"角色ID {role_id} 不存在",
-            )
-        roles.append(role)
+    roles_result = await db.execute(select(Role).where(Role.id.in_(role_ids)))
+    roles = list(roles_result.scalars().all())
+    found_ids = {r.id for r in roles}
+    missing_ids = set(role_ids) - found_ids
+    if missing_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"角色ID {', '.join(str(i) for i in missing_ids)} 不存在",
+        )
 
     old_role_ids = [r.id for r in user.roles]
 
     user.roles = roles
     await db.commit()
+
+    await cache_delete_pattern("users:list:*")
 
     return {
         "user_id": user.id,
@@ -252,6 +266,8 @@ async def revoke_user_roles(
     user.roles = []
     await db.commit()
 
+    await cache_delete_pattern("users:list:*")
+
     return {"success": True}
 
 
@@ -264,20 +280,19 @@ async def batch_delete_users(
     current_user: User = Depends(require_permissions(["user:delete"])),
 ):
     """Batch delete users."""
-    deleted_ids = []
-    failed_ids = []
+    existing_result = await db.execute(select(User.id).where(User.id.in_(user_ids)))
+    existing_ids = set(existing_result.scalars().all())
+    missing_ids = set(user_ids) - existing_ids
 
-    for user_id in user_ids:
-        user = await crud_user.get(db, id=user_id)
-        if user:
-            await crud_user.delete(db, id=user_id)
-            deleted_ids.append(user_id)
-        else:
-            failed_ids.append(user_id)
+    if existing_ids:
+        await db.execute(delete(User).where(User.id.in_(existing_ids)))
+        await db.commit()
+
+    await cache_delete_pattern("users:list:*")
 
     return {
-        "deleted_count": len(deleted_ids),
-        "failed_count": len(failed_ids),
-        "deleted_ids": deleted_ids,
-        "failed_ids": failed_ids,
+        "deleted_count": len(existing_ids),
+        "failed_count": len(missing_ids),
+        "deleted_ids": list(existing_ids),
+        "failed_ids": list(missing_ids),
     }

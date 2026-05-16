@@ -4,14 +4,31 @@ CRUD operations for navigation links.
 
 from collections import defaultdict
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.crud.base import CRUDBase
-from app.models.navigation import NavigationLink
+from app.models.navigation import NavigationLink, navigation_link_roles
 from app.models.permission import Role
 from app.schemas.navigation import NavigationLinkCreate, NavigationLinkUpdate
+
+
+def _build_access_filter(user_role_ids: set[int] | None):
+    no_roles = ~exists(
+        select(navigation_link_roles.c.navigation_link_id).where(
+            navigation_link_roles.c.navigation_link_id == NavigationLink.id
+        )
+    )
+    if not user_role_ids:
+        return no_roles
+    has_matching_role = exists(
+        select(navigation_link_roles.c.navigation_link_id).where(
+            navigation_link_roles.c.navigation_link_id == NavigationLink.id,
+            navigation_link_roles.c.role_id.in_(user_role_ids),
+        )
+    )
+    return no_roles | has_matching_role
 
 
 class CRUDNavigationLink(CRUDBase[NavigationLink, NavigationLinkCreate, NavigationLinkUpdate]):
@@ -21,8 +38,7 @@ class CRUDNavigationLink(CRUDBase[NavigationLink, NavigationLinkCreate, Navigati
         self, db: AsyncSession, user_role_ids: set[int], category: str | None = None
     ) -> list[NavigationLink]:
         """Get active navigation links visible to user based on their roles."""
-
-        conditions = [NavigationLink.is_active]
+        conditions = [NavigationLink.is_active, _build_access_filter(user_role_ids)]
         if category:
             conditions.append(NavigationLink.category == category)
 
@@ -34,18 +50,7 @@ class CRUDNavigationLink(CRUDBase[NavigationLink, NavigationLinkCreate, Navigati
         )
 
         result = await db.execute(query)
-        links = result.scalars().all()
-
-        filtered_links = []
-        for link in links:
-            if not link.roles:
-                filtered_links.append(link)
-            else:
-                link_role_ids = {role.id for role in link.roles}
-                if user_role_ids & link_role_ids:
-                    filtered_links.append(link)
-
-        return filtered_links
+        return list(result.scalars().all())
 
     async def get_grouped_links_for_user(self, db: AsyncSession, user_role_ids: set[int]) -> dict:
         """Get navigation links grouped by category for a user."""
@@ -120,8 +125,6 @@ class CRUDNavigationLink(CRUDBase[NavigationLink, NavigationLinkCreate, Navigati
         self, db: AsyncSession, *, category: str | None = None, is_active: bool | None = None
     ) -> int:
         """Count links with filters."""
-        from sqlalchemy import func
-
         conditions = []
         if category is not None:
             conditions.append(NavigationLink.category == category)
@@ -151,14 +154,16 @@ class CRUDNavigationLink(CRUDBase[NavigationLink, NavigationLinkCreate, Navigati
         For superadmin: returns all records.
         For non-superadmin: only returns records where roles is empty OR user has a matching role.
         """
-        query = select(NavigationLink).options(selectinload(NavigationLink.roles))
-
         conditions = []
         if category is not None:
             conditions.append(NavigationLink.category == category)
         if is_active is not None:
             conditions.append(NavigationLink.is_active == is_active)
 
+        if not is_superadmin:
+            conditions.append(_build_access_filter(set(user_role_ids) if user_role_ids else None))
+
+        query = select(NavigationLink).options(selectinload(NavigationLink.roles))
         if conditions:
             query = query.where(and_(*conditions))
 
@@ -167,22 +172,7 @@ class CRUDNavigationLink(CRUDBase[NavigationLink, NavigationLinkCreate, Navigati
             .offset(skip)
             .limit(limit)
         )
-        all_links = result.scalars().all()
-
-        if is_superadmin:
-            return all_links
-
-        filtered_links = []
-        user_role_set = set(user_role_ids) if user_role_ids else set()
-        for link in all_links:
-            if not link.roles:
-                filtered_links.append(link)
-            else:
-                link_role_ids = {role.id for role in link.roles}
-                if user_role_set & link_role_ids:
-                    filtered_links.append(link)
-
-        return filtered_links
+        return list(result.scalars().all())
 
     async def count_with_access_filter(
         self,
@@ -198,35 +188,21 @@ class CRUDNavigationLink(CRUDBase[NavigationLink, NavigationLinkCreate, Navigati
         For superadmin: counts all records.
         For non-superadmin: only counts records where roles is empty OR user has a matching role.
         """
-
-        query = select(NavigationLink).options(selectinload(NavigationLink.roles))
-
         conditions = []
         if category is not None:
             conditions.append(NavigationLink.category == category)
         if is_active is not None:
             conditions.append(NavigationLink.is_active == is_active)
 
+        if not is_superadmin:
+            conditions.append(_build_access_filter(set(user_role_ids) if user_role_ids else None))
+
+        query = select(func.count(NavigationLink.id))
         if conditions:
             query = query.where(and_(*conditions))
 
         result = await db.execute(query)
-        all_links = result.scalars().all()
-
-        if is_superadmin:
-            return len(all_links)
-
-        user_role_set = set(user_role_ids) if user_role_ids else set()
-        count = 0
-        for link in all_links:
-            if not link.roles:
-                count += 1
-            else:
-                link_role_ids = {role.id for role in link.roles}
-                if user_role_set & link_role_ids:
-                    count += 1
-
-        return count
+        return result.scalar() or 0
 
     async def get_with_roles(self, db: AsyncSession, *, id: int) -> NavigationLink | None:
         """Get a navigation link by ID with roles loaded."""

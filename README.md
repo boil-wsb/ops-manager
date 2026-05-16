@@ -10,9 +10,10 @@
 - **SQLAlchemy 2.0** - ORM 框架
 - **PostgreSQL 15** - 主数据库
 - **Redis 7** - 缓存和消息队列
-- **Celery 5.3+** - 异步任务和定时任务
+- **APScheduler 3.x** - 定时任务调度
 - **JWT** - 身份认证
 - **Alembic** - 数据库迁移
+- **lark_oapi** - 飞书开放平台 SDK
 
 ### 前端
 
@@ -45,13 +46,15 @@
 - 巡检任务配置
 - SSL 证书管理（到期提醒）
 - DNS 记录管理
+- 定时任务管理（查看、编辑、手动执行、执行日志查看）
 
 ### 3. 监控告警
 
 - 监控项配置（Ping、HTTP、TCP、UDP）
 - 告警事件管理
 - 告警规则配置
-- 通知渠道配置（邮件、Webhook）
+- 通知渠道配置（邮件、飞书、Webhook）
+- 告警抑制与静默
 
 ### 4. 权限管理
 
@@ -59,6 +62,55 @@
 - 用户管理
 - 角色管理
 - JWT 认证
+
+### 5. 飞书集成
+
+- 飞书用户自动同步（Open ID / Union ID）
+- 卡片通知发送（支持个人和群聊）
+- 交互卡片更新（通过 callback_id 验证）
+- 飞书回调事件处理（消息接收、卡片交互）
+- 通知记录管理与查询
+
+### 6. IT 反馈
+
+- 终端卡顿反馈提交
+- 飞书卡片通知 IT 人员
+- 处理状态流转（待处理 → 处理中 → 已解决）
+- 处理方式记录与反馈
+
+## 定时任务
+
+系统内置以下定时任务，通过 APScheduler 调度，支持在前端"运维管理 - 定时任务"页面统一管理：
+
+| 任务名称 | 任务 ID | 分类 | 触发方式 | 功能说明 |
+|---------|---------|------|---------|---------|
+| 监控检查 | check-all-monitors | monitor | 每 60 秒 | 检查所有启用的监控项状态（Ping/HTTP/TCP/UDP），状态变化时自动创建或解除告警 |
+| 审计日志数据库清理 | cleanup-audit-logs-db | cleanup | 每天 03:00 | 清理过期的审计日志数据库记录 |
+| 审计日志文件清理 | cleanup-audit-logs-file | cleanup | 每天 03:30 | 清理过期的审计日志文件 |
+| 飞书用户同步 | sync-feishu-users | sync | 每天 02:00 | 从飞书同步用户数据到本地数据库 |
+| Prometheus 资产同步 | sync-assets-from-prometheus | sync | 按配置间隔 | 从 Prometheus 自动同步资产数据 |
+| Prometheus 证书同步 | sync-certificates-from-prometheus | sync | 每天 03:00 | 从 Prometheus 同步 SSL 证书数据 |
+| 终端指标同步 | sync-terminal-metrics | sync | 每 5 分钟 | 从 Prometheus 同步终端性能指标（CPU/内存/磁盘）到本地数据库 |
+| Ansible Playbook 执行 | execute-ansible-playbook | ops | 按配置时间 | 通过 SSH 执行 Ansible Playbook |
+
+### 监控检查
+
+监控检查任务（`check-all-monitors`）每 60 秒执行一次，工作流程：
+
+1. 从数据库查询所有 `is_enabled=True` 的监控项
+2. 根据监控类型（Ping/HTTP/TCP/UDP）执行对应的网络检查
+3. 更新监控项的最近检查时间、检查结果和当前状态
+4. 当状态从 UP 变为 DOWN 时，自动创建告警
+5. 当状态从 DOWN 变为 UP 时，自动解除对应的告警
+
+### 终端指标同步
+
+终端指标同步任务（`sync-terminal-metrics`）每 5 分钟执行一次，工作流程：
+
+1. 通过 PrometheusClient 获取所有终端及其性能指标
+2. 提取每个终端的 hostname、customer、instance、cpu_usage、memory_usage、disk_usage
+3. 获取或创建对应的资产记录
+4. 将指标数据写入 terminal_metrics 表
 
 ## 快速开始
 
@@ -78,20 +130,20 @@ git clone <repository-url>
 cd ops-manager
 ```
 
-1. 配置环境变量
+2. 配置环境变量
 
 ```bash
 cp .env.example .env
 # 编辑 .env 文件，设置必要的环境变量
 ```
 
-1. 启动服务
+3. 启动服务
 
 ```bash
 docker-compose up -d
 ```
 
-1. 访问系统
+4. 访问系统
 
 - 前端: <http://localhost:8080>
 - API 文档: <http://localhost:8080/docs>
@@ -117,26 +169,26 @@ python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 ```
 
-1. 安装依赖
+2. 安装依赖
 
 ```bash
 pip install -r requirements/dev.txt
 ```
 
-1. 配置环境变量
+3. 配置环境变量
 
 ```bash
 cp .env.example .env
 # 编辑 .env 文件
 ```
 
-1. 运行数据库迁移
+4. 运行数据库迁移
 
 ```bash
-alembic upgrade head
+python -m alembic upgrade head
 ```
 
-1. 启动开发服务器
+5. 启动开发服务器
 
 ```bash
 uvicorn app.main:app --reload
@@ -151,14 +203,14 @@ cd frontend
 npm install
 ```
 
-1. 配置环境变量
+2. 配置环境变量
 
 ```bash
 cp .env.example .env
 # 编辑 .env 文件
 ```
 
-1. 启动开发服务器
+3. 启动开发服务器
 
 ```bash
 npm run dev
@@ -168,29 +220,38 @@ npm run dev
 
 ```
 ops-manager/
-├── backend/                 # 后端代码
+├── backend/                    # 后端代码
 │   ├── app/
-│   │   ├── api/            # API 路由
-│   │   ├── core/           # 核心模块
-│   │   ├── crud/           # 数据库操作
-│   │   ├── models/         # 数据模型
-│   │   ├── schemas/        # Pydantic 模型
-│   │   ├── services/       # 业务逻辑
-│   │   ├── tasks/          # Celery 任务
-│   │   └── main.py         # 应用入口
-│   ├── alembic/            # 数据库迁移
-│   ├── requirements/       # 依赖管理
+│   │   ├── api/v1/            # API 路由（auth, assets, alerts, feishu 等）
+│   │   ├── core/              # 核心模块（security, middleware, permissions, audit）
+│   │   ├── crud/              # 数据库 CRUD 操作
+│   │   ├── db/                # 数据库配置与会话管理
+│   │   ├── integrations/      # 外部系统集成（feishu）
+│   │   ├── models/            # SQLAlchemy 数据模型
+│   │   ├── schemas/           # Pydantic 请求/响应模型
+│   │   ├── scheduler/         # APScheduler 定时任务调度器
+│   │   ├── services/          # 业务逻辑（alerts, prometheus）
+│   │   ├── startup/           # 启动初始化
+│   │   ├── tasks/             # 定时任务函数实现
+│   │   ├── config.py          # 应用配置
+│   │   └── main.py            # 应用入口
+│   ├── alembic/               # 数据库迁移
+│   ├── requirements/          # 依赖管理
 │   └── Dockerfile
-├── frontend/               # 前端代码
+├── frontend/                   # 前端代码
 │   ├── src/
-│   │   ├── components/     # 组件
-│   │   ├── pages/          # 页面
-│   │   ├── services/       # API 服务
-│   │   ├── stores/         # 状态管理
-│   │   └── types/          # TypeScript 类型
+│   │   ├── components/        # 通用组件（Layout, PermissionGuard）
+│   │   ├── config/            # 前端配置（菜单权限、路由权限、主题）
+│   │   ├── hooks/             # 自定义 Hooks（useFormModal, usePermission）
+│   │   ├── pages/             # 页面组件（Alerts, Assets, System, Users 等）
+│   │   ├── services/          # API 服务层
+│   │   ├── stores/            # Zustand 状态管理
+│   │   ├── types/             # TypeScript 类型定义
+│   │   └── utils/             # 工具函数
 │   └── Dockerfile
-├── nginx/                  # Nginx 配置
+├── nginx/                      # Nginx 配置
 ├── docker-compose.yml
+├── feishu-notify-api.md        # 飞书通知 API 接口文档
 └── README.md
 ```
 
@@ -201,6 +262,8 @@ ops-manager/
 - Swagger UI: <http://localhost:8080/docs>
 - ReDoc: <http://localhost:8080/redoc>
 
+飞书通知 API 详见 [feishu-notify-api.md](./feishu-notify-api.md)
+
 ## 数据库模型
 
 ### 核心表
@@ -210,10 +273,33 @@ ops-manager/
 - `assets` - 资产表
 - `labels` - 标签表
 - `monitors` - 监控项表
-- `alerts` - 告警表
 - `deployments` - 发布记录表
 - `certificates` - 证书表
 - `dns_records` - DNS 记录表
+
+### 监控告警
+
+- `alert_templates` - 告警模板表
+- `alert_receivers` - 告警接收人表
+- `alert_history` - 告警历史表
+
+### 飞书与通知
+
+- `notification_records` - 通知记录表（含 chat_id, receive_type, callback_id）
+- `notification_groups` - 通知组表
+- `notification_group_members` - 通知组成员表
+
+### 定时任务
+
+- `scheduled_tasks` - 定时任务表（任务定义、触发配置、执行状态）
+- `task_execution_logs` - 任务执行日志表（执行时间、耗时、结果、错误信息）
+
+### 其他
+
+- `it_feedbacks` - IT 反馈表
+- `terminal_metrics` - 终端指标表
+- `pc_client_versions` - PC 客户端版本表
+- `system_configs` - 系统配置表（键值对配置，按分组管理）
 
 ## 监控检查类型
 
@@ -244,4 +330,3 @@ ops-manager/
 
 - 项目主页: <https://github.com/your-org/ops-manager-v2>
 - 问题反馈: <https://github.com/your-org/ops-manager-v2/issues>
-

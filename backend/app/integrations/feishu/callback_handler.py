@@ -18,6 +18,14 @@ _callback_thread: threading.Thread | None = None
 _ws_client: Any = None
 
 
+def _record_interaction(**kwargs) -> None:
+    try:
+        from app.crud.crud_feishu_interaction import record_interaction_sync
+        record_interaction_sync(**kwargs)
+    except Exception as e:
+        logger.error(f"Failed to record feishu interaction: {e}")
+
+
 def _get_lark_module():
     global _lark
     if _lark is None:
@@ -41,6 +49,14 @@ def _do_card_action_trigger(data: Any) -> Any:
         input_value = getattr(action, "input_value", None)
         name = getattr(action, "name", None)
 
+        operator_open_id = None
+        if hasattr(data.event, "operator") and data.event.operator:
+            operator_id = getattr(data.event.operator, "operator_id", None)
+            if operator_id:
+                operator_open_id = getattr(operator_id, "open_id", None) or getattr(
+                    operator_id, "user_id", None
+                )
+
         if action_tag == "input":
             logger.info("Ignoring input tag callback, waiting for form submission")
             from lark_oapi.event.callback.model.p2_card_action_trigger import (
@@ -60,6 +76,43 @@ def _do_card_action_trigger(data: Any) -> Any:
                 if hasattr(data.event.context, "open_message_id")
                 else None
             )
+
+        related_type = None
+        related_id = None
+        if button_action.startswith("handle_"):
+            related_type = "it_feedback"
+            related_id = button_action.replace("handle_", "")
+        elif button_action == "submit_resolution":
+            related_type = "it_feedback"
+            feedback_id_from_value = value.get("feedback_id") if isinstance(value, dict) else None
+            if feedback_id_from_value:
+                related_id = str(feedback_id_from_value)
+            elif open_message_id:
+                related_id = _get_feedback_id_by_open_message_id(open_message_id)
+        elif button_action.startswith("acknowledge_"):
+            related_type = "alert"
+            related_id = button_action.replace("acknowledge_", "")
+        elif button_action.startswith("transfer_it_"):
+            related_type = "alert"
+            related_id = button_action.replace("transfer_it_", "")
+        elif button_action == "resolve_alert":
+            related_type = "alert"
+            alert_id_from_value = value.get("alert_id") if isinstance(value, dict) else None
+            if alert_id_from_value:
+                related_id = str(alert_id_from_value)
+            elif open_message_id:
+                related_id = _get_alert_id_by_open_message_id(open_message_id)
+
+        _record_interaction(
+            direction="inbound",
+            interaction_type="card_action",
+            feishu_open_id=operator_open_id,
+            message_id=open_message_id,
+            content={"action": button_action, "value": value if isinstance(value, dict) else str(value)},
+            action_type=button_action,
+            related_type=related_type,
+            related_id=related_id,
+        )
 
         if button_action.startswith("handle_"):
             feedback_id = button_action.replace("handle_", "")
@@ -749,6 +802,21 @@ def _do_bot_p2p_chat_entered(data: Any) -> None:
     """Handle bot entered p2p chat event."""
     lark = _get_lark_module()
     logger.info(f"Bot p2p chat entered: {lark.JSON.marshal(data)}")
+
+    try:
+        open_id = None
+        if hasattr(data.event, "operator") and data.event.operator:
+            operator_id = getattr(data.event.operator, "operator_id", None)
+            if operator_id:
+                open_id = getattr(operator_id, "open_id", None)
+        _record_interaction(
+            direction="inbound",
+            interaction_type="chat_entered",
+            feishu_open_id=open_id,
+        )
+    except Exception as e:
+        logger.error(f"Error recording chat_entered interaction: {e}")
+
     return None
 
 
@@ -756,6 +824,31 @@ def _do_im_message_reaction_created_v1(data: Any) -> None:
     """Handle im.message.reaction.created_v1 event."""
     lark = _get_lark_module()
     logger.info(f"Message reaction created: {lark.JSON.marshal(data)}")
+
+    try:
+        open_id = None
+        emoji_type = None
+        message_id = None
+        if hasattr(data.event, "operator") and data.event.operator:
+            operator_id = getattr(data.event.operator, "operator_id", None)
+            if operator_id:
+                open_id = getattr(operator_id, "open_id", None)
+        reaction = getattr(data.event, "reaction", None)
+        if reaction:
+            emoji = getattr(reaction, "emoji", None)
+            if emoji:
+                emoji_type = getattr(emoji, "emoji_type", None)
+            message_id = getattr(reaction, "message_id", None)
+        _record_interaction(
+            direction="inbound",
+            interaction_type="reaction",
+            feishu_open_id=open_id,
+            message_id=message_id,
+            content={"emoji_type": emoji_type},
+        )
+    except Exception as e:
+        logger.error(f"Error recording reaction interaction: {e}")
+
     return None
 
 
@@ -763,6 +856,25 @@ def _do_im_message_message_read_v1(data: Any) -> None:
     """Handle im.message.message_read_v1 event."""
     lark = _get_lark_module()
     logger.info(f"Message read event: {lark.JSON.marshal(data)}")
+
+    try:
+        open_id = None
+        message_id_list = None
+        reader = getattr(data.event, "reader", None)
+        if reader:
+            reader_id = getattr(reader, "reader_id", None)
+            if reader_id:
+                open_id = getattr(reader_id, "open_id", None)
+            message_id_list = getattr(reader, "message_id_list", None)
+        _record_interaction(
+            direction="inbound",
+            interaction_type="message_read",
+            feishu_open_id=open_id,
+            content={"message_id_list": message_id_list},
+        )
+    except Exception as e:
+        logger.error(f"Error recording message_read interaction: {e}")
+
     return None
 
 
@@ -787,6 +899,8 @@ def _do_im_message_receive_v1(data: Any) -> Any:
         message_id = getattr(message, "message_id", None) if message else None
 
         content = getattr(message, "content", None) if message else None
+        msg_type = ""
+        text_content = ""
         if content:
             try:
                 msg_dict = json.loads(content) if isinstance(content, str) else content
@@ -795,6 +909,15 @@ def _do_im_message_receive_v1(data: Any) -> Any:
 
                 logger.info(
                     f"Message from {sender_id}: type={msg_type}, text={text_content[:100] if text_content else 'N/A'}"
+                )
+
+                _record_interaction(
+                    direction="inbound",
+                    interaction_type="message",
+                    feishu_open_id=sender_id,
+                    message_id=message_id,
+                    content={"msg_type": msg_type, "text": text_content},
+                    msg_type=msg_type,
                 )
 
                 if msg_type == "text" and text_content:

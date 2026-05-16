@@ -21,6 +21,7 @@ from app.core.rate_limit import limiter
 from app.core.redis import close_redis, init_redis
 from app.db.init_db import init_db
 from app.integrations.feishu.callback_handler import start_feishu_callback_client
+from app.scheduler import start_scheduler, stop_scheduler
 from app.startup.pc_versions import sync_pc_versions_on_startup
 
 logger = get_logger(__name__)
@@ -82,10 +83,12 @@ async def lifespan(app: FastAPI):
             logger.warning(f"Task '{result.name}' failed, but continuing startup")
 
     start_feishu_callback_client()
+    start_scheduler()
 
     yield
 
     logger.info("Shutting down application")
+    stop_scheduler()
 
     try:
         await close_redis()

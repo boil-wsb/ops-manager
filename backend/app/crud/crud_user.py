@@ -6,6 +6,7 @@ from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.security import get_password_hash
 from app.crud.base import CRUDBase
@@ -16,6 +17,13 @@ from app.schemas.user import UserCreate, UserUpdate
 
 class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
     """User CRUD operations."""
+
+    async def get(self, db: AsyncSession, id: int) -> User | None:
+        """Get a user by ID with roles preloaded."""
+        result = await db.execute(
+            select(User).options(selectinload(User.roles)).where(User.id == id)
+        )
+        return result.scalar_one_or_none()
 
     async def get_by_username(self, db: AsyncSession, *, username: str) -> User | None:
         """Get user by username."""
@@ -45,6 +53,13 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         result = await db.execute(select(User).where(User.is_feishu_user))
         return list(result.scalars().all())
 
+    async def _get_roles_by_ids(self, db: AsyncSession, role_ids: list[int]) -> list[Role]:
+        """Batch fetch roles by IDs."""
+        if not role_ids:
+            return []
+        result = await db.execute(select(Role).where(Role.id.in_(role_ids)))
+        return list(result.scalars().all())
+
     async def create(self, db: AsyncSession, *, obj_in: UserCreate) -> User:
         """Create a new user with hashed password."""
         db_obj = User(
@@ -58,13 +73,9 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         await db.commit()
         await db.refresh(db_obj)
 
-        # Assign roles if provided
         if obj_in.role_ids:
-            for role_id in obj_in.role_ids:
-                role_result = await db.execute(select(Role).where(Role.id == role_id))
-                role = role_result.scalar_one_or_none()
-                if role:
-                    db_obj.roles.append(role)
+            roles = await self._get_roles_by_ids(db, obj_in.role_ids)
+            db_obj.roles = roles
             await db.commit()
             await db.refresh(db_obj)
 
@@ -99,19 +110,18 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         await db.commit()
         await db.refresh(db_obj)
 
-        # Assign viewer role by default
         viewer_role_result = await db.execute(select(Role).where(Role.name == "viewer"))
         viewer_role = viewer_role_result.scalar_one_or_none()
         if viewer_role:
             db_obj.roles.append(viewer_role)
 
-        # Assign additional roles if provided
         if role_ids:
-            for role_id in role_ids:
-                role_result = await db.execute(select(Role).where(Role.id == role_id))
-                role = role_result.scalar_one_or_none()
-                if role and role not in db_obj.roles:
-                    db_obj.roles.append(role)
+            all_role_ids = list(set(role_ids) - {viewer_role.id} if viewer_role else set(role_ids))
+            if all_role_ids:
+                additional_roles = await self._get_roles_by_ids(db, all_role_ids)
+                for role in additional_roles:
+                    if role not in db_obj.roles:
+                        db_obj.roles.append(role)
 
         await db.commit()
         await db.refresh(db_obj)
@@ -147,25 +157,17 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         """Update user."""
         update_data = obj_in.model_dump(exclude_unset=True)
 
-        # Handle password update
         if "password" in update_data and update_data["password"]:
             update_data["hashed_password"] = get_password_hash(update_data.pop("password"))
 
-        # Handle role_ids separately
         role_ids = update_data.pop("role_ids", None)
 
-        # Update other fields
         for field, value in update_data.items():
             setattr(db_obj, field, value)
 
-        # Update roles if provided
         if role_ids is not None:
-            db_obj.roles = []
-            for role_id in role_ids:
-                role_result = await db.execute(select(Role).where(Role.id == role_id))
-                role = role_result.scalar_one_or_none()
-                if role:
-                    db_obj.roles.append(role)
+            roles = await self._get_roles_by_ids(db, role_ids)
+            db_obj.roles = roles
 
         await db.commit()
         await db.refresh(db_obj)

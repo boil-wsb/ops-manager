@@ -13,6 +13,9 @@ class NotificationRecordBase(BaseModel):
     user: str = Field(..., min_length=1, max_length=100)
     matched_user: str | None = Field(None, max_length=100)
     feishu_open_id: str | None = Field(None, max_length=100)
+    chat_id: str | None = Field(None, max_length=100)
+    receive_type: str = Field("open_id", max_length=20)
+    callback_id: str | None = Field(None, max_length=100)
     card_content: dict | None = None
     message_id: str | None = Field(None, max_length=100)
     success: bool = False
@@ -27,6 +30,10 @@ class NotificationRecordCreate(BaseModel):
     user: str
     matched_user: str | None = None
     feishu_open_id: str | None = None
+    chat_id: str | None = None
+    receive_type: str = "open_id"
+    callback_id: str | None = None
+    open_message_id: str | None = None
     card_content: dict | None = None
     success: bool = False
     error: str | None = None
@@ -37,6 +44,7 @@ class NotificationRecordCreate(BaseModel):
 class NotificationRecordUpdate(BaseModel):
     """Schema for updating Notification Record."""
 
+    callback_id: str | None = None
     message_id: str | None = None
     success: bool | None = None
     error: str | None = None
@@ -53,6 +61,10 @@ class NotificationRecordResponse(BaseModel):
     user: str
     matched_user: str | None = None
     feishu_open_id: str | None = None
+    chat_id: str | None = None
+    receive_type: str = "open_id"
+    callback_id: str | None = None
+    open_message_id: str | None = None
     card_content: dict | None = None
     message_id: str | None = None
     success: bool

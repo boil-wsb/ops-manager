@@ -63,6 +63,8 @@ setup-env:
     - echo "VERSION=${VERSION}"
     - echo "DOCKER_IMAGE_BACKEND=${DOCKER_IMAGE_BACKEND}"
     - echo "DOCKER_IMAGE_FRONTEND=${DOCKER_IMAGE_FRONTEND}"
+    - echo "DOCKER_IMAGE_BACKEND=${DOCKER_IMAGE_BACKEND}" > build.env
+    - echo "DOCKER_IMAGE_FRONTEND=${DOCKER_IMAGE_FRONTEND}" >> build.env
   artifacts:
     reports:
       dotenv:
@@ -85,7 +87,8 @@ backend-lint:
     - pip config set global.trusted-host mirrors.aliyun.com
     - cd backend
     - export PYTHONPATH=$PWD:$PYTHONPATH
-    - python -m venv .venv && source .venv/bin/activate
+    - test -d .venv || python -m venv .venv
+    - source .venv/bin/activate
     - pip install -r requirements/dev.txt -q
   script:
     - source .venv/bin/activate
@@ -103,9 +106,14 @@ frontend-lint:
   image: $NODE_IMAGE
   tags:
     - ops-docker
+  cache:
+    key: "npm-frontend-$CI_COMMIT_REF_SLUG"
+    paths:
+      - frontend/node_modules
+    policy: pull-push
   before_script:
     - cd frontend
-    - npm install --registry=https://registry.npmmirror.com 
+    - npm install --registry=https://registry.npmmirror.com
   script:
     - npm run lint
   rules:
@@ -120,9 +128,14 @@ frontend-typecheck:
   image: $NODE_IMAGE
   tags:
     - ops-docker
+  cache:
+    key: "npm-frontend-$CI_COMMIT_REF_SLUG"
+    paths:
+      - frontend/node_modules
+    policy: pull
   before_script:
     - cd frontend
-    - npm install --registry=https://registry.npmmirror.com 
+    - npm install --registry=https://registry.npmmirror.com
   script:
     - npx tsc --noEmit
   rules:
@@ -148,12 +161,13 @@ backend-test:
     - pip config set global.trusted-host mirrors.aliyun.com
     - cd backend
     - export PYTHONPATH=$PWD:$PYTHONPATH
-    - export SECRET_KEY=test-secret-key-for-ci-only-min-32-chars
+    - export SECRET_KEY=$CI_SECRET_KEY
     - export ENVIRONMENT=testing
-    - export DATABASE_URL=postgresql+asyncpg://opsmanager:opsmanager@192.168.23.36:15432/opsmanager_test
-    - export REDIS_URL=redis://192.168.23.36:16379/0
+    - export DATABASE_URL=$CI_DATABASE_URL
+    - export REDIS_URL=$CI_REDIS_URL
     - export DISABLE_RATE_LIMIT=true
-    - python -m venv .venv && source .venv/bin/activate
+    - test -d .venv || python -m venv .venv
+    - source .venv/bin/activate
     - pip install -r requirements/dev.txt -q
   script:
     - source .venv/bin/activate
@@ -180,22 +194,45 @@ backend-security:
   tags:
     - ops-docker
   cache:
-    key: "pip-backend-$CI_COMMIT_REF_SLUG"
+    key: "pip-security-$CI_COMMIT_REF_SLUG"
     paths:
       - /root/.cache/pip
-      - backend/.venv
+      - backend/.venv-security
     policy: pull-push
   before_script:
-    - pip config set global.index.url https://mirrors.aliyun.com/pypi/simple
+    - pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
     - pip config set global.trusted-host mirrors.aliyun.com
     - cd backend
-    - python -m venv .venv && source .venv/bin/activate
+    - test -d .venv-security || python -m venv .venv-security
+    - source .venv-security/bin/activate
     - pip install safety bandit pip-audit -q || true
   script:
-    - source .venv/bin/activate
+    - source .venv-security/bin/activate
     - safety scan --json || true
     - bandit -r app/ -f json -o bandit-report.json || true
     - pip-audit --format=json || true
+  rules:
+    - <<: *if-merge-request
+    - <<: *if-master-branch
+    - <<: *if-release-branch
+  allow_failure: true
+
+# Security Scan - Frontend
+frontend-security:
+  stage: test
+  image: $NODE_IMAGE
+  tags:
+    - ops-docker
+  cache:
+    key: "npm-frontend-$CI_COMMIT_REF_SLUG"
+    paths:
+      - frontend/node_modules
+    policy: pull
+  before_script:
+    - cd frontend
+    - npm install --registry=https://registry.npmmirror.com
+  script:
+    - npx audit --json || true
   rules:
     - <<: *if-merge-request
     - <<: *if-master-branch
@@ -238,29 +275,28 @@ deploy-docker:
       echo "Backend Image: $REGISTRY_URL/$DOCKER_IMAGE_BACKEND"
       echo "Frontend Image: $REGISTRY_URL/$DOCKER_IMAGE_FRONTEND"
 
-      # Export environment variables for docker-compose
       export REGISTRY_URL=$REGISTRY_URL
       export VERSION=v1.0.$CI_PIPELINE_IID
 
-      # Pull latest images
       cd $REMOTE_DIR
       docker-compose pull
-
-      # Restart services with new images
       docker-compose down
       docker-compose up -d
 
-      # Wait for services to be healthy
       echo "Waiting for services to start..."
-      sleep 10
+      MAX_RETRIES=12
+      RETRY_INTERVAL=5
+      for i in $(seq 1 $MAX_RETRIES); do
+        if curl -sf http://localhost:8080/health > /dev/null 2>&1; then
+          echo "=== Deployment successful (attempt $i) ==="
+          exit 0
+        fi
+        echo "Health check attempt $i/$MAX_RETRIES failed, retrying in ${RETRY_INTERVAL}s..."
+        sleep $RETRY_INTERVAL
+      done
 
-      # Check health
-      if curl -f http://localhost:8080/health > /dev/null 2>&1; then
-        echo "=== Deployment successful ==="
-      else
-        echo "=== Health check failed ==="
-        docker-compose logs --tail=50
-        exit 1
-      fi
+      echo "=== Health check failed after $MAX_RETRIES attempts ==="
+      docker-compose logs --tail=50
+      exit 1
   rules:
     - <<: *if-master-branch

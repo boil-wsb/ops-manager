@@ -3,6 +3,7 @@ import { Table, Button, Input, Select, Tag, Space, Card, App, Popconfirm } from 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { userApi } from '../../services/users';
+import { fuzzyFilterOption } from '../../utils/selectFilter';
 import { PermissionGuard } from '../../components/PermissionGuard';
 import StatusTag from '../../components/StatusTag';
 import UserFormModal from './UserFormModal';
@@ -148,7 +149,7 @@ const UserList = () => {
     <div>
       <Card style={{ marginBottom: 24 }}>
         <Space wrap>
-          <Input
+          <Input.Search
             placeholder="搜索用户名/邮箱/姓名"
             prefix={<SearchOutlined />}
             value={searchParams.keyword}
@@ -162,6 +163,8 @@ const UserList = () => {
             onChange={(value) => setSearchParams({ ...searchParams, isActive: value, page: 1 })}
             style={{ width: 120 }}
             allowClear
+            showSearch
+            filterOption={fuzzyFilterOption}
           >
             <Option value={true}>启用</Option>
             <Option value={false}>禁用</Option>
