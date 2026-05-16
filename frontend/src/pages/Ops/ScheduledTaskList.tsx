@@ -4,7 +4,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { ReloadOutlined, EditOutlined, PlayCircleOutlined } from '@ant-design/icons';
 import { scheduledTaskApi } from '../../services/scheduledTask';
 import { fuzzyFilterOption } from '../../utils/selectFilter';
-import type { ScheduledTask, TaskExecutionLog } from '../../types';
+import type { ScheduledTask } from '../../types';
 
 const categoryColorMap: Record<string, string> = {
   sync: 'blue',

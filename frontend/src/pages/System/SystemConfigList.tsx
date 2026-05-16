@@ -13,7 +13,7 @@ const groupColorMap: Record<string, string> = {
 };
 
 const SystemConfigList = () => {
-  const { message, modal } = App.useApp();
+  const { message } = App.useApp();
   const [filter, setFilter] = useState({
     group: undefined as string | undefined,
     key: undefined as string | undefined,

@@ -138,7 +138,7 @@ const NotificationRecordList = () => {
         {header && (
           <div style={cardHeaderStyle(header.template as string)}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {header.ud_icon && (
+              {!!header.ud_icon && (
                 <span style={{ fontSize: 16 }}>
                   {String((header.ud_icon as Record<string, unknown>)?.tag || '')}
                 </span>
@@ -147,7 +147,7 @@ const NotificationRecordList = () => {
                 <div style={{ fontWeight: 600, fontSize: 14 }}>
                   {String(header.title?.valueOf() ? (header.title as Record<string, unknown>)?.content || header.title : header.title || '无标题')}
                 </div>
-                {header.subtitle && (
+                {!!header.subtitle && (
                   <div style={{ fontSize: 12, opacity: 0.85 }}>
                     {String(
                       (header.subtitle as Record<string, unknown>)?.content || header.subtitle
