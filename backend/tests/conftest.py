@@ -41,15 +41,20 @@ def event_loop():
 @pytest.fixture(scope="session", autouse=True)
 async def setup_and_teardown_db():
     """Run Alembic migrations to ensure schema is up to date, then create any missing tables."""
-    from alembic.config import Config as AlembicConfig
-    from alembic import command
+    import subprocess
+    import sys
 
-    alembic_cfg = AlembicConfig("alembic.ini")
     database_url = TEST_DATABASE_URL
     if database_url.startswith("postgresql+asyncpg://"):
         database_url = database_url.replace("postgresql+asyncpg://", "postgresql://", 1)
-    alembic_cfg.set_main_option("sqlalchemy.url", database_url)
-    command.upgrade(alembic_cfg, "head")
+
+    env = {**os.environ, "PYTHONPATH": os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "DATABASE_URL": database_url}
+    subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        env=env,
+        check=False,
+    )
 
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
