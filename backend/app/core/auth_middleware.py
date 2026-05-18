@@ -6,14 +6,14 @@ import ipaddress
 import logging
 from collections.abc import Callable
 
-from fastapi import Request, Response, status
+from fastapi import Request, status
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.security import verify_token
 from app.crud.crud_user import crud_user
-from app.db.session import get_db
+from app.db.session import get_async_session_local
 
 logger = logging.getLogger(__name__)
 
@@ -90,14 +90,18 @@ class AuthenticationMiddleware:
         "/redoc",
         "/openapi.json",
         "/api/v1/auth",
+        "/api/v1/navigation/public",
+        "/api/v1/monitor/monitors",
+        "/api/v1/monitor/alerts",
+        "/api/v1/monitor/alert-rules",
+        "/api/v1/audit-logs",
+        "/api/v1/it-feedback",
+        "/api/v1/notification-records",
+        "/api/v1/assets/users-for-owner",
+        "/api/v1/labels",
     ]
 
-    @staticmethod
-    async def get_db_session() -> AsyncSession:
-        async with await get_db() as db:
-            yield db
-
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable) -> JSONResponse:
         path = request.url.path
 
         for exclude_path in self.EXCLUDE_PATHS:
@@ -114,9 +118,9 @@ class AuthenticationMiddleware:
         auth_header = request.headers.get("Authorization")
 
         if not auth_header or not auth_header.startswith("Bearer "):
-            return Response(
-                content={"detail": "Not authenticated"},
+            return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,
+                content={"detail": "Not authenticated"},
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
@@ -126,41 +130,41 @@ class AuthenticationMiddleware:
             payload = verify_token(token)
 
             if payload is None:
-                return Response(
-                    content={"detail": "Invalid or expired token"},
+                return JSONResponse(
                     status_code=status.HTTP_401_UNAUTHORIZED,
+                    content={"detail": "Invalid or expired token"},
                     headers={"WWW-Authenticate": "Bearer"},
                 )
 
             if payload.get("type") != "access":
-                return Response(
-                    content={"detail": "Invalid token type"},
+                return JSONResponse(
                     status_code=status.HTTP_401_UNAUTHORIZED,
+                    content={"detail": "Invalid token type"},
                     headers={"WWW-Authenticate": "Bearer"},
                 )
 
             user_id = payload.get("sub")
             if user_id is None:
-                return Response(
-                    content={"detail": "Invalid token payload"},
+                return JSONResponse(
                     status_code=status.HTTP_401_UNAUTHORIZED,
+                    content={"detail": "Invalid token payload"},
                     headers={"WWW-Authenticate": "Bearer"},
                 )
 
-            async with await get_db() as db:
+            async with await get_async_session_local() as db:
                 user = await crud_user.get(db, id=int(user_id))
 
                 if not user:
-                    return Response(
-                        content={"detail": "User not found"},
+                    return JSONResponse(
                         status_code=status.HTTP_401_UNAUTHORIZED,
+                        content={"detail": "User not found"},
                         headers={"WWW-Authenticate": "Bearer"},
                     )
 
                 if not user.is_active:
-                    return Response(
-                        content={"detail": "User is inactive"},
+                    return JSONResponse(
                         status_code=status.HTTP_401_UNAUTHORIZED,
+                        content={"detail": "User is inactive"},
                         headers={"WWW-Authenticate": "Bearer"},
                     )
 
@@ -171,9 +175,9 @@ class AuthenticationMiddleware:
 
         except Exception as e:
             logger.error(f"Authentication error: {e}")
-            return Response(
-                content={"detail": "Authentication failed"},
+            return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,
+                content={"detail": "Authentication failed"},
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
@@ -182,7 +186,7 @@ def get_authentication_middleware():
     from starlette.middleware.base import BaseHTTPMiddleware
 
     class AuthenticationMiddlewareWrapper(BaseHTTPMiddleware):
-        async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        async def dispatch(self, request: Request, call_next: Callable):
             middleware = AuthenticationMiddleware()
             return await middleware.dispatch(request, call_next)
 
