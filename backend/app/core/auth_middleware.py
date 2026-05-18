@@ -99,6 +99,9 @@ class AuthenticationMiddleware:
         "/api/v1/notification-records",
         "/api/v1/assets/users-for-owner",
         "/api/v1/labels",
+        "/api/v1/feishu/notify",
+        "/api/v1/it-reporter",
+        "/api/v1/open-id",
     ]
 
     async def dispatch(self, request: Request, call_next: Callable) -> JSONResponse:
