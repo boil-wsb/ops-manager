@@ -51,3 +51,6 @@ minio==7.2.15
 
 # HTML Parsing
 beautifulsoup4==4.12.3
+
+# SSH
+paramiko==3.5.0
