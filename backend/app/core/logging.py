@@ -79,7 +79,7 @@ def configure_logging() -> None:
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("uvicorn.error").setLevel(logging.INFO)
     logging.getLogger("fastapi").setLevel(logging.WARNING)
-    logging.getLogger("httpx").setLevel(logging.DEBUG)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 def get_logger(name: str) -> logging.Logger:

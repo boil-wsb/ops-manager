@@ -51,6 +51,9 @@ def _parse_excluded_paths() -> list[str]:
 TRUSTED_NETWORKS = _parse_trusted_networks()
 AUTH_EXCLUDED_PATHS = _parse_excluded_paths()
 
+logger.info(f"[Auth Middleware] TRUSTED_NETWORKS: {[str(n) for n in TRUSTED_NETWORKS]}")
+logger.info(f"[Auth Middleware] AUTH_EXCLUDED_PATHS: {AUTH_EXCLUDED_PATHS}")
+
 
 def _get_client_ip(request: Request) -> str | None:
     forwarded = request.headers.get("X-Forwarded-For")
@@ -98,13 +101,15 @@ class AuthenticationMiddleware:
         path = request.url.path
 
         for exclude_path in self.EXCLUDE_PATHS:
-            if path.startswith(exclude_path):
+            if path == exclude_path or path.startswith(exclude_path + "/"):
                 return await call_next(request)
 
+        is_trusted = _is_trusted_client(request)
         for excluded_path in AUTH_EXCLUDED_PATHS:
-            if path.startswith(excluded_path) and _is_trusted_client(request):
-                logger.debug(f"Trusted network auth bypass: {path} from {_get_client_ip(request)}")
-                return await call_next(request)
+            if path.startswith(excluded_path):
+                if is_trusted:
+                    logger.debug(f"Trusted network auth bypass: {path} from {_get_client_ip(request)}")
+                    return await call_next(request)
 
         auth_header = request.headers.get("Authorization")
 

@@ -79,6 +79,15 @@ async def _get_user_by_identifier(db: AsyncSession, identifier: str) -> User | N
         .where(and_(User.full_name == identifier, User.feishu_open_id.isnot(None)))
         .limit(1)
     )
+    user = result.scalar_one_or_none()
+    if user:
+        return user
+
+    result = await db.execute(
+        select(User)
+        .where(and_(User.feishu_open_id == identifier))
+        .limit(1)
+    )
     return result.scalar_one_or_none()
 
 
@@ -87,6 +96,7 @@ async def send_feishu_card_notification(
     request: FeishuCardSendRequest,
     db: AsyncSession = Depends(get_db),
 ):
+    logger.info(f"[Feishu Notify] Received request: user={request.user}, chat_id={request.chat_id}")
     """Send Feishu interactive card notification to a user or chat.
 
     - If `chat_id` is provided, sends directly to the group chat.
@@ -184,6 +194,7 @@ async def send_feishu_card_notification(
     user = await _get_user_by_identifier(db, request.user)
 
     if not user:
+        logger.warning(f"[Feishu Notify] User not found: {request.user}")
         raise HTTPException(status_code=404, detail="User not found")
 
     if not user.feishu_open_id:
