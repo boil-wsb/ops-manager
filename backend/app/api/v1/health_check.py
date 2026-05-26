@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import HTMLResponse, Response
 
 from app.core.logging import get_logger
@@ -87,13 +87,17 @@ async def get_report_history(
     page: int = Query(1, description="页码"),
     page_size: int = Query(20, description="每页数量"),
 ):
-    result = await health_check_service.get_report_history(days, page, page_size)
-    return {
-        "items": [_serialize_report(r) for r in result["items"]],
-        "total": result["total"],
-        "page": result["page"],
-        "page_size": result["page_size"],
-    }
+    try:
+        result = await health_check_service.get_report_history(days, page, page_size)
+        return {
+            "items": [_serialize_report(r) for r in result["items"]],
+            "total": result["total"],
+            "page": result["page"],
+            "page_size": result["page_size"],
+        }
+    except Exception as e:
+        logger.error(f"获取巡检历史失败: {e}", extra={"action": "health_check.history", "error": str(e)})
+        raise HTTPException(status_code=500, detail="获取巡检历史记录失败，请稍后重试")
 
 
 @router.get("/reports/{report_id}")
