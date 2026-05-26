@@ -29,10 +29,11 @@ def _try_forward_callback(
         return
 
     try:
+        from sqlalchemy import select
+
+        from app.crud.crud_notification_callback_log import notification_callback_log
         from app.db.session import SessionLocal
         from app.models.notification_record import NotificationRecord
-        from app.crud.crud_notification_callback_log import notification_callback_log
-        from sqlalchemy import select
 
         with SessionLocal() as db:
             result = db.execute(
@@ -102,8 +103,8 @@ def _try_forward_callback(
             extra={"action": "feishu.callback.forward", "error": str(e), "open_message_id": open_message_id},
         )
         try:
-            from app.db.session import SessionLocal
             from app.crud.crud_notification_callback_log import notification_callback_log
+            from app.db.session import SessionLocal
 
             with SessionLocal() as db:
                 notification_callback_log.create(
@@ -638,7 +639,6 @@ def _acknowledge_alert(alert_id: str, open_message_id: str | None) -> None:
 def _send_transfer_notification(alert_id: str, alertname: str, severity: str, instance: str) -> None:
     """Send notification to IT team members when alert is transferred."""
     from sqlalchemy import create_engine, text
-    from sqlalchemy.orm import selectinload
 
     from app.config import settings
 
@@ -672,6 +672,8 @@ def _send_transfer_card_to_user(
 ) -> None:
     """Send alert transferred notification card to a single user."""
     try:
+        from app.integrations.feishu.service import get_feishu_service
+
         tags = [
             {"label": "告警名称", "value": alertname or "未知"},
             {"label": "严重程度", "value": severity or "info"},

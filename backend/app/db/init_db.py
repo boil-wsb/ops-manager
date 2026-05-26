@@ -5,7 +5,6 @@ Creates default admin user, roles, and permissions.
 
 import asyncio
 import logging
-from datetime import datetime
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -400,7 +399,7 @@ async def init_permissions(db: AsyncSession) -> dict:
         permission_map[perm_data["code"]] = permission.id
 
     await db.commit()
-    logger.info(f"权限初始化完成", extra={"action": "db.seed", "permissions": len(permission_map)})
+    logger.info("权限初始化完成", extra={"action": "db.seed", "permissions": len(permission_map)})
     return permission_map
 
 
@@ -451,7 +450,7 @@ async def init_roles(db: AsyncSession, permission_map: dict) -> dict:
                     )
 
     await db.commit()
-    logger.info(f"角色初始化完成", extra={"action": "db.seed", "roles": len(role_map)})
+    logger.info("角色初始化完成", extra={"action": "db.seed", "roles": len(role_map)})
     return role_map
 
 
@@ -461,7 +460,7 @@ async def init_admin_user(db: AsyncSession, role_map: dict) -> None:
     admin_user = result.scalar_one_or_none()
 
     if admin_user:
-        logger.info(f"管理员用户已存在", extra={"action": "db.seed", "username": DEFAULT_ADMIN_USERNAME})
+        logger.info("管理员用户已存在", extra={"action": "db.seed", "username": DEFAULT_ADMIN_USERNAME})
         return
 
     superadmin_role_id = role_map.get("superadmin")
@@ -489,8 +488,8 @@ async def init_admin_user(db: AsyncSession, role_map: dict) -> None:
 
     await db.commit()
 
-    logger.info(f"创建默认管理员用户", extra={"action": "db.seed", "username": DEFAULT_ADMIN_USERNAME})
-    logger.info(f"默认密码已设置", extra={"action": "db.seed"})
+    logger.info("创建默认管理员用户", extra={"action": "db.seed", "username": DEFAULT_ADMIN_USERNAME})
+    logger.info("默认密码已设置", extra={"action": "db.seed"})
     logger.warning("请首次登录后修改默认密码", extra={"action": "db.seed"})
 
 
@@ -517,11 +516,11 @@ async def check_db_initialized(db: AsyncSession) -> bool:
             return False
 
         if role_count < len(DEFAULT_ROLES):
-            logger.info(f"角色数量不足", extra={"action": "db.init", "found": role_count, "expected": len(DEFAULT_ROLES)})
+            logger.info("角色数量不足", extra={"action": "db.init", "found": role_count, "expected": len(DEFAULT_ROLES)})
             return False
 
         if perm_count < len(DEFAULT_PERMISSIONS):
-            logger.info(f"权限数量不足", extra={"action": "db.init", "found": perm_count, "expected": len(DEFAULT_PERMISSIONS)})
+            logger.info("权限数量不足", extra={"action": "db.init", "found": perm_count, "expected": len(DEFAULT_PERMISSIONS)})
             return False
 
         logger.info("数据库已初始化", extra={"action": "db.init", "users": 1, "roles": role_count, "permissions": perm_count})

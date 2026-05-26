@@ -482,7 +482,7 @@ async def run_task_manually(task_id: str, triggered_by: str | None = None):
             retry_delay=1.0,
         )
     except Exception as e:
-        raise ValueError(f"Task {task_id} not found or DB error: {e}")
+        raise ValueError(f"Task {task_id} not found or DB error: {e}") from e
 
     if not task_function_path:
         raise ValueError(f"Task {task_id} not found")

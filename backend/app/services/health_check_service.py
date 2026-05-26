@@ -30,7 +30,6 @@ DEFAULT_THRESHOLDS = {
 class HealthCheckService:
     async def generate_health_report(self) -> "HealthCheckReport":
         """Execute full health check: collect -> evaluate -> save -> notify"""
-        from app.models.health_check import HealthCheckDetail, HealthCheckReport
 
         # 1. Read thresholds from system_configs
         thresholds_value = await db_operation_with_retry(
@@ -413,7 +412,6 @@ class HealthCheckService:
         self, summary: dict, host_results: list[dict]
     ) -> "HealthCheckReport":
         """Save report and details to database"""
-        from app.models.health_check import HealthCheckDetail, HealthCheckReport
 
         return await db_operation_with_retry(
             lambda db: self._save_report_db(db, summary, host_results),
@@ -465,7 +463,7 @@ class HealthCheckService:
         await db.refresh(report)
 
         logger.info(
-            f"巡检报告已保存",
+            "巡检报告已保存",
             extra={"action": "health_check.run", "report_id": report.id, "total": report.total_hosts, "ok": report.ok_count, "warning": report.warning_count, "critical": report.critical_count},
         )
 
@@ -599,8 +597,8 @@ class HealthCheckService:
         logger.info(f"飞书通知已发送: report_id={report.id}", extra={"action": "health_check.notify", "report_id": report.id, "chat_id": chat_id})
 
     async def _get_notification_chat_id(self, db):
-        from app.crud.crud_system_config import crud_system_config
         from app.config import settings
+        from app.crud.crud_system_config import crud_system_config
 
         chat_id = await crud_system_config.get_value(db, "health_check.chat_id")
         if not chat_id:
