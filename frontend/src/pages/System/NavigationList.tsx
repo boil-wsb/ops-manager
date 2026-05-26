@@ -20,7 +20,6 @@ import {
   EditOutlined,
   DeleteOutlined,
   LinkOutlined,
-  MonitorOutlined,
   CloudUploadOutlined,
   DatabaseOutlined,
   DesktopOutlined,
@@ -43,7 +42,6 @@ interface Role {
 }
 
 const iconMap: Record<string, React.ReactNode> = {
-  MonitorOutlined: <MonitorOutlined />,
   CloudUploadOutlined: <CloudUploadOutlined />,
   LinkOutlined: <LinkOutlined />,
   DatabaseOutlined: <DatabaseOutlined />,
@@ -56,7 +54,6 @@ const iconMap: Record<string, React.ReactNode> = {
 };
 
 const iconOptions = [
-  { value: 'MonitorOutlined', icon: <MonitorOutlined /> },
   { value: 'CloudUploadOutlined', icon: <CloudUploadOutlined /> },
   { value: 'LinkOutlined', icon: <LinkOutlined /> },
   { value: 'DatabaseOutlined', icon: <DatabaseOutlined /> },

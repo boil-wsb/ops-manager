@@ -2,23 +2,21 @@
 Alert notification service.
 """
 
-import asyncio
 import re
 from datetime import datetime
 from typing import Any
 
-from celery import shared_task
 from sqlalchemy import case, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
+from app.core.tz import now_shanghai
 from app.models.alert import AlertTemplate
 from app.models.asset import Asset
 from app.models.user import User
 from app.services.alerts.alert_inhibition import alert_inhibition_service
 from app.services.alerts.alert_template import alert_template_service
 from app.services.alerts.feishu_notification import get_feishu_notification_service
-from app.tasks.utils import get_celery_async_session
 
 logger = get_logger(__name__)
 
@@ -46,7 +44,7 @@ async def send_alert_notification(
     try:
         instance = alert_data.get("instance", "")
         if not instance:
-            logger.info("No instance in alert, skipping notification")
+            logger.info("告警无实例信息，跳过通知", extra={"action": "alert.notify"})
             return
 
         email_templates_result = await db.execute(
@@ -78,42 +76,13 @@ async def send_alert_notification(
         )
 
         logger.info(
-            f"Alert notification processed: alertname={alert_data.get('alertname')}, "
-            f"instance={instance}"
+            f"告警通知已处理: alertname={alert_data.get('alertname')}, instance={instance}",
+            extra={"action": "alert.notify", "alertname": alert_data.get('alertname'), "instance": instance},
         )
 
     except Exception as exc:
-        logger.error(f"Failed to process alert notification: {str(exc)}")
+        logger.error(f"处理告警通知失败: {str(exc)}", extra={"action": "alert.notify"})
         raise
-
-
-@shared_task(bind=True, max_retries=3)
-def send_alert_notification_task(
-    self,
-    alert_data: dict[str, Any],
-):
-    """Send alert notification to asset owner based on instance (Celery task).
-
-    This task runs asynchronously via Celery.
-
-    Args:
-        alert_data: Alert data dictionary
-    """
-    asyncio.run(_send_alert_notification_celery(alert_data))
-
-
-async def _send_alert_notification_celery(
-    alert_data: dict[str, Any],
-) -> None:
-    """Internal async function to send alert notifications via Celery.
-
-    Args:
-        alert_data: Alert data dictionary
-    """
-    session_local = get_celery_async_session()
-
-    async with session_local() as db:
-        await send_alert_notification(alert_data, db)
 
 
 async def _send_notification_by_instance(
@@ -140,14 +109,14 @@ async def _send_notification_by_instance(
     labels = alert_data.get("labels", {})
     annotations = alert_data.get("annotations", {})
 
-    logger.info(f"[DEBUG] Alert data received: {alert_data}")
+    logger.info(f"收到告警数据: {alert_data}", extra={"action": "alert.notify"})
 
     starts_at = starts_at_str
     if isinstance(starts_at_str, str):
         try:
             starts_at = datetime.fromisoformat(starts_at_str.replace("Z", "+00:00"))
         except ValueError:
-            starts_at = datetime.utcnow()
+            starts_at = now_shanghai()
 
     email_template = None
     feishu_template = None
@@ -168,7 +137,8 @@ async def _send_notification_by_instance(
 
     if email_template:
         logger.info(
-            f"[DEBUG] Email template matched: id={email_template.id}, name={email_template.name}"
+            f"邮件模板匹配: id={email_template.id}, name={email_template.name}",
+            extra={"action": "alert.notify", "template_id": email_template.id},
         )
         subject, body = await alert_template_service.render_alert_template(
             db=db,
@@ -184,17 +154,20 @@ async def _send_notification_by_instance(
         )
 
         if subject and body:
-            logger.info(f"Email notification prepared: instance={instance}, subject={subject}")
+            logger.info(f"邮件通知已准备: instance={instance}, subject={subject}", extra={"action": "alert.notify", "instance": instance})
 
     if feishu_template:
         logger.info(
-            f"[DEBUG] Feishu template matched: id={feishu_template.id}, name={feishu_template.name}"
+            f"飞书模板匹配: id={feishu_template.id}, name={feishu_template.name}",
+            extra={"action": "alert.notify", "template_id": feishu_template.id},
         )
         logger.info(
-            f"[DEBUG] Feishu template content - subject_template: {feishu_template.subject_template}"
+            f"飞书模板内容 - subject_template: {feishu_template.subject_template}",
+            extra={"action": "alert.notify"},
         )
         logger.info(
-            f"[DEBUG] Feishu template content - body_template: {feishu_template.body_template}"
+            f"飞书模板内容 - body_template: {feishu_template.body_template}",
+            extra={"action": "alert.notify"},
         )
         subject, body = await alert_template_service.render_alert_template(
             db=db,
@@ -260,9 +233,9 @@ async def _send_notification_by_instance(
                         template_str=card_config_json,
                         context=context,
                     )
-                    logger.info(f"[DEBUG] Rendered card config: {rendered_card_str[:500]}")
+                    logger.info(f"渲染卡片配置: {rendered_card_str[:500]}", extra={"action": "alert.notify"})
                     card = json.loads(rendered_card_str)
-                    logger.info("[DEBUG] Using card_config from template")
+                    logger.info("使用模板card_config", extra={"action": "alert.notify"})
 
                 if not card:
                     card = feishu_svc.build_alert_card(
@@ -273,9 +246,9 @@ async def _send_notification_by_instance(
                         description=description,
                         starts_at=starts_at_str,
                     )
-                    logger.info("[DEBUG] Using default build_alert_card")
+                    logger.info("使用默认build_alert_card", extra={"action": "alert.notify"})
 
-                logger.info(f"[DEBUG] Feishu card JSON content: {card}")
+                logger.info(f"飞书卡片JSON内容: {card}", extra={"action": "alert.notify"})
 
                 if status == "resolved":
                     await _update_resolved_alert_card(
@@ -304,14 +277,16 @@ async def _send_notification_by_instance(
                             alertname=alertname,
                             instance=instance,
                         )
-                        logger.info(f"P2P Feishu card sent to asset owner for instance={instance}")
+                        logger.info(f"P2P飞书卡片已发送: instance={instance}", extra={"action": "alert.notify", "instance": instance})
                     else:
                         logger.warning(
-                            f"Failed to send P2P Feishu card to asset owner for instance={instance}"
+                            f"P2P飞书卡片发送失败: instance={instance}",
+                            extra={"action": "alert.notify", "instance": instance},
                         )
             else:
                 logger.info(
-                    f"No asset owner found for instance={instance}, skipping Feishu notification"
+                    f"未找到资产负责人: instance={instance}，跳过飞书通知",
+                    extra={"action": "alert.notify", "instance": instance},
                 )
 
 
@@ -350,15 +325,17 @@ async def _save_firing_alert_message_id(
             )
             await db.commit()
             logger.info(
-                f"Saved feishu_open_message_id for firing alert: alertname={alertname}, instance={instance}, history_id={history_id}"
+                f"保存feishu_open_message_id: alertname={alertname}, instance={instance}, history_id={history_id}",
+                extra={"action": "alert.notify", "alertname": alertname, "instance": instance, "history_id": history_id},
             )
         else:
             logger.warning(
-                f"No firing AlertHistory found for: alertname={alertname}, instance={instance}"
+                f"未找到firing告警记录: alertname={alertname}, instance={instance}",
+                extra={"action": "alert.notify", "alertname": alertname, "instance": instance},
             )
 
     except Exception as exc:
-        logger.error(f"Error saving feishu_open_message_id: {str(exc)}")
+        logger.error(f"保存feishu_open_message_id异常: {str(exc)}", extra={"action": "alert.notify"})
 
 
 async def _update_resolved_alert_card(
@@ -390,7 +367,8 @@ async def _update_resolved_alert_card(
 
         if not row:
             logger.warning(
-                f"No firing alert with message_id found for: alertname={alertname}, instance={instance}"
+                f"未找到firing告警卡片: alertname={alertname}, instance={instance}",
+                extra={"action": "alert.resolve", "alertname": alertname, "instance": instance},
             )
             return
 
@@ -416,12 +394,12 @@ async def _update_resolved_alert_card(
                 {"id": history_id},
             )
             await db.commit()
-            logger.info(f"Updated card to resolved for: alertname={alertname}, instance={instance}")
+            logger.info(f"卡片已更新为resolved: alertname={alertname}, instance={instance}", extra={"action": "alert.resolve", "alertname": alertname, "instance": instance})
         else:
-            logger.error(f"Failed to update card: {update_result.get('message')}")
+            logger.error(f"更新卡片失败: {update_result.get('message')}", extra={"action": "alert.resolve"})
 
     except Exception as exc:
-        logger.error(f"Error updating resolved alert card: {str(exc)}")
+        logger.error(f"更新resolved告警卡片异常: {str(exc)}", extra={"action": "alert.resolve"})
 
 
 async def _update_alert_history_notification_sent(
@@ -455,15 +433,17 @@ async def _update_alert_history_notification_sent(
             )
             await db.commit()
             logger.info(
-                f"Updated notification_sent=True for AlertHistory: id={history_id}, alertname={alertname}, instance={instance}"
+                f"更新notification_sent=True: id={history_id}, alertname={alertname}, instance={instance}",
+                extra={"action": "alert.notify", "alertname": alertname, "instance": instance},
             )
         else:
             logger.warning(
-                f"No firing AlertHistory found for notification_sent update: alertname={alertname}, instance={instance}"
+                f"未找到firing告警记录(notification_sent): alertname={alertname}, instance={instance}",
+                extra={"action": "alert.notify", "alertname": alertname, "instance": instance},
             )
 
     except Exception as exc:
-        logger.error(f"Error updating notification_sent: {str(exc)}")
+        logger.error(f"更新notification_sent异常: {str(exc)}", extra={"action": "alert.notify"})
 
 
 async def _get_asset_owner_open_id(db: AsyncSession, instance: str) -> str | None:
@@ -495,35 +475,34 @@ async def _get_asset_owner_open_id(db: AsyncSession, instance: str) -> str | Non
             asset, user = row
             if user.feishu_open_id:
                 logger.info(
-                    f"Found asset owner: asset={asset.name}, user={user.username}, open_id={user.feishu_open_id}"
+                    f"找到资产负责人: asset={asset.name}, user={user.username}, open_id={user.feishu_open_id}",
+                    extra={"action": "alert.notify", "instance": instance, "asset_name": asset.name, "username": user.username},
                 )
                 return user.feishu_open_id
 
-        logger.debug(f"No asset owner found for IP: {instance}")
+        logger.debug(f"未找到资产负责人: IP={instance}", extra={"action": "alert.notify", "instance": instance})
         return None
 
     except Exception as exc:
-        logger.error(f"Error looking up asset owner for {instance}: {str(exc)}")
+        logger.error(f"查询资产负责人异常: {instance}: {str(exc)}", extra={"action": "alert.notify", "instance": instance})
         return None
 
 
-@shared_task
 def check_silence_expiry():
     """Periodic task to check and deactivate expired silence rules.
 
     This should be run periodically (e.g., every minute) to ensure
     expired silence rules are properly handled.
     """
-    logger.info("Checking for expired silence rules...")
+    logger.info("检查过期静默规则...", extra={"action": "alert.silence"})
 
     alert_inhibition_service.clear_cache()
-    logger.info("Silence cache cleared")
+    logger.info("静默缓存已清理", extra={"action": "alert.silence"})
 
 
-@shared_task
 def cleanup_notification_cache():
     """Periodic task to clean up template and other caches."""
-    logger.info("Cleaning up notification caches...")
+    logger.info("清理通知缓存...", extra={"action": "alert.notify"})
     alert_template_service.clear_cache()
     alert_inhibition_service.clear_cache()
-    logger.info("Notification caches cleaned")
+    logger.info("通知缓存已清理", extra={"action": "alert.notify"})

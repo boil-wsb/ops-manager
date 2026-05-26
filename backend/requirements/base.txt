@@ -12,11 +12,9 @@ psycopg2-binary==2.9.9
 # Redis
 redis==5.2.1
 
-# Celery (optional - only for immediate task queue, not for scheduling)
-celery==5.4.0
-
 # Task Scheduling
 apscheduler==3.10.4
+tenacity==8.5.0
 
 # Authentication and Security
 python-jose[cryptography]==3.3.0

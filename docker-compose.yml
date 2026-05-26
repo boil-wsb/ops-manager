@@ -41,8 +41,10 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://${DB_USER:-opsmanager}:${DB_PASSWORD:-opsmanager}@postgres:5432/${DB_NAME:-opsmanager}
       - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/1
-      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT:-192.168.23.36:9000}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-fYIukgJZaLOivnFimLVX}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-shdyfYIukgJZaLOivnFimLVX123}
+      - MINIO_SECURE=${MINIO_SECURE:-false}
       - TZ=Asia/Shanghai
     volumes:
       - ./logs:/app/logs
@@ -51,27 +53,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    networks:
-      - ops-network
-    restart: unless-stopped
-
-  celery-worker:
-    image: ${REGISTRY_URL:-192.168.100.213:8083}/opsmanager/backend:${VERSION:-latest}
-    container_name: ops-celery-worker
-    env_file:
-      - .env
-    environment:
-      - DATABASE_URL=postgresql+asyncpg://${DB_USER:-opsmanager}:${DB_PASSWORD:-opsmanager}@postgres:5432/${DB_NAME:-opsmanager}
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/1
-      - CELERY_RESULT_BACKEND=redis://redis:6379/2
-      - TZ=Asia/Shanghai
-    volumes:
-      - ./logs:/app/logs
-    depends_on:
-      - postgres
-      - redis
-    command: celery -A app.tasks.celery_app worker -l info -c 4
     networks:
       - ops-network
     restart: unless-stopped

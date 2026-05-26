@@ -2,7 +2,7 @@
 IT Feedback API endpoints.
 """
 
-import logging
+from app.core.logging import get_logger
 from contextlib import suppress
 from datetime import datetime
 
@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
+from app.core.tz import now_shanghai
 from app.crud.crud_notification_group import notification_group
 from app.models.it_feedback import ITFeedback
 from app.schemas.it_feedback import (
@@ -22,7 +23,7 @@ from app.schemas.it_feedback import (
 NOTIFICATION_TYPE_IT_FEEDBACK_CREATED = "it_feedback_created"
 NOTIFICATION_TYPE_IT_FEEDBACK_RESOLVED = "it_feedback_resolved"
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def get_feishu_service():
@@ -104,7 +105,8 @@ async def create_feedback(
         )
         open_msg_ids = []
         logger.info(
-            f"[IT Feedback] Sending notifications to {len(notification_user_ids)} users: {notification_user_ids}"
+            f"Sending notifications to {len(notification_user_ids)} users: {notification_user_ids}",
+            extra={"action": "feedback.notify", "user_count": len(notification_user_ids)}
         )
         for user_id in notification_user_ids:
             open_msg_id = send_it_feedback_created_notification(
@@ -123,7 +125,8 @@ async def create_feedback(
             await db.commit()
             await db.refresh(feedback)
             logger.info(
-                f"[IT Feedback] Saved open_message_id={open_msg_ids[0]} for feedback {feedback.id}, sent to {len(open_msg_ids)} users"
+                f"Saved open_message_id={open_msg_ids[0]} for feedback {feedback.id}, sent to {len(open_msg_ids)} users",
+                extra={"action": "feedback.notify", "feedback_id": feedback.id, "open_message_id": open_msg_ids[0], "sent_count": len(open_msg_ids)}
             )
 
     return ITFeedbackResponse.model_validate(feedback)
@@ -217,11 +220,12 @@ def send_it_feedback_created_notification(
         open_message_id = result.get("message_id") if isinstance(result, dict) else None
         if open_message_id:
             logger.info(
-                f"[IT Feedback] Notification sent to user_id={user_id}, message_id={open_message_id}"
+                f"Notification sent to user_id={user_id}, message_id={open_message_id}",
+                extra={"action": "feedback.notify", "user_id": user_id, "message_id": open_message_id}
             )
         return open_message_id
     except Exception as e:
-        logger.error(f"[IT Feedback] Failed to send notification to user_id={user_id}: {e}")
+        logger.error(f"Failed to send notification to user_id={user_id}: {e}", extra={"action": "feedback.notify", "user_id": user_id, "error": str(e)})
         return None
 
 
@@ -279,7 +283,7 @@ async def resolve_feedback(
         raise HTTPException(status_code=404, detail="Feedback not found")
 
     feedback.status = "resolved"
-    feedback.resolved_at = datetime.utcnow()
+    feedback.resolved_at = now_shanghai()
     feedback.resolved_by = resolved_by
     if notes:
         feedback.notes = notes

@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.tz import now_shanghai
 from app.models.scheduled_task import ScheduledTask, TaskExecutionLog
 from app.schemas.scheduled_task import ScheduledTaskUpdate
 
@@ -168,7 +169,7 @@ class CRUDScheduledTask:
     ) -> ScheduledTask:
         db_obj = await self.get_by_task_id(db, task_id)
         if db_obj:
-            db_obj.last_run_at = datetime.utcnow()
+            db_obj.last_run_at = now_shanghai()
             db_obj.last_run_status = status
             db_obj.last_run_duration = duration
             db.add(db_obj)

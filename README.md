@@ -84,7 +84,6 @@
 
 | 任务名称 | 任务 ID | 分类 | 触发方式 | 功能说明 |
 |---------|---------|------|---------|---------|
-| 监控检查 | check-all-monitors | monitor | 每 60 秒 | 检查所有启用的监控项状态（Ping/HTTP/TCP/UDP），状态变化时自动创建或解除告警 |
 | 审计日志数据库清理 | cleanup-audit-logs-db | cleanup | 每天 03:00 | 清理过期的审计日志数据库记录 |
 | 审计日志文件清理 | cleanup-audit-logs-file | cleanup | 每天 03:30 | 清理过期的审计日志文件 |
 | 飞书用户同步 | sync-feishu-users | sync | 每天 02:00 | 从飞书同步用户数据到本地数据库 |
@@ -92,16 +91,6 @@
 | Prometheus 证书同步 | sync-certificates-from-prometheus | sync | 每天 03:00 | 从 Prometheus 同步 SSL 证书数据 |
 | 终端指标同步 | sync-terminal-metrics | sync | 每 5 分钟 | 从 Prometheus 同步终端性能指标（CPU/内存/磁盘）到本地数据库 |
 | Ansible Playbook 执行 | execute-ansible-playbook | ops | 按配置时间 | 通过 SSH 执行 Ansible Playbook |
-
-### 监控检查
-
-监控检查任务（`check-all-monitors`）每 60 秒执行一次，工作流程：
-
-1. 从数据库查询所有 `is_enabled=True` 的监控项
-2. 根据监控类型（Ping/HTTP/TCP/UDP）执行对应的网络检查
-3. 更新监控项的最近检查时间、检查结果和当前状态
-4. 当状态从 UP 变为 DOWN 时，自动创建告警
-5. 当状态从 DOWN 变为 UP 时，自动解除对应的告警
 
 ### 终端指标同步
 

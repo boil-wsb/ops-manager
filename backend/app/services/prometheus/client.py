@@ -3,15 +3,16 @@ Prometheus HTTP API 客户端实现
 """
 
 import asyncio
-import logging
 from datetime import datetime
 from typing import Any
 
 import httpx
 
 from app.config import settings
+from app.core.logging import get_logger
+from app.core.tz import from_timestamp, now_shanghai
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class PrometheusClient:
@@ -54,15 +55,15 @@ class PrometheusClient:
             data = response.json()
 
             if data.get("status") != "success":
-                logger.error(f"Prometheus query failed: {data.get('error')}")
+                logger.error(f"查询失败: {data.get('error')}", extra={"action": "prometheus.query"})
                 return {"status": "error", "error": data.get("error")}
 
             return data
         except httpx.TimeoutException:
-            logger.error(f"Prometheus query timeout: {query}")
+            logger.error(f"查询超时: {query}", extra={"action": "prometheus.query", "query": query})
             return {"status": "error", "error": "timeout"}
         except Exception as e:
-            logger.error(f"Prometheus query error: {e}")
+            logger.error(f"查询异常: {e}", extra={"action": "prometheus.query"})
             return {"status": "error", "error": str(e)}
 
     async def query_range(
@@ -89,12 +90,12 @@ class PrometheusClient:
             data = response.json()
 
             if data.get("status") != "success":
-                logger.error(f"Prometheus range query failed: {data.get('error')}")
+                logger.error(f"范围查询失败: {data.get('error')}", extra={"action": "prometheus.query"})
                 return {"status": "error", "error": data.get("error")}
 
             return data
         except Exception as e:
-            logger.error(f"Prometheus range query error: {e}")
+            logger.error(f"范围查询异常: {e}", extra={"action": "prometheus.query"})
             return {"status": "error", "error": str(e)}
 
     async def get_all_nodes(self) -> list[dict[str, Any]]:
@@ -184,7 +185,7 @@ class PrometheusClient:
                 metrics["memory_usage_percent"] = round(float(value[1]), 2)
 
         # 磁盘使用率
-        disk_query = f'100 * (1 - (node_filesystem_avail_bytes{{instance=~".*{instance}.*",mount="/"}} / node_filesystem_size_bytes{{instance=~".*{instance}.*",mount="/"}}))'
+        disk_query = f'100 * (1 - (node_filesystem_avail_bytes{{instance=~".*{instance}.*",mountpoint="/"}} / node_filesystem_size_bytes{{instance=~".*{instance}.*",mountpoint="/"}}))'
         disk_data = await self.query(disk_query)
         if disk_data.get("status") == "success" and disk_data.get("data", {}).get("result"):
             value = disk_data["data"]["result"][0].get("value", [])
@@ -245,7 +246,7 @@ class PrometheusClient:
                 metrics["memory_gb"] = round(float(value[1]), 2)
 
         # 磁盘总量
-        disk_total_query = f'node_filesystem_size_bytes{{instance=~".*{instance}.*",mount="/"}} / 1024 / 1024 / 1024'
+        disk_total_query = f'node_filesystem_size_bytes{{instance=~".*{instance}.*",mountpoint="/"}} / 1024 / 1024 / 1024'
         disk_total_data = await self.query(disk_total_query)
         if disk_total_data.get("status") == "success" and disk_total_data.get("data", {}).get(
             "result"
@@ -255,6 +256,41 @@ class PrometheusClient:
                 metrics["disk_gb"] = round(float(value[1]), 2)
 
         return metrics
+
+    async def get_node_load(self, instance: str) -> dict[str, Any]:
+        """
+        获取节点的负载信息
+
+        Args:
+            instance: 节点实例地址
+
+        Returns:
+            负载字典，包含 load1, load5, load15
+        """
+        result = {}
+
+        queries = {
+            "load1": f'node_load1{{instance=~".*{instance}.*"}}',
+            "load5": f'node_load5{{instance=~".*{instance}.*"}}',
+            "load15": f'node_load15{{instance=~".*{instance}.*"}}',
+        }
+
+        results = await asyncio.gather(
+            *[self.query(q) for q in queries.values()], return_exceptions=True
+        )
+
+        for (key, _), data in zip(queries.items(), results, strict=True):
+            if isinstance(data, Exception):
+                logger.error(f"负载查询失败: {instance} {key}: {data}", extra={"action": "prometheus.query", "instance": instance})
+                continue
+            if data.get("status") == "success":
+                result_list = data.get("data", {}).get("result", [])
+                if result_list:
+                    value = result_list[0].get("value", [])
+                    if len(value) >= 2:
+                        result[key] = round(float(value[1]), 2)
+
+        return result
 
     async def get_all_nodes_with_metrics(self) -> list[dict[str, Any]]:
         """
@@ -275,6 +311,107 @@ class PrometheusClient:
 
         # 过滤掉异常结果
         return [node for node in enriched_nodes if isinstance(node, dict)]
+
+    async def get_all_nodes_health_check(self) -> list[dict[str, Any]]:
+        """
+        批量获取所有服务器节点的健康检查数据
+
+        Returns:
+            节点健康检查列表
+        """
+        queries = {
+            "uname": "node_uname_info",
+            "up": "up",
+            "load1": "node_load1",
+            "load5": "node_load5",
+            "load15": "node_load15",
+            "cpu_usage": '100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)',
+            "memory_usage": "100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))",
+            "memory_total": "node_memory_MemTotal_bytes / 1024 / 1024",
+            "disk_usage": '100 * (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}))',
+            "disk_total": 'node_filesystem_size_bytes{mountpoint="/"} / 1024 / 1024 / 1024',
+            "cpu_cores": 'count(node_cpu_seconds_total{mode="system"}) by (instance)',
+        }
+
+        results = await asyncio.gather(
+            *[self.query(q) for q in queries.values()], return_exceptions=True
+        )
+
+        query_results: dict[str, list[dict[str, Any]]] = {}
+        for key, data in zip(queries.keys(), results, strict=True):
+            if isinstance(data, Exception):
+                logger.error(f"批量查询失败: {key}: {data}", extra={"action": "prometheus.query"})
+                query_results[key] = []
+                continue
+            if data.get("status") == "success":
+                query_results[key] = data.get("data", {}).get("result", [])
+            else:
+                query_results[key] = []
+
+        nodes_by_instance: dict[str, dict[str, Any]] = {}
+        for result in query_results.get("uname", []):
+            metric = result.get("metric", {})
+            inst = metric.get("instance", "")
+            job = metric.get("job", "")
+            asset_type = self.map_job_to_asset_type(job)
+            if asset_type != "server":
+                continue
+            nodes_by_instance[inst] = {
+                "instance": inst,
+                "nodename": metric.get("nodename", ""),
+                "sysname": metric.get("sysname", ""),
+                "release": metric.get("release", ""),
+                "machine": metric.get("machine", ""),
+                "job": job,
+                "env": metric.get("env", ""),
+            }
+
+        def build_value_map(results_list: list[dict[str, Any]]) -> dict[str, float]:
+            value_map: dict[str, float] = {}
+            for r in results_list:
+                metric = r.get("metric", {})
+                inst = metric.get("instance", "")
+                value = r.get("value", [])
+                if inst and len(value) >= 2:
+                    try:
+                        value_map[inst] = float(value[1])
+                    except (ValueError, TypeError):
+                        pass
+            return value_map
+
+        up_map: dict[str, bool] = {}
+        for r in query_results.get("up", []):
+            metric = r.get("metric", {})
+            inst = metric.get("instance", "")
+            value = r.get("value", [])
+            if inst and len(value) >= 2:
+                up_map[inst] = value[1] == "1"
+
+        load1_map = build_value_map(query_results.get("load1", []))
+        load5_map = build_value_map(query_results.get("load5", []))
+        load15_map = build_value_map(query_results.get("load15", []))
+        cpu_usage_map = build_value_map(query_results.get("cpu_usage", []))
+        memory_usage_map = build_value_map(query_results.get("memory_usage", []))
+        memory_total_map = build_value_map(query_results.get("memory_total", []))
+        disk_usage_map = build_value_map(query_results.get("disk_usage", []))
+        disk_total_map = build_value_map(query_results.get("disk_total", []))
+        cpu_cores_map = build_value_map(query_results.get("cpu_cores", []))
+
+        health_check_list: list[dict[str, Any]] = []
+        for inst, node in nodes_by_instance.items():
+            node["is_online"] = up_map.get(inst, False)
+            node["cpu_usage_percent"] = round(cpu_usage_map.get(inst, 0.0), 2)
+            node["cpu_cores"] = int(cpu_cores_map.get(inst, 0))
+            node["load1"] = round(load1_map.get(inst, 0.0), 2)
+            node["load5"] = round(load5_map.get(inst, 0.0), 2)
+            node["load15"] = round(load15_map.get(inst, 0.0), 2)
+            node["memory_usage_percent"] = round(memory_usage_map.get(inst, 0.0), 2)
+            node["memory_total_mb"] = round(memory_total_map.get(inst, 0.0), 2)
+            node["disk_usage_percent"] = round(disk_usage_map.get(inst, 0.0), 2)
+            node["disk_total_gb"] = round(disk_total_map.get(inst, 0.0), 2)
+            health_check_list.append(node)
+
+        return health_check_list
 
     async def _enrich_node_data(self, node: dict[str, Any]) -> dict[str, Any]:
         """
@@ -298,7 +435,7 @@ class PrometheusClient:
 
             return node
         except Exception as e:
-            logger.error(f"Failed to enrich node data for {instance}: {e}")
+            logger.error(f"节点数据丰富失败: {instance}: {e}", extra={"action": "prometheus.query", "instance": instance})
             node["status"] = "unknown"
             return node
 
@@ -316,7 +453,7 @@ class PrometheusClient:
         data = await self.query(query)
 
         if data.get("status") != "success":
-            logger.warning("Failed to query SSL certificate expiry")
+            logger.warning("SSL证书查询失败", extra={"action": "prometheus.query"})
             return certificates
 
         for result in data.get("data", {}).get("result", []):
@@ -325,8 +462,8 @@ class PrometheusClient:
 
             if len(value) >= 2:
                 expiry_timestamp = float(value[1])
-                expiry_date = datetime.fromtimestamp(expiry_timestamp)
-                now = datetime.now()
+                expiry_date = from_timestamp(expiry_timestamp)
+                now = now_shanghai()
                 days_until_expiry = (expiry_date - now).days
 
                 certificates.append(
@@ -385,8 +522,8 @@ class PrometheusClient:
             return {}
 
         expiry_timestamp = float(value[1])
-        expiry_date = datetime.fromtimestamp(expiry_timestamp)
-        now = datetime.now()
+        expiry_date = from_timestamp(expiry_timestamp)
+        now = now_shanghai()
         days_until_expiry = (expiry_date - now).days
 
         return {
@@ -448,7 +585,7 @@ class PrometheusClient:
         data = await self.query(pc_info_query)
 
         if data.get("status") != "success":
-            logger.warning("Failed to query pc_info metrics")
+            logger.warning("终端指标查询失败", extra={"action": "prometheus.query"})
             return terminals
 
         results = data.get("data", {}).get("result", [])
@@ -464,7 +601,10 @@ class PrometheusClient:
                     "uuid": metric.get("uuid", ""),
                     "customer": metric.get("customer", ""),
                     "instance": metric.get("instance", ""),
+                    "ip_address": metric.get("ipAddress", ""),
                     "job": metric.get("job", ""),
+                    "os_caption": metric.get("osCaption", ""),
+                    "os_version": metric.get("osVersion", ""),
                     "pc_info_labels": dict(metric),
                 }
                 terminals.append(terminal)
@@ -497,7 +637,7 @@ class PrometheusClient:
 
         for (key, _), data in zip(queries.items(), results, strict=True):
             if isinstance(data, Exception):
-                logger.error(f"Failed to query {key} for {hostname}: {data}")
+                logger.error(f"终端指标查询失败: {hostname} {key}: {data}", extra={"action": "prometheus.query", "hostname": hostname})
                 continue
             if data.get("status") == "success":
                 result_list = data.get("data", {}).get("result", [])
@@ -536,14 +676,13 @@ class PrometheusClient:
                     metrics = await self.get_terminal_metrics(hostname)
                     terminal.update(metrics)
                 except Exception as e:
-                    logger.error(f"Failed to get metrics for terminal {hostname}: {e}")
+                    logger.error(f"终端指标获取失败: {hostname}: {e}", extra={"action": "prometheus.query", "hostname": hostname})
             enriched_terminals.append(terminal)
 
         return enriched_terminals
 
 
-# 全局客户端实例
-prometheus_client = PrometheusClient()
+prometheus_client: PrometheusClient | None = None
 
 
 def get_prometheus_client() -> PrometheusClient:
@@ -557,6 +696,3 @@ def get_prometheus_client() -> PrometheusClient:
     if prometheus_client is None:
         prometheus_client = PrometheusClient()
     return prometheus_client
-
-
-prometheus_client: "PrometheusClient | None" = None

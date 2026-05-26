@@ -8,7 +8,6 @@ import type { ScheduledTask } from '../../types';
 
 const categoryColorMap: Record<string, string> = {
   sync: 'blue',
-  monitor: 'green',
   cleanup: 'orange',
   ops: 'purple',
 };
@@ -334,7 +333,6 @@ const ScheduledTaskList = () => {
             filterOption={fuzzyFilterOption}
           >
             <Select.Option value="sync">sync</Select.Option>
-            <Select.Option value="monitor">monitor</Select.Option>
             <Select.Option value="cleanup">cleanup</Select.Option>
             <Select.Option value="ops">ops</Select.Option>
           </Select>

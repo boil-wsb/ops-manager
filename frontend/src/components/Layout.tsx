@@ -1,14 +1,12 @@
-import { Layout as AntLayout, Menu, Button, Avatar, Dropdown, Badge, Space, Tooltip } from 'antd';
+import { Layout as AntLayout, Menu, Button, Avatar, Dropdown, Space, Tooltip } from 'antd';
 import type { MenuProps } from 'antd';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   DashboardOutlined,
   DatabaseOutlined,
-  MonitorOutlined,
   DeploymentUnitOutlined,
   LogoutOutlined,
   UserOutlined,
-  BellOutlined,
   SettingOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
@@ -18,11 +16,9 @@ import {
   AlertOutlined,
 } from '@ant-design/icons';
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { usePermission } from '../hooks/usePermission';
 import { useThemeStore } from '../stores/themeStore';
-import api from '../services/api';
 
 const { Header, Sider, Content } = AntLayout;
 
@@ -42,21 +38,6 @@ const Layout = () => {
   const { mode, toggleMode } = useThemeStore();
   const [collapsed, setCollapsed] = useState(false);
 
-  const { data: alertData } = useQuery({
-    queryKey: ['alerts-count'],
-    queryFn: async () => {
-      try {
-        const response = await api.get('/monitor/alerts?status=firing');
-        return response.data;
-      } catch {
-        return { total: 0 };
-      }
-    },
-    refetchInterval: 300000,
-  });
-
-  const firingAlertsCount = alertData?.total || 0;
-
   const menuItems: MenuItemType[] = useMemo(
     () => [
       {
@@ -69,16 +50,6 @@ const Layout = () => {
         icon: <DatabaseOutlined />,
         label: '资产管理',
         permission: 'asset:read',
-      },
-      {
-        key: '/monitor',
-        icon: <MonitorOutlined />,
-        label: '监控管理',
-        permission: 'monitor:read',
-        children: [
-          { key: '/monitor/list', label: '监控列表' },
-          { key: '/monitor/domains', label: '域名监控' },
-        ],
       },
       {
         key: '/alerts',
@@ -100,7 +71,9 @@ const Layout = () => {
         children: [
           { key: '/ops/deployments', label: '部署管理', permission: 'deployment:read' },
           { key: '/ops/it-management', label: 'IT管理', permission: 'it:read' },
+          { key: '/ops/domains', label: '域名管理', permission: 'certificate:read' },
           { key: '/ops/scheduled-tasks', label: '定时任务', permission: 'ops:read' },
+          { key: '/ops/health-check', label: '每日巡检', permission: 'health-check:read' },
         ],
       },
       {
@@ -240,11 +213,6 @@ const Layout = () => {
             style={{ fontSize: 16 }}
           />
           <Space size={24}>
-            <Tooltip title="告警">
-              <Badge count={firingAlertsCount} size="small">
-                <Button type="text" icon={<BellOutlined style={{ fontSize: 18 }} />} />
-              </Badge>
-            </Tooltip>
             <Tooltip title={mode === 'dark' ? '切换到浅色模式' : '切换到深色模式'}>
               <Button
                 type="text"

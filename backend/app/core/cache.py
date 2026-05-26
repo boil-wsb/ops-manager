@@ -3,12 +3,12 @@ Redis cache utility module.
 """
 
 import json
-import logging
 from typing import Any
 
+from app.core.logging import get_logger
 from app.core.redis import get_redis
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def _serialize(value: Any) -> str:

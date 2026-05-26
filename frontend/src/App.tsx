@@ -15,11 +15,12 @@ import Dashboard from './pages/Dashboard';
 import AssetList from './pages/Assets/AssetList';
 import AssetDetail from './pages/Assets/AssetDetail';
 import AssetDiscovery from './pages/Assets/AssetDiscovery';
-import MonitorList from './pages/Monitor/MonitorList';
 import DeploymentList from './pages/Ops/DeploymentList';
 import CertificateList from './pages/Ops/CertificateList';
 import ITManagement from './pages/Ops/ITManagement';
 import ScheduledTaskList from './pages/Ops/ScheduledTaskList';
+import HealthCheckList from './pages/Ops/HealthCheckList';
+import HealthCheckDetail from './pages/Ops/HealthCheckDetail';
 import RoleList from './pages/Roles/RoleList';
 import UserList from './pages/Users/UserList';
 import Profile from './pages/Profile/Profile';
@@ -105,11 +106,12 @@ function App() {
                 <Route path="assets" element={<AssetList />} />
                 <Route path="assets/discovery" element={<AssetDiscovery />} />
                 <Route path="assets/:id" element={<AssetDetail />} />
-                <Route path="monitor/list" element={<MonitorList />} />
-                <Route path="monitor/domains" element={<CertificateList />} />
+                <Route path="ops/domains" element={<CertificateList />} />
                 <Route path="ops/deployments" element={<DeploymentList />} />
                 <Route path="ops/it-management" element={<ITManagement />} />
                 <Route path="ops/scheduled-tasks" element={<ScheduledTaskList />} />
+                <Route path="ops/health-check" element={<HealthCheckList />} />
+                <Route path="ops/health-check/:id" element={<HealthCheckDetail />} />
                 <Route path="system/users" element={<UserList />} />
                 <Route path="system/roles" element={<RoleList />} />
                 <Route path="system/navigation" element={<NavigationList />} />

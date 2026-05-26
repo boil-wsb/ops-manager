@@ -44,22 +44,22 @@ async def _run_task(name: str, coro: Any) -> TaskResult:
         result = await coro
         return TaskResult(name, True, result, None)
     except Exception as e:
-        logger.error(f"{name} failed: {e}")
+        logger.error(f"{name} 失败: {e}", extra={"action": "app.startup", "task": name, "error": str(e)})
         return TaskResult(name, False, None, e)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
-    logger.info(f"Starting up application: {settings.app_name} v{settings.app_version}")
+    logger.info(f"应用启动: {settings.app_name} v{settings.app_version}", extra={"action": "app.startup", "app_name": settings.app_name, "version": settings.app_version})
 
     async def _init_db_task():
         await init_db()
-        logger.info("Database initialization check completed")
+        logger.info("数据库初始化检查完成", extra={"action": "app.startup"})
 
     async def _init_redis_task():
         await init_redis()
-        logger.info("Redis connection initialized")
+        logger.info("Redis连接已初始化", extra={"action": "app.startup"})
 
     async def _sync_pc_versions_task():
         from app.db.session import get_async_session_local
@@ -67,9 +67,9 @@ async def lifespan(app: FastAPI):
         async with await get_async_session_local() as db:
             synced = await sync_pc_versions_on_startup(db)
             if synced:
-                logger.info(f"PC client versions synced: {synced}")
+                logger.info(f"PC客户端版本已同步: {synced}", extra={"action": "app.startup", "synced": synced})
             else:
-                logger.info("No new PC client versions to sync")
+                logger.info("无新PC客户端版本需同步", extra={"action": "app.startup"})
             return synced
 
     results = await asyncio.gather(
@@ -80,21 +80,21 @@ async def lifespan(app: FastAPI):
 
     for result in results:
         if not result.success:
-            logger.warning(f"Task '{result.name}' failed, but continuing startup")
+            logger.warning(f"启动任务 '{result.name}' 失败，继续启动流程", extra={"action": "app.startup", "task": result.name})
 
     start_feishu_callback_client()
     start_scheduler()
 
     yield
 
-    logger.info("Shutting down application")
+    logger.info("应用关闭中", extra={"action": "app.shutdown"})
     stop_scheduler()
 
     try:
         await close_redis()
-        logger.info("Redis connection closed")
+        logger.info("Redis连接已关闭", extra={"action": "app.shutdown"})
     except Exception as e:
-        logger.error(f"Error closing Redis connection: {e}")
+        logger.error(f"关闭Redis连接失败: {e}", extra={"action": "app.shutdown", "error": str(e)})
 
 
 app = FastAPI(

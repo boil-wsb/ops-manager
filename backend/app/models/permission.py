@@ -4,6 +4,7 @@ Permission model for RBAC.
 
 from datetime import datetime
 
+from app.core.tz import now_shanghai
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Table
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -17,7 +18,7 @@ role_permissions = Table(
     Column(
         "permission_id", Integer, ForeignKey("permissions.id", ondelete="CASCADE"), primary_key=True
     ),
-    Column("created_at", DateTime(timezone=True), default=datetime.utcnow),
+    Column("created_at", DateTime(timezone=True), default=now_shanghai),
 )
 
 

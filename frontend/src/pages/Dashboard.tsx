@@ -1,7 +1,6 @@
 import { Row, Col, Card, Statistic, Table, Tag, Space, Button, Tooltip, Tabs, Progress } from 'antd';
 import { LinkOutlined, MonitorOutlined, CloudUploadOutlined, DatabaseOutlined, CloudOutlined, SettingOutlined, DashboardOutlined, SafetyOutlined, ApiOutlined, DesktopOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import { monitorApi } from '../services/monitor';
 import { opsApi } from '../services/ops';
 import { assetApi } from '../services/assets';
 import { navigationApi } from '../services/navigation';
@@ -45,20 +44,6 @@ const Dashboard = () => {
       return {
         firing: firing.total || 0,
         resolved: resolved.total || 0,
-      };
-    },
-  });
-
-  const { data: monitorStats, isLoading: monitorLoading } = useQuery({
-    queryKey: ['monitor-stats'],
-    queryFn: async () => {
-      const all = await monitorApi.getMonitors({ limit: 1 });
-      const up = await monitorApi.getMonitors({ status: 'up', limit: 1 });
-      const down = await monitorApi.getMonitors({ status: 'down', limit: 1 });
-      return {
-        total: all.total || 0,
-        up: up.total || 0,
-        down: down.total || 0,
       };
     },
   });
@@ -144,21 +129,6 @@ const Dashboard = () => {
       <Row gutter={[16, 16]}>
         {!isViewer && (
           <>
-            <Col xs={24} sm={12} lg={6}>
-              <Card loading={monitorLoading}>
-                <Statistic
-                  title="监控总数"
-                  value={monitorStats?.total || 0}
-                  suffix="个"
-                  style={{ color: '#1890ff' }}
-                />
-                <div style={{ marginTop: 8 }}>
-                  <Tag color="green">正常: {monitorStats?.up || 0}</Tag>
-                  <Tag color="red">故障: {monitorStats?.down || 0}</Tag>
-                </div>
-              </Card>
-            </Col>
-
             <Col xs={24} sm={12} lg={6}>
               <Card loading={alertLoading}>
                 <Statistic
@@ -364,7 +334,7 @@ const Dashboard = () => {
       {!isViewer && (
         <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
           <Col xs={24} lg={12}>
-            <Card title="最近告警" extra={<a href="/monitor/alerts">查看全部</a>}>
+            <Card title="最近告警" extra={<a href="/alerts/alertmanager">查看全部</a>}>
               <Table
                 dataSource={recentAlerts?.items || []}
                 rowKey="id"

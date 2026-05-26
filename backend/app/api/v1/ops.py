@@ -9,6 +9,7 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db, require_permissions
+from app.core.tz import now_shanghai
 from app.core.audit import audit_log
 from app.core.exceptions import NotFoundError
 from app.crud.base import CRUDBase
@@ -276,7 +277,7 @@ async def create_certificate(
     current_user: None = Depends(require_permissions(["ops:write"])),
 ):
     """Create a new certificate."""
-    days_until_expiry = (obj_in.valid_until - datetime.utcnow()).days
+    days_until_expiry = (obj_in.valid_until - now_shanghai()).days
 
     cert_data = obj_in.model_dump()
     cert_data["days_until_expiry"] = max(0, days_until_expiry)
@@ -398,7 +399,7 @@ async def sync_certificates_from_prometheus(
                 issuer=prom_cert.get("job", "unknown"),
                 subject=domain,
                 serial_number=f"prom-{domain}",
-                valid_from=datetime.utcnow(),
+                valid_from=now_shanghai(),
                 valid_until=expiry_date,
                 days_until_expiry=max(0, days_until_expiry),
                 alert_threshold_days=30,

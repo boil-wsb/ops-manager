@@ -18,6 +18,7 @@ class NotificationRecordBase(BaseModel):
     callback_id: str | None = Field(None, max_length=100)
     card_content: dict | None = None
     message_id: str | None = Field(None, max_length=100)
+    callback_url: str | None = Field(None, max_length=500)
     success: bool = False
     error: str | None = Field(None, max_length=1000)
 
@@ -34,6 +35,7 @@ class NotificationRecordCreate(BaseModel):
     receive_type: str = "open_id"
     callback_id: str | None = None
     open_message_id: str | None = None
+    callback_url: str | None = None
     card_content: dict | None = None
     success: bool = False
     error: str | None = None
@@ -65,6 +67,7 @@ class NotificationRecordResponse(BaseModel):
     receive_type: str = "open_id"
     callback_id: str | None = None
     open_message_id: str | None = None
+    callback_url: str | None = None
     card_content: dict | None = None
     message_id: str | None = None
     success: bool

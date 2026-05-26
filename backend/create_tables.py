@@ -41,10 +41,6 @@ def import_models():
     from app.models.asset import Asset, Label, asset_labels
     logger.info("  - Asset models imported")
     
-    # Import monitor models (depends on Asset)
-    from app.models.monitor import Monitor, Alert, AlertRule, NotificationChannel
-    logger.info("  - Monitor models imported")
-    
     logger.info("All models imported successfully")
 
 

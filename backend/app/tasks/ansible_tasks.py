@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Generator
 
 import paramiko
-from celery import shared_task
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 from app.config import settings
 from app.core.logging import get_logger
@@ -87,10 +87,10 @@ class SSHCommandExecutor:
                 remote_file.write(script_content)
             sftp.close()
             self.client.exec_command(f"chmod +x {remote_path}")
-            logger.info(f"Script uploaded to {self.host}:{remote_path}")
+            logger.info("脚本已上传", extra={"action": "ansible.run", "host": self.host, "remote_path": remote_path})
             return True
         except Exception as e:
-            logger.error(f"Failed to upload script: {str(e)}")
+            logger.error(f"脚本上传失败: {str(e)}", extra={"action": "ansible.run"})
             return False
 
     def close(self) -> None:
@@ -123,9 +123,7 @@ def execute_ansible_command() -> tuple[bool, str]:
         )
 
         executor.connect()
-        logger.info(
-            f"SSH connected to {settings.ansible_ssh_host}:{settings.ansible_ssh_port} as {settings.ansible_ssh_username}"
-        )
+        logger.info("SSH连接成功", extra={"action": "ansible.run", "host": settings.ansible_ssh_host, "port": settings.ansible_ssh_port})
 
         if settings.ansible_local_script_path:
             script_path = Path(settings.ansible_local_script_path)
@@ -137,7 +135,7 @@ def execute_ansible_command() -> tuple[bool, str]:
                 return False, f"Local script file not found: {script_path}"
 
             script_content = script_path.read_text(encoding="utf-8")
-            logger.info(f"Reading script from local file: {script_path}")
+            logger.debug("读取本地脚本文件", extra={"action": "ansible.run", "script_path": str(script_path)})
             upload_success = executor.upload_script(script_content, "/tmp/execute_script.sh")
             if not upload_success:
                 executor.close()
@@ -145,7 +143,7 @@ def execute_ansible_command() -> tuple[bool, str]:
 
             command_to_execute = "bash /tmp/execute_script.sh"
         elif settings.ansible_script:
-            logger.info("Script mode detected, uploading and executing script")
+            logger.info("检测到脚本模式，上传并执行脚本", extra={"action": "ansible.run"})
             upload_success = executor.upload_script(
                 settings.ansible_script,
                 "/tmp/execute_script.sh"
@@ -164,10 +162,10 @@ def execute_ansible_command() -> tuple[bool, str]:
         for stdout, stderr in executor.execute_command(command_to_execute):
             if stdout:
                 output_lines.append(stdout)
-                logger.info(f"[ansible] {stdout}")
+                logger.info(f"[ansible] {stdout}", extra={"action": "ansible.run"})
             if stderr:
                 error_lines.append(stderr)
-                logger.warning(f"[ansible] {stderr}")
+                logger.warning(f"[ansible] {stderr}", extra={"action": "ansible.run"})
 
         executor.close()
 
@@ -179,17 +177,17 @@ def execute_ansible_command() -> tuple[bool, str]:
 
     except paramiko.AuthenticationException:
         error_msg = f"SSH authentication failed for {settings.ansible_ssh_username}@{settings.ansible_ssh_host}"
-        logger.error(error_msg)
+        logger.error(error_msg, extra={"action": "ansible.run"})
         return False, error_msg
 
     except paramiko.SSHException as e:
         error_msg = f"SSH connection error: {str(e)}"
-        logger.error(error_msg)
+        logger.error(error_msg, extra={"action": "ansible.run"})
         return False, error_msg
 
     except Exception as e:
         error_msg = f"Unexpected error executing ansible command: {str(e)}"
-        logger.error(error_msg)
+        logger.error(error_msg, extra={"action": "ansible.run"})
         return False, error_msg
 
 
@@ -211,9 +209,7 @@ def execute_remote_script(script_content: str) -> tuple[bool, str]:
         )
 
         executor.connect()
-        logger.info(
-            f"SSH connected to {settings.ansible_ssh_host}:{settings.ansible_ssh_port} as {settings.ansible_ssh_username}"
-        )
+        logger.info("SSH连接成功", extra={"action": "ansible.run", "host": settings.ansible_ssh_host, "port": settings.ansible_ssh_port})
 
         upload_success = executor.upload_script(script_content, "/tmp/execute_script.sh")
         if not upload_success:
@@ -227,10 +223,10 @@ def execute_remote_script(script_content: str) -> tuple[bool, str]:
         for stdout, stderr in executor.execute_command(command_to_execute):
             if stdout:
                 output_lines.append(stdout)
-                logger.info(f"[script] {stdout}")
+                logger.info(f"[script] {stdout}", extra={"action": "ansible.run"})
             if stderr:
                 error_lines.append(stderr)
-                logger.warning(f"[script] {stderr}")
+                logger.warning(f"[script] {stderr}", extra={"action": "ansible.run"})
 
         executor.close()
 
@@ -242,63 +238,63 @@ def execute_remote_script(script_content: str) -> tuple[bool, str]:
 
     except paramiko.AuthenticationException:
         error_msg = f"SSH authentication failed for {settings.ansible_ssh_username}@{settings.ansible_ssh_host}"
-        logger.error(error_msg)
+        logger.error(error_msg, extra={"action": "ansible.run"})
         return False, error_msg
 
     except paramiko.SSHException as e:
         error_msg = f"SSH connection error: {str(e)}"
-        logger.error(error_msg)
+        logger.error(error_msg, extra={"action": "ansible.run"})
         return False, error_msg
 
     except Exception as e:
         error_msg = f"Unexpected error executing script: {str(e)}"
-        logger.error(error_msg)
+        logger.error(error_msg, extra={"action": "ansible.run"})
         return False, error_msg
 
 
-@shared_task(bind=True, max_retries=3)
-def execute_ansible_playbook_task(self):
+@retry(stop=stop_after_attempt(3), wait=wait_fixed(300))
+def execute_ansible_playbook_task():
     """Execute ansible playbook on remote server via SSH.
 
     This task connects to the configured Ansible server and runs
     the ansible-playbook command. If ANSIBLE_SCRIPT is configured,
     it will upload and execute the script instead.
     """
-    logger.info("Starting ansible playbook execution task")
+    logger.info("开始Ansible Playbook执行任务", extra={"action": "ansible.run"})
 
     success, message = execute_ansible_command()
 
     if success:
-        logger.info("Ansible playbook execution completed successfully")
+        logger.info("Ansible Playbook执行完成", extra={"action": "ansible.run"})
     else:
-        logger.error(f"Ansible playbook execution failed: {message}")
-        raise self.retry(exc=Exception(message), countdown=300)
+        logger.error(f"Ansible Playbook执行失败: {message}", extra={"action": "ansible.run"})
+        raise Exception(message)
 
     return {"status": "success" if success else "failed", "message": message}
 
 
-@shared_task(bind=True, max_retries=3)
-def execute_remote_script_task(self, script_content: str):
+@retry(stop=stop_after_attempt(3), wait=wait_fixed(300))
+def execute_remote_script_task(script_content: str):
     """Execute a shell script on the remote server via SSH.
 
     Args:
         script_content: The shell script content to execute.
     """
-    logger.info("Starting remote script execution")
+    logger.info("开始远程脚本执行", extra={"action": "ansible.run"})
 
     success, message = execute_remote_script(script_content, "/tmp/execute_script.sh")
 
     if success:
-        logger.info("Remote script execution completed successfully")
+        logger.info("远程脚本执行完成", extra={"action": "ansible.run"})
     else:
-        logger.error(f"Remote script execution failed: {message}")
-        raise self.retry(exc=Exception(message), countdown=300)
+        logger.error(f"远程脚本执行失败: {message}", extra={"action": "ansible.run"})
+        raise Exception(message)
 
     return {"status": "success" if success else "failed", "message": message}
 
 
-@shared_task(bind=True, max_retries=3)
-def execute_named_script_task(self, script_name: str):
+@retry(stop=stop_after_attempt(3), wait=wait_fixed(300))
+def execute_named_script_task(script_name: str):
     """Execute a named script from the local shells directory on remote server.
 
     Args:
@@ -307,18 +303,18 @@ def execute_named_script_task(self, script_name: str):
     script_path = SCRIPTS_DIRECTORY / script_name
 
     if not script_path.exists():
-        logger.error(f"Script file not found: {script_path}")
+        logger.error(f"脚本文件未找到: {script_path}", extra={"action": "ansible.run"})
         raise Exception(f"Script file not found: {script_path}")
 
     script_content = script_path.read_text(encoding="utf-8")
-    logger.info(f"Executing named script: {script_name} from {script_path}")
+    logger.info("执行命名脚本", extra={"action": "ansible.run", "script_name": script_name})
 
     success, message = execute_remote_script(script_content, "/tmp/execute_script.sh")
 
     if success:
-        logger.info("Named script execution completed successfully")
+        logger.info("命名脚本执行完成", extra={"action": "ansible.run"})
     else:
-        logger.error(f"Named script execution failed: {message}")
-        raise self.retry(exc=Exception(message), countdown=300)
+        logger.error(f"命名脚本执行失败: {message}", extra={"action": "ansible.run"})
+        raise Exception(message)
 
     return {"status": "success" if success else "failed", "message": message}

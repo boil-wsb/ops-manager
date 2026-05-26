@@ -5,6 +5,7 @@ Audit log model for tracking user operations.
 from datetime import datetime
 from typing import Any
 
+from app.core.tz import now_shanghai
 from sqlalchemy import JSON, DateTime, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -58,7 +59,7 @@ class AuditLog(Base):
 
     # Operation details
     operation_time: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow, nullable=False, index=True
+        DateTime(timezone=True), default=now_shanghai, nullable=False, index=True
     )
     """Timestamp of the operation"""
 

@@ -1,20 +1,25 @@
 """
-Feishu user sync tasks for Celery.
+Feishu user sync tasks.
 """
 
-import asyncio
 from typing import Any
 
-from celery import shared_task
-
 from app.core.logging import get_logger
-from app.tasks.utils import get_celery_async_session
+from app.db.session import db_operation_with_retry
 
 logger = get_logger(__name__)
 
 
-@shared_task(bind=True, max_retries=3)
-def sync_feishu_users_task(self) -> dict[str, Any]:
+async def _sync_feishu_users_db(db) -> dict[str, Any]:
+    from app.crud.crud_user import crud_user
+    from app.integrations.feishu.sync_service import sync_users
+
+    result = await sync_users(db, crud_user)
+    logger.info("飞书同步完成", extra={"action": "feishu.sync", "result": result})
+    return result
+
+
+async def sync_feishu_users_task() -> dict[str, Any]:
     """Sync Feishu users to local database.
 
     This task runs daily at 02:00 AM via Celery Beat.
@@ -23,22 +28,12 @@ def sync_feishu_users_task(self) -> dict[str, Any]:
     - Updates existing users if info changed
     - Deletes users no longer in Feishu scope
     """
-    from app.crud.crud_user import crud_user
-    from app.integrations.feishu.sync_service import sync_users
-
-    logger.info("Starting Feishu user sync task")
-
-    async def _sync():
-        session_local = get_celery_async_session()
-        async with session_local() as db:
-            result = await sync_users(db, crud_user)
-            return result
+    logger.info("开始飞书用户同步", extra={"action": "feishu.sync"})
 
     try:
-        result = asyncio.run(_sync())
-        logger.info(f"Feishu sync task completed: {result}")
-        return result
+        return await db_operation_with_retry(
+            _sync_feishu_users_db, max_retries=3, retry_delay=2.0
+        )
     except Exception as exc:
-        logger.error(f"Feishu sync task failed: {exc}")
-        countdown = 300 * (5**self.request.retries)
-        raise self.retry(exc=exc, countdown=countdown) from exc
+        logger.error(f"飞书同步失败: {exc}", extra={"action": "feishu.sync"})
+        raise

@@ -1,7 +1,7 @@
 import { Tag } from 'antd';
 import type { TagProps } from 'antd';
 
-type StatusType = 'asset' | 'terminal' | 'user' | 'monitor' | 'alert' | 'alertSeverity' | 'deployment' | 'certificate';
+type StatusType = 'asset' | 'terminal' | 'user' | 'alert' | 'alertSeverity' | 'deployment' | 'certificate';
 
 interface StatusConfig {
   color: string;
@@ -28,12 +28,6 @@ const statusConfigs: StatusConfigMap = {
   user: {
     active: { color: 'green', label: '启用' },
     inactive: { color: 'red', label: '禁用' },
-  },
-  monitor: {
-    up: { color: 'green', label: 'UP' },
-    down: { color: 'red', label: 'DOWN' },
-    unknown: { color: 'default', label: 'UNKNOWN' },
-    paused: { color: 'orange', label: 'PAUSED' },
   },
   alert: {
     firing: { color: 'red', label: '触发中' },

@@ -182,7 +182,7 @@ This is an automated alert notification from OpsManager.
             True if sent successfully, False otherwise
         """
         if not self.is_configured():
-            logger.warning("Email service not configured, skipping email")
+            logger.warning("邮件服务未配置，跳过发送", extra={"action": "alert.email"})
             return False
 
         try:
@@ -202,11 +202,11 @@ This is an automated alert notification from OpsManager.
                     server.login(self.smtp_user, self.smtp_password)
                 server.sendmail(self.smtp_user, to_addresses, msg.as_string())
 
-            logger.info(f"Email sent successfully: to={to_addresses}, subject={subject}")
+            logger.info(f"邮件发送成功: to={to_addresses}, subject={subject}", extra={"action": "alert.email", "to": to_addresses, "subject": subject})
             return True
 
         except Exception as exc:
-            logger.error(f"Failed to send email: to={to_addresses}, error={str(exc)}")
+            logger.error(f"邮件发送失败: to={to_addresses}, error={str(exc)}", extra={"action": "alert.email", "to": to_addresses})
             return False
 
     def send_alert_email(

@@ -4,7 +4,6 @@ Navigation link management API routes.
 
 import csv
 import io
-import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -15,7 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, get_current_user_optional, get_db
 from app.core.audit import audit_log
 from app.core.cache import cache_delete_pattern, cache_get_or_set
+from app.core.logging import get_logger
 from app.core.permissions import require_permissions
+from app.core.tz import now_shanghai
 from app.crud.crud_navigation import navigation_link
 from app.models.permission import Role
 from app.models.user import User
@@ -29,7 +30,7 @@ from app.schemas.navigation import (
 )
 
 router = APIRouter(prefix="/navigation")
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @router.get("/public", response_model=dict)
@@ -162,7 +163,7 @@ async def export_navigation_links(
         )
 
     output.seek(0)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = now_shanghai().strftime("%Y%m%d_%H%M%S")
     filename = f"navigation_export_{timestamp}.csv"
 
     return StreamingResponse(
@@ -184,7 +185,7 @@ async def import_navigation_links(
 ):
     """Import navigation links from CSV data."""
     require_permissions(["navigation:create"])(current_user)
-    logger.info(f"[导航管理] 用户 {current_user.username} 开始导入导航链接，共 {len(links_in)} 条")
+    logger.info(f"用户 {current_user.username} 开始导入导航链接，共 {len(links_in)} 条", extra={"action": "nav.import", "username": current_user.username, "count": len(links_in)})
 
     results = []
     success_count = 0
@@ -242,7 +243,7 @@ async def import_navigation_links(
             )
             success_count += 1
         except Exception as e:
-            logger.error(f"[导航管理] 导入导航链接 '{link_in.name}' 失败: {str(e)}")
+            logger.error(f"导入导航链接 '{link_in.name}' 失败: {str(e)}", extra={"action": "nav.import", "item_name": link_in.name, "error": str(e)})
             results.append(
                 NavigationLinkImportResult(
                     success=False, name=link_in.name, message=f"导入失败: {str(e)}"
@@ -250,7 +251,7 @@ async def import_navigation_links(
             )
             failed_count += 1
 
-    logger.info(f"[导航管理] 导入完成，成功 {success_count} 条，失败 {failed_count} 条")
+    logger.info(f"导入完成，成功 {success_count} 条，失败 {failed_count} 条", extra={"action": "nav.import", "success_count": success_count, "failed_count": failed_count})
 
     await cache_delete_pattern("nav:public:*")
 
@@ -272,14 +273,14 @@ async def create_navigation_link(
 ):
     """Create a new navigation link."""
     require_permissions(["navigation:create"])(current_user)
-    logger.info(f"[导航管理] 创建导航链接 '{link_in.name}'")
+    logger.info(f"创建导航链接 '{link_in.name}'", extra={"action": "nav.create", "item_name": link_in.name})
 
     role_ids = None
     if link_in.restrict_to_current_role and current_user.roles:
         role_ids = [role.id for role in current_user.roles]
 
     link = await navigation_link.create_with_roles(db, obj_in=link_in, role_ids=role_ids)
-    logger.info(f"[导航管理] 导航链接 '{link.name}' 创建成功，ID: {link.id}")
+    logger.info(f"导航链接 '{link.name}' 创建成功，ID: {link.id}", extra={"action": "nav.create", "item_name": link.name, "link_id": link.id})
 
     await cache_delete_pattern("nav:public:*")
 
@@ -346,7 +347,7 @@ async def update_navigation_link(
     link = await navigation_link.update_with_roles(
         db, db_obj=link, obj_in=link_in, role_ids=role_ids
     )
-    logger.info(f"[导航管理] 导航链接 '{link.name}' 更新成功")
+    logger.info(f"导航链接 '{link.name}' 更新成功", extra={"action": "nav.update", "item_name": link.name, "link_id": link.id})
 
     await cache_delete_pattern("nav:public:*")
 
@@ -373,7 +374,7 @@ async def delete_navigation_link(
         )
 
     await navigation_link.delete(db, id=link_id)
-    logger.info(f"[导航管理] 导航链接 ID={link_id} 删除成功")
+    logger.info(f"导航链接 ID={link_id} 删除成功", extra={"action": "nav.delete", "link_id": link_id})
 
     await cache_delete_pattern("nav:public:*")
 

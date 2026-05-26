@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db, require_permissions
 from app.core.audit import audit_log
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import NotFoundError, PermissionDeniedError
 from app.crud.crud_scheduled_task import crud_scheduled_task
 from app.crud.crud_system_config import crud_system_config
 from app.models.scheduled_task import ScheduledTask
@@ -112,6 +112,9 @@ async def run_scheduled_task(
     task = await crud_scheduled_task.get_by_task_id(db, task_id)
     if not task:
         raise NotFoundError(detail=f"Scheduled task '{task_id}' not found")
+
+    if not task.is_enabled:
+        raise PermissionDeniedError(detail=f"定时任务「{task.name}」已禁用，无法手动执行")
 
     result = await run_task_manually(task_id, triggered_by=current_user.username)
     return result

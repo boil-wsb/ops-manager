@@ -3,7 +3,6 @@ Authentication middleware for global API authentication.
 """
 
 import ipaddress
-import logging
 from collections.abc import Callable
 
 from fastapi import Request, status
@@ -11,11 +10,12 @@ from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer
 
 from app.config import settings
+from app.core.logging import get_logger
 from app.core.security import verify_token
 from app.crud.crud_user import crud_user
 from app.db.session import get_async_session_local
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 security = HTTPBearer(auto_error=False)
 
@@ -32,7 +32,7 @@ def _parse_trusted_networks() -> list[ipaddress.IPv4Network]:
         try:
             networks.append(ipaddress.ip_network(cidr, strict=False))
         except ValueError:
-            logger.warning(f"Invalid trusted network CIDR: {cidr}")
+            logger.warning(f"无效的信任网络CIDR: {cidr}", extra={"action": "auth.middleware"})
     return networks
 
 
@@ -51,8 +51,8 @@ def _parse_excluded_paths() -> list[str]:
 TRUSTED_NETWORKS = _parse_trusted_networks()
 AUTH_EXCLUDED_PATHS = _parse_excluded_paths()
 
-logger.info(f"[Auth Middleware] TRUSTED_NETWORKS: {[str(n) for n in TRUSTED_NETWORKS]}")
-logger.info(f"[Auth Middleware] AUTH_EXCLUDED_PATHS: {AUTH_EXCLUDED_PATHS}")
+logger.info(f"信任网络配置: {[str(n) for n in TRUSTED_NETWORKS]}", extra={"action": "auth.middleware"})
+logger.info(f"认证排除路径: {AUTH_EXCLUDED_PATHS}", extra={"action": "auth.middleware"})
 
 
 def _get_client_ip(request: Request) -> str | None:
@@ -91,9 +91,6 @@ class AuthenticationMiddleware:
         "/openapi.json",
         "/api/v1/auth",
         "/api/v1/navigation/public",
-        "/api/v1/monitor/monitors",
-        "/api/v1/monitor/alerts",
-        "/api/v1/monitor/alert-rules",
         "/api/v1/audit-logs",
         "/api/v1/it-feedback",
         "/api/v1/notification-records",
@@ -115,7 +112,7 @@ class AuthenticationMiddleware:
         for excluded_path in AUTH_EXCLUDED_PATHS:
             if path.startswith(excluded_path):
                 if is_trusted:
-                    logger.debug(f"Trusted network auth bypass: {path} from {_get_client_ip(request)}")
+                    logger.debug(f"信任网络跳过认证: {path}", extra={"action": "auth.bypass", "client_ip": _get_client_ip(request)})
                     return await call_next(request)
 
         auth_header = request.headers.get("Authorization")
@@ -177,7 +174,7 @@ class AuthenticationMiddleware:
                 return response
 
         except Exception as e:
-            logger.error(f"Authentication error: {e}")
+            logger.error(f"认证错误: {e}", extra={"action": "auth.middleware", "error": str(e)})
             return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 content={"detail": "Authentication failed"},

@@ -58,6 +58,7 @@ class CRUDNotificationRecord(CRUDBase):
             receive_type=obj_in.receive_type,
             callback_id=obj_in.callback_id,
             open_message_id=obj_in.open_message_id,
+            callback_url=obj_in.callback_url,
             card_content=obj_in.card_content,
             success=obj_in.success,
             error=obj_in.error,

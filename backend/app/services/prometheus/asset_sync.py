@@ -7,17 +7,18 @@ Phase 2 实现：
 - 处理资产变更事件
 """
 
-import logging
 from datetime import datetime
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import get_logger
+from app.core.tz import now_shanghai
 from app.models.asset import Asset, AssetStatus, AssetType
 from app.services.prometheus.client import PrometheusClient
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class AssetSyncService:
@@ -197,7 +198,7 @@ class AssetSyncService:
             "source": "prometheus",
             "prometheus_instance": instance,
             "sync_status": "synced",
-            "last_sync_time": datetime.utcnow().isoformat(),
+            "last_sync_time": now_shanghai().isoformat(),
         }
 
         # 构建资产数据
@@ -233,16 +234,14 @@ class AssetSyncService:
         }
 
         try:
-            logger.info(f"Starting sync for instance: {instance}")
+            logger.info(f"开始同步实例: {instance}", extra={"action": "asset.sync", "instance": instance})
 
-            # 获取节点信息
             ip_address = self._extract_ip_from_instance(instance)
-            logger.info(f"Extracted IP: {ip_address}")
+            logger.info(f"提取IP: {ip_address}", extra={"action": "asset.sync"})
 
-            # 从 Prometheus 获取节点详细信息
-            logger.info("Fetching nodes from Prometheus...")
+            logger.info("从Prometheus获取节点...", extra={"action": "asset.sync"})
             nodes = await self.prometheus_client.get_all_nodes()
-            logger.info(f"Found {len(nodes)} nodes from Prometheus")
+            logger.info(f"从Prometheus获取到 {len(nodes)} 个节点", extra={"action": "asset.sync"})
 
             node = None
             for n in nodes:
@@ -252,31 +251,27 @@ class AssetSyncService:
 
             if not node:
                 result["error"] = f"Node not found in Prometheus: {instance}"
-                logger.error(result["error"])
+                logger.error(result["error"], extra={"action": "asset.sync", "instance": instance})
                 return result
 
-            logger.info(f"Found node: {node}")
+            logger.info(f"找到节点: {node}", extra={"action": "asset.sync"})
 
-            # 获取节点状态
-            logger.info("Fetching node status...")
+            logger.info("获取节点状态...", extra={"action": "asset.sync"})
             status = await self.prometheus_client.get_node_status(instance)
             node["status"] = status
-            logger.info(f"Node status: {status}")
+            logger.info(f"节点状态: {status}", extra={"action": "asset.sync"})
 
-            # 获取节点指标
-            logger.info("Fetching node metrics...")
+            logger.info("获取节点指标...", extra={"action": "asset.sync"})
             metrics = await self.prometheus_client.get_node_metrics(instance)
             node.update(metrics)
-            logger.info(f"Node metrics: {metrics}")
+            logger.info(f"节点指标: {metrics}", extra={"action": "asset.sync"})
 
-            # 映射数据
             asset_data = self._map_prometheus_node_to_asset_data(node)
-            logger.info(f"Mapped asset data: {asset_data}")
+            logger.info(f"映射资产数据: {asset_data}", extra={"action": "asset.sync"})
 
-            # 检查是否已存在（通过 IP 地址）
-            logger.info(f"Checking for existing asset with IP: {asset_data['ip_address']}")
+            logger.info(f"检查已有资产 IP: {asset_data['ip_address']}", extra={"action": "asset.sync"})
             existing_asset = await self._get_asset_by_ip(asset_data["ip_address"])
-            logger.info(f"Existing asset: {existing_asset}")
+            logger.info(f"已有资产: {existing_asset}", extra={"action": "asset.sync"})
 
             if existing_asset:
                 # 更新现有资产
@@ -294,7 +289,7 @@ class AssetSyncService:
                     "source": AssetSource.PROMETHEUS.value,
                     "sync_status": SyncStatus.SYNCED.value,
                     "prometheus_instance": instance,
-                    "last_sync_time": datetime.utcnow(),
+                    "last_sync_time": now_shanghai(),
                 }
 
                 # 更新字段
@@ -309,11 +304,11 @@ class AssetSyncService:
                 result["action"] = "updated"
                 result["asset"] = existing_asset
                 logger.info(
-                    f"Updated asset: {existing_asset.asset_id} (IP: {asset_data['ip_address']})"
+                    f"更新资产: {existing_asset.asset_id} (IP: {asset_data['ip_address']})",
+                    extra={"action": "asset.update", "asset_id": existing_asset.asset_id, "ip_address": asset_data['ip_address']},
                 )
             else:
-                # 创建新资产
-                logger.info("Creating new asset...")
+                logger.info("创建新资产...", extra={"action": "asset.create"})
                 from app.models.asset import AssetSource, SyncStatus
 
                 new_asset = Asset(
@@ -332,25 +327,28 @@ class AssetSyncService:
                     source=AssetSource.PROMETHEUS.value,
                     sync_status=SyncStatus.SYNCED.value,
                     prometheus_instance=instance,
-                    last_sync_time=datetime.utcnow(),
+                    last_sync_time=now_shanghai(),
                 )
 
                 self.db.add(new_asset)
-                logger.info("Asset added to session, committing...")
+                logger.info("资产已添加到会话，提交中...", extra={"action": "asset.create"})
                 await self.db.commit()
-                logger.info("Commit successful, refreshing...")
+                logger.info("提交成功，刷新中...", extra={"action": "asset.create"})
                 await self.db.refresh(new_asset)
-                logger.info(f"Refresh successful, asset ID: {new_asset.id}")
+                logger.info(f"刷新成功，资产ID: {new_asset.id}", extra={"action": "asset.create"})
 
                 result["success"] = True
                 result["action"] = "created"
                 result["asset"] = new_asset
-                logger.info(f"Created asset: {new_asset.asset_id} (IP: {asset_data['ip_address']})")
+                logger.info(
+                    f"创建资产: {new_asset.asset_id} (IP: {asset_data['ip_address']})",
+                    extra={"action": "asset.create", "asset_id": new_asset.asset_id, "ip_address": asset_data['ip_address']},
+                )
 
         except Exception as e:
             result["error"] = str(e)
-            logger.exception(f"Exception in sync_single_asset: {e}")
-            logger.error(f"Failed to sync asset {instance}: {e}")
+            logger.exception(f"同步异常: {e}", extra={"action": "asset.sync", "instance": instance})
+            logger.error(f"同步资产失败: {instance}: {e}", extra={"action": "asset.sync", "instance": instance})
 
         return result
 
@@ -367,7 +365,7 @@ class AssetSyncService:
             "updated": 0,
             "failed": 0,
             "errors": [],
-            "start_time": datetime.utcnow().isoformat(),
+            "start_time": now_shanghai().isoformat(),
             "end_time": None,
         }
 
@@ -376,7 +374,7 @@ class AssetSyncService:
             nodes = await self.prometheus_client.get_all_nodes()
             stats["total"] = len(nodes)
 
-            logger.info(f"Starting sync for {len(nodes)} nodes from Prometheus")
+            logger.info(f"开始同步 {len(nodes)} 个节点", extra={"action": "asset.sync", "total": len(nodes)})
 
             for node in nodes:
                 instance = node.get("instance", "")
@@ -398,18 +396,17 @@ class AssetSyncService:
                     if result["error"]:
                         stats["errors"].append(f"{instance}: {result['error']}")
 
-            stats["end_time"] = datetime.utcnow().isoformat()
+            stats["end_time"] = now_shanghai().isoformat()
             logger.info(
-                f"Sync completed. Total: {stats['total']}, "
-                f"Created: {stats['created']}, Updated: {stats['updated']}, "
-                f"Failed: {stats['failed']}"
+                f"同步完成",
+                extra={"action": "asset.sync", "total": stats['total'], "created_count": stats['created'], "updated_count": stats['updated'], "failed_count": stats['failed']},
             )
 
         except Exception as e:
             stats["failed"] += 1
             stats["errors"].append(f"Sync error: {str(e)}")
-            stats["end_time"] = datetime.utcnow().isoformat()
-            logger.error(f"Failed to sync all assets: {e}")
+            stats["end_time"] = now_shanghai().isoformat()
+            logger.error(f"全量同步失败: {e}", extra={"action": "asset.sync"})
 
         return stats
 

@@ -8,7 +8,6 @@
 """
 
 import asyncio
-import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
@@ -16,10 +15,12 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import get_logger
+from app.core.tz import now_shanghai
 from app.models.asset import Asset, AssetSource, AssetStatus, AssetType, SyncStatus
 from app.services.prometheus.client import PrometheusClient
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -31,7 +32,7 @@ class NodeCache:
     ttl: timedelta = timedelta(minutes=5)  # 缓存5分钟
 
     def is_valid(self) -> bool:
-        return datetime.utcnow() - self.timestamp < self.ttl
+        return now_shanghai() - self.timestamp < self.ttl
 
 
 class OptimizedAssetSyncService:
@@ -55,13 +56,13 @@ class OptimizedAssetSyncService:
             节点列表
         """
         if not force_refresh and self._node_cache and self._node_cache.is_valid():
-            logger.debug(f"Using cached nodes ({len(self._node_cache.nodes)} nodes)")
+            logger.debug(f"使用缓存节点 ({len(self._node_cache.nodes)} 个)", extra={"action": "asset.sync"})
             return self._node_cache.nodes
 
-        logger.debug("Fetching nodes from Prometheus...")
+        logger.debug("从Prometheus获取节点...", extra={"action": "asset.sync"})
         nodes = await self.prometheus_client.get_all_nodes()
-        self._node_cache = NodeCache(nodes=nodes, timestamp=datetime.utcnow())
-        logger.debug(f"Cached {len(nodes)} nodes from Prometheus")
+        self._node_cache = NodeCache(nodes=nodes, timestamp=now_shanghai())
+        logger.debug(f"缓存 {len(nodes)} 个节点", extra={"action": "asset.sync"})
         return nodes
 
     async def _get_node_details(self, instance: str, node: dict[str, Any]) -> dict[str, Any]:
@@ -104,7 +105,7 @@ class OptimizedAssetSyncService:
         }
 
         try:
-            logger.debug(f"Starting optimized sync for instance: {instance}")
+            logger.debug(f"开始优化同步实例: {instance}", extra={"action": "asset.sync", "instance": instance})
 
             # 从缓存获取节点列表
             nodes = await self._get_cached_nodes(force_refresh=force_refresh)
@@ -118,7 +119,7 @@ class OptimizedAssetSyncService:
 
             if not node:
                 result["error"] = f"Node not found in Prometheus: {instance}"
-                logger.error(result["error"])
+                logger.error(result["error"], extra={"action": "asset.sync", "instance": instance})
                 return result
 
             # 获取节点详细信息
@@ -126,10 +127,12 @@ class OptimizedAssetSyncService:
 
             # 映射数据
             asset_data = self._map_prometheus_node_to_asset_data(node)
-            logger.debug(f"Mapped asset data: {asset_data}")
+            logger.debug(f"映射资产数据: {asset_data}", extra={"action": "asset.sync"})
 
             # 检查是否已存在
             existing_asset = await self._get_asset_by_ip(asset_data["ip_address"])
+            if not existing_asset and asset_data.get("asset_id"):
+                existing_asset = await self._get_asset_by_asset_id(asset_data["asset_id"])
 
             if existing_asset:
                 # 更新现有资产
@@ -145,8 +148,10 @@ class OptimizedAssetSyncService:
                 result["asset"] = new_asset
 
         except Exception as e:
+            if self.db:
+                await self.db.rollback()
             result["error"] = str(e)
-            logger.exception(f"Exception in sync_single_asset: {e}")
+            logger.exception(f"同步异常: {e}", extra={"action": "asset.sync", "instance": instance})
 
         return result
 
@@ -169,7 +174,7 @@ class OptimizedAssetSyncService:
             "errors": [],
         }
 
-        logger.debug(f"Starting batch sync for {len(instances)} instances")
+        logger.debug(f"开始批量同步 {len(instances)} 个实例", extra={"action": "asset.sync", "total": len(instances)})
 
         # 先刷新缓存，确保数据最新
         await self._get_cached_nodes(force_refresh=True)
@@ -191,7 +196,7 @@ class OptimizedAssetSyncService:
                 results["failed"] += 1
                 results["errors"].append(f"{instance}: {str(e)}")
 
-        logger.debug(f"Batch sync completed: {results}")
+        logger.debug(f"批量同步完成: {results}", extra={"action": "asset.sync"})
         return results
 
     async def sync_all_assets(self) -> dict[str, Any]:
@@ -207,7 +212,7 @@ class OptimizedAssetSyncService:
             "updated": 0,
             "failed": 0,
             "errors": [],
-            "start_time": datetime.utcnow().isoformat(),
+            "start_time": now_shanghai().isoformat(),
             "end_time": None,
         }
 
@@ -215,7 +220,7 @@ class OptimizedAssetSyncService:
             nodes = await self._get_cached_nodes(force_refresh=True)
             stats["total"] = len(nodes)
 
-            logger.debug(f"Starting sync for {len(nodes)} nodes from Prometheus")
+            logger.debug(f"开始同步 {len(nodes)} 个节点", extra={"action": "asset.sync", "total": len(nodes)})
 
             for node in nodes:
                 instance = node.get("instance", "")
@@ -236,18 +241,17 @@ class OptimizedAssetSyncService:
                     if result["error"]:
                         stats["errors"].append(f"{instance}: {result['error']}")
 
-            stats["end_time"] = datetime.utcnow().isoformat()
+            stats["end_time"] = now_shanghai().isoformat()
             logger.info(
-                f"Sync completed. Total: {stats['total']}, "
-                f"Created: {stats['created']}, Updated: {stats['updated']}, "
-                f"Failed: {stats['failed']}"
+                f"同步完成",
+                extra={"action": "asset.sync", "total": stats['total'], "created_count": stats['created'], "updated_count": stats['updated'], "failed_count": stats['failed']},
             )
 
         except Exception as e:
             stats["failed"] += 1
             stats["errors"].append(f"Sync error: {str(e)}")
-            stats["end_time"] = datetime.utcnow().isoformat()
-            logger.error(f"Failed to sync all assets: {e}")
+            stats["end_time"] = now_shanghai().isoformat()
+            logger.error(f"全量同步失败: {e}", extra={"action": "asset.sync"})
 
         return stats
 
@@ -343,7 +347,7 @@ class OptimizedAssetSyncService:
             "source": "prometheus",
             "prometheus_instance": instance,
             "sync_status": "synced",
-            "last_sync_time": datetime.utcnow().isoformat(),
+            "last_sync_time": now_shanghai().isoformat(),
         }
 
         asset_data = {
@@ -368,6 +372,14 @@ class OptimizedAssetSyncService:
         result = await self.db.execute(select(Asset).where(Asset.ip_address == ip_address))
         return result.scalar_one_or_none()
 
+    async def _get_asset_by_asset_id(self, asset_id: str) -> Asset | None:
+        """根据 asset_id 查找资产"""
+        if not asset_id:
+            return None
+
+        result = await self.db.execute(select(Asset).where(Asset.asset_id == asset_id))
+        return result.scalar_one_or_none()
+
     async def _update_asset(
         self, existing_asset: Asset, asset_data: dict[str, Any], node: dict[str, Any], instance: str
     ) -> None:
@@ -384,7 +396,7 @@ class OptimizedAssetSyncService:
             "source": AssetSource.PROMETHEUS.value,
             "sync_status": SyncStatus.SYNCED.value,
             "prometheus_instance": instance,
-            "last_sync_time": datetime.utcnow(),
+            "last_sync_time": now_shanghai(),
         }
 
         for field, value in update_data.items():
@@ -393,7 +405,7 @@ class OptimizedAssetSyncService:
 
         await self.db.commit()
         await self.db.refresh(existing_asset)
-        logger.debug(f"Updated asset: {existing_asset.asset_id}")
+        logger.debug(f"更新资产: {existing_asset.asset_id}", extra={"action": "asset.update", "asset_id": existing_asset.asset_id})
 
     async def _create_asset(
         self, asset_data: dict[str, Any], node: dict[str, Any], instance: str
@@ -415,11 +427,11 @@ class OptimizedAssetSyncService:
             source=AssetSource.PROMETHEUS.value,
             sync_status=SyncStatus.SYNCED.value,
             prometheus_instance=instance,
-            last_sync_time=datetime.utcnow(),
+            last_sync_time=now_shanghai(),
         )
 
         self.db.add(new_asset)
         await self.db.commit()
         await self.db.refresh(new_asset)
-        logger.debug(f"Created asset: {new_asset.asset_id}")
+        logger.debug(f"创建资产: {new_asset.asset_id}", extra={"action": "asset.create", "asset_id": new_asset.asset_id})
         return new_asset

@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     app_name: str = Field(default="OpsManager V2", alias="APP_NAME")
     app_version: str = Field(default="1.0.0", alias="APP_VERSION")
     debug: bool = Field(default=False, alias="DEBUG")
+    timezone: str = Field(default="Asia/Shanghai", alias="APP_TIMEZONE")
 
     # Security
     secret_key: str = Field(default="your-secret-key-change-in-production", alias="SECRET_KEY")
@@ -39,12 +40,6 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
     redis_password: str | None = Field(default=None, alias="REDIS_PASSWORD")
-
-    # Celery
-    celery_broker_url: str = Field(default="redis://localhost:6379/1", alias="CELERY_BROKER_URL")
-    celery_result_backend: str = Field(
-        default="redis://localhost:6379/2", alias="CELERY_RESULT_BACKEND"
-    )
 
     # CORS - Use string type and parse manually
     cors_origins_str: str = Field(
@@ -98,9 +93,10 @@ class Settings(BaseSettings):
 
     # IT Reporter Configuration
     itreporter_chat_id: str = Field(default="", alias="ITREPORTER_CHAT_ID")
-    itreporter_minio_bucket: str = Field(default="reports", alias="ITREPORTER_MINIO_BUCKET")
+    itreporter_minio_bucket: str = Field(default="devops-scripts", alias="ITREPORTER_MINIO_BUCKET")
     itreporter_presigned_url_expires_hours: int = Field(default=2, alias="ITREPORTER_PRESIGNED_URL_EXPIRES_HOURS")
-    itreporter_report_path: str = Field(default="devops-scripts/{date}-health-check.html", alias="ITREPORTER_REPORT_PATH")
+    itreporter_report_path: str = Field(default="IT-days-reporter/health_check_detailed_report_{date_compact}", alias="ITREPORTER_REPORT_PATH")
+    itreporter_download_base_url: str = Field(default="http://192.168.23.36:8080", alias="ITREPORTER_DOWNLOAD_BASE_URL")
 
     # Ansible SSH Configuration
     ansible_ssh_host: str = Field(default="192.168.23.38", alias="ANSIBLE_SSH_HOST")

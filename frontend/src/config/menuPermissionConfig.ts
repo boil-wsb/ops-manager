@@ -27,17 +27,6 @@ export const menuPermissionConfig: MenuItemConfig[] = [
     permission: 'asset:read',
   },
   {
-    key: '/monitor',
-    label: '监控管理',
-    icon: 'MonitorOutlined',
-    permission: 'monitor:read',
-    children: [
-      { key: '/monitor/list', label: '监控列表' },
-      { key: '/monitor/alerts', label: '告警管理' },
-      { key: '/monitor/domains', label: '域名监控' },
-    ],
-  },
-  {
     key: '/alerts',
     label: '告警中心',
     icon: 'AlertOutlined',
@@ -57,6 +46,7 @@ export const menuPermissionConfig: MenuItemConfig[] = [
     children: [
       { key: '/ops/deployments', label: '部署管理', permission: 'deployment:read' },
       { key: '/ops/it-management', label: 'IT管理', permission: 'it:read' },
+      { key: '/ops/domains', label: '域名管理', permission: 'certificate:read' },
       { key: '/ops/scheduled-tasks', label: '定时任务', permission: 'ops:read' },
     ],
   },

@@ -1,5 +1,4 @@
 import json
-import logging
 from datetime import datetime
 from typing import Any
 
@@ -7,11 +6,13 @@ from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.core.logging import get_logger
+from app.core.tz import now_shanghai
 from app.crud.base import CRUDBase
 from app.models.feishu_interaction import FeishuInteraction
 from app.schemas.feishu_interaction import FeishuInteractionCreate
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class CRUDFeishuInteraction(CRUDBase):
@@ -96,7 +97,7 @@ def _resolve_user_id_by_open_id(open_id: str | None) -> int | None:
         engine.dispose()
         return row[0] if row else None
     except Exception as e:
-        logger.error(f"Error resolving user_id by open_id {open_id}: {e}")
+        logger.error(f"解析用户ID失败: {e}", extra={"action": "feishu.interaction", "open_id": open_id, "error": str(e)})
         return None
 
 
@@ -144,14 +145,14 @@ def record_interaction_sync(
                     "related_id": related_id,
                     "status": status,
                     "error": error,
-                    "created_at": datetime.utcnow(),
-                    "updated_at": datetime.utcnow(),
+                    "created_at": now_shanghai(),
+                    "updated_at": now_shanghai(),
                 },
             )
             conn.commit()
         engine.dispose()
     except Exception as e:
-        logger.error(f"Error recording feishu interaction: {e}")
+        logger.error(f"记录飞书交互失败: {e}", extra={"action": "feishu.interaction", "error": str(e)})
 
 
 feishu_interaction = CRUDFeishuInteraction()

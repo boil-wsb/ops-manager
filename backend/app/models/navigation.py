@@ -4,6 +4,7 @@ Navigation link model for external quick links.
 
 from datetime import datetime
 
+from app.core.tz import now_shanghai
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Table
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -19,7 +20,7 @@ navigation_link_roles = Table(
         primary_key=True,
     ),
     Column("role_id", Integer, ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True),
-    Column("created_at", DateTime(timezone=True), default=datetime.utcnow),
+    Column("created_at", DateTime(timezone=True), default=now_shanghai),
 )
 
 

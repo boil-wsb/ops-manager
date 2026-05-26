@@ -10,6 +10,7 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
+from app.core.tz import now_shanghai
 from app.core.logging import get_logger
 from app.crud.crud_alert import crud_alert_history, crud_alert_silence, crud_alert_template
 from app.models.alert import AlertHistory, AlertHistoryStatus
@@ -105,7 +106,7 @@ def parse_alertmanager_datetime(dt_value: datetime | str | None) -> datetime | N
         dt_str = dt_str.replace("Z", "+00:00")
         return datetime.fromisoformat(dt_str)
     except ValueError:
-        logger.warning(f"Failed to parse datetime: {dt_str}")
+        logger.warning(f"Failed to parse datetime: {dt_str}", extra={"action": "alert.receive"})
         return None
 
 
@@ -151,16 +152,17 @@ async def process_alert(
             pending_result = await db.execute(pending_query)
             pending_alerts = pending_result.scalars().all()
             if pending_alerts:
-                now = datetime.utcnow()
+                now = now_shanghai()
                 for pending in pending_alerts:
                     pending.status = AlertHistoryStatus.RESOLVED.value
                     pending.ends_at = now
                 await db.commit()
                 logger.info(
-                    f"Batch resolved {len(pending_alerts)} pending alerts for alertname={alertname}, instance={instance}"
+                    f"Batch resolved {len(pending_alerts)} pending alerts for alertname={alertname}, instance={instance}",
+                    extra={"action": "alert.resolve", "alertname": alertname, "instance": instance, "resolved_count": len(pending_alerts)}
                 )
         except Exception as exc:
-            logger.warning(f"Failed to batch resolve pending alerts: {exc}")
+            logger.warning(f"Failed to batch resolve pending alerts: {exc}", extra={"action": "alert.resolve", "error": str(exc)})
 
     # Check if alert should be suppressed
     try:
@@ -169,10 +171,11 @@ async def process_alert(
             alert_labels=labels,
         )
         logger.info(
-            f"Inhibition check result: is_suppressed={is_suppressed}, silence_id={silence_id}"
+            f"Inhibition check result: is_suppressed={is_suppressed}, silence_id={silence_id}",
+            extra={"action": "alert.receive", "is_suppressed": is_suppressed, "silence_id": silence_id}
         )
     except Exception as exc:
-        logger.error(f"Error in inhibition check: {exc}")
+        logger.error(f"Error in inhibition check: {exc}", extra={"action": "alert.receive", "error": str(exc)})
         is_suppressed, silence_id = False, None
 
     if is_suppressed:
@@ -181,9 +184,10 @@ async def process_alert(
     # Create alert history record
     try:
         logger.info(
-            f"Creating history record: alertname={alertname}, status={alert_status.value}, severity={severity}"
+            f"Creating history record: alertname={alertname}, status={alert_status.value}, severity={severity}",
+            extra={"action": "alert.receive", "alertname": alertname, "status": alert_status.value, "severity": severity}
         )
-        logger.info(f"  labels type: {type(labels)}, annotations type: {type(annotations)}")
+        logger.info(f"  labels type: {type(labels)}, annotations type: {type(annotations)}", extra={"action": "alert.receive"})
         history = await crud_alert_history.create_from_alertmanager(
             db=db,
             alertname=alertname,
@@ -191,16 +195,16 @@ async def process_alert(
             severity=severity,
             labels=labels,
             annotations=annotations,
-            starts_at=starts_at or datetime.utcnow(),
+            starts_at=starts_at or now_shanghai(),
             ends_at=ends_at,
             is_suppressed=is_suppressed,
             silence_id=silence_id,
         )
-        logger.info(f"History record created successfully: id={history.id}")
+        logger.info(f"History record created successfully: id={history.id}", extra={"action": "alert.receive", "history_id": history.id})
     except Exception as exc:
         import traceback
 
-        logger.error(f"Error creating history record: {exc}\n{traceback.format_exc()}")
+        logger.error(f"Error creating history record: {exc}\n{traceback.format_exc()}", extra={"action": "alert.receive", "error": str(exc)})
         raise
 
     # Prepare alert data for notification
@@ -210,7 +214,7 @@ async def process_alert(
         "severity": severity,
         "instance": labels.get("instance", ""),
         "description": annotations.get("description", ""),
-        "starts_at": starts_at.isoformat() if starts_at else datetime.utcnow().isoformat(),
+        "starts_at": starts_at.isoformat() if starts_at else now_shanghai().isoformat(),
         "labels": labels,
         "annotations": annotations,
         "is_suppressed": is_suppressed,
@@ -221,9 +225,9 @@ async def process_alert(
     # Send notification asynchronously if not suppressed
     if not is_suppressed:
         await send_alert_notification(alert_notification_data, db)
-        logger.info(f"Alert notification sent: {alertname}, history_id={history.id}")
+        logger.info(f"Alert notification sent: {alertname}, history_id={history.id}", extra={"action": "alert.receive", "alertname": alertname, "history_id": history.id})
     else:
-        logger.info(f"Alert suppressed by silence rule: {alertname}, silence_id={silence_id}")
+        logger.info(f"Alert suppressed by silence rule: {alertname}, silence_id={silence_id}", extra={"action": "alert.receive", "alertname": alertname, "silence_id": silence_id})
 
     return {
         "history_id": history.id,
@@ -260,10 +264,11 @@ async def receive_alertmanager_webhook(
     This endpoint handles the Alertmanager v4 webhook format and processes
     alerts through the notification pipeline.
     """
-    logger.info(f"[DEBUG] Full webhook payload: {payload.model_dump_json(indent=2)}")
+    logger.info(f"Full webhook payload: {payload.model_dump_json(indent=2)}", extra={"action": "alert.receive"})
     logger.info(
         f"Received Alertmanager webhook: receiver={payload.receiver}, "
-        f"status={payload.status}, alerts_count={len(payload.alerts)}"
+        f"status={payload.status}, alerts_count={len(payload.alerts)}",
+        extra={"action": "alert.receive", "receiver": payload.receiver, "status": payload.status, "alerts_count": len(payload.alerts)}
     )
 
     results = []
@@ -275,7 +280,7 @@ async def receive_alertmanager_webhook(
             import traceback
 
             error_trace = traceback.format_exc()
-            logger.error(f"Failed to process alert: {str(exc)}\n{error_trace}")
+            logger.error(f"Failed to process alert: {str(exc)}\n{error_trace}", extra={"action": "alert.receive", "error": str(exc)})
             results.append(
                 {
                     "error": str(exc),
@@ -293,12 +298,13 @@ async def receive_alertmanager_webhook(
     logger.info(
         f"Alertmanager webhook processed: "
         f"total={len(results)}, firing={firing_count}, "
-        f"resolved={resolved_count}, suppressed={suppressed_count}, errors={error_count}"
+        f"resolved={resolved_count}, suppressed={suppressed_count}, errors={error_count}",
+        extra={"action": "alert.receive", "total": len(results), "firing": firing_count, "resolved": resolved_count, "suppressed": suppressed_count, "errors": error_count}
     )
 
     return {
         "status": "success",
-        "received_at": datetime.utcnow().isoformat(),
+        "received_at": now_shanghai().isoformat(),
         "total_alerts": len(payload.alerts),
         "processed": {
             "firing": firing_count,

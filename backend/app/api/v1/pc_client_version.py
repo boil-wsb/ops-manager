@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api import deps
+from app.core.logging import get_logger
 from app.crud import crud_pc_client_version
 from app.schemas.pc_client_version import (
     PCClientVersionCheckResponse,
@@ -17,6 +18,7 @@ from app.schemas.pc_client_version import (
 )
 
 router = APIRouter(prefix="/pc-client-version")
+logger = get_logger(__name__)
 
 
 @router.get("/version", response_model=PCClientVersionCheckResponse)
@@ -50,20 +52,18 @@ async def download_personalized_pc_client(
     """
     import io
     import json
-    import logging
     import zipfile
     from pathlib import Path
 
-    logger = logging.getLogger(__name__)
-    logger.info(f"Download endpoint called by user: {current_user.username}")
+    logger.info(f"Download endpoint called by user: {current_user.username}", extra={"action": "terminal.version", "username": current_user.username})
 
     pcinfo_dir = (
         Path(__file__).parent.parent.parent.parent.parent / "frontend" / "public" / "pcinfo"
     )
 
     conf_path = pcinfo_dir / "Conf.json"
-    logger.info(f"Looking for Conf.json at: {conf_path}")
-    logger.info(f"Conf.json exists: {conf_path.exists()}")
+    logger.info(f"Looking for Conf.json at: {conf_path}", extra={"action": "terminal.version"})
+    logger.info(f"Conf.json exists: {conf_path.exists()}", extra={"action": "terminal.version"})
     with open(conf_path, encoding="utf-8") as f:
         conf = json.load(f)
 

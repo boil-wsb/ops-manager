@@ -14,6 +14,49 @@ from app.core.audit.sanitizer import sanitize_sensitive_data
 from app.models.audit_log import AuditLog
 
 
+async def _write_audit_log_db(
+    db,
+    operation_type: str,
+    operation_module: str,
+    object_type: str | None,
+    object_id: str | None,
+    object_name: str | None,
+    before_data: dict | None,
+    after_data: dict | None,
+    operator_id: int | None,
+    operator_name: str | None,
+    operator_ip: str | None,
+    user_agent: str | None,
+    status: str,
+    error_message: str | None,
+    request_id: str,
+    duration_ms: int | None,
+) -> AuditLog:
+    audit_log = AuditLog(
+        operation_type=operation_type,
+        operation_module=operation_module,
+        object_type=object_type,
+        object_id=str(object_id) if object_id else None,
+        object_name=object_name,
+        before_data=before_data,
+        after_data=after_data,
+        operator_id=operator_id,
+        operator_name=operator_name,
+        operator_ip=operator_ip,
+        user_agent=user_agent,
+        status=status,
+        error_message=error_message,
+        request_id=request_id,
+        duration_ms=duration_ms,
+    )
+
+    db.add(audit_log)
+    await db.commit()
+    await db.refresh(audit_log)
+
+    return audit_log
+
+
 class AuditLogger:
     """
     Audit logger that writes to both database and file.
@@ -252,16 +295,15 @@ class AuditLogger:
         request_id: str,
         duration_ms: int | None,
     ) -> AuditLog:
-        """Log to database."""
-        from app.db.session import get_session_maker
+        from app.db.session import db_operation_with_retry
 
-        session_maker = get_session_maker()
-        async with session_maker() as db:
-            audit_log = AuditLog(
+        return await db_operation_with_retry(
+            lambda db: _write_audit_log_db(
+                db,
                 operation_type=operation_type,
                 operation_module=operation_module,
                 object_type=object_type,
-                object_id=str(object_id) if object_id else None,
+                object_id=object_id,
                 object_name=object_name,
                 before_data=before_data,
                 after_data=after_data,
@@ -273,13 +315,10 @@ class AuditLogger:
                 error_message=error_message,
                 request_id=request_id,
                 duration_ms=duration_ms,
-            )
-
-            db.add(audit_log)
-            await db.commit()
-            await db.refresh(audit_log)
-
-            return audit_log
+            ),
+            max_retries=2,
+            retry_delay=1.0,
+        )
 
 
 # Global audit logger instance

@@ -9,8 +9,10 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db, require_permissions
+from app.core.tz import now_shanghai
 from app.core.audit import audit_log
 from app.core.exceptions import ConflictError, NotFoundError
+from app.core.logging import get_logger
 from app.crud.crud_asset import crud_asset, crud_label
 from app.models.user import User
 from app.schemas.asset import (
@@ -24,6 +26,7 @@ from app.schemas.asset import (
 )
 
 router = APIRouter()
+logger = get_logger(__name__)
 
 
 def api_response(data: Any = None, message: str = "操作成功") -> dict:
@@ -100,25 +103,16 @@ async def trigger_asset_sync(
     _: None = Depends(require_permissions(["asset:admin"])),
 ):
     """手动触发从 Prometheus 同步资产"""
-    try:
-        from app.tasks.asset_sync_tasks import sync_assets_from_prometheus_task
+    import asyncio
 
-        task = sync_assets_from_prometheus_task.delay()
+    from app.services.prometheus.asset_sync import sync_assets_from_prometheus
 
-        return {
-            "message": "Asset sync task triggered successfully",
-            "task_id": task.id,
-            "status": "pending",
-        }
-    except Exception:
-        from app.services.prometheus.asset_sync import sync_assets_from_prometheus
+    asyncio.create_task(sync_assets_from_prometheus(db))
 
-        result = await sync_assets_from_prometheus(db)
-        return {
-            "message": "Asset sync completed",
-            "result": result,
-            "status": "completed",
-        }
+    return {
+        "message": "Asset sync task triggered successfully",
+        "status": "pending",
+    }
 
 
 @router.post("/assets/sync-terminals")
@@ -129,14 +123,10 @@ async def sync_terminals_from_pc_info(
     _: None = Depends(require_permissions(["asset:admin"])),
 ):
     """从 Prometheus pc_info 指标同步终端资产"""
-    import logging
-
     from sqlalchemy import select
 
     from app.models.asset import Asset, AssetSource, AssetStatus, AssetType, SyncStatus
     from app.services.prometheus.client import get_prometheus_client
-
-    logger = logging.getLogger(__name__)
 
     try:
         prometheus_client = get_prometheus_client()
@@ -180,7 +170,7 @@ async def sync_terminals_from_pc_info(
                     "customer": customer_name,
                     "source": AssetSource.PROMETHEUS.value,
                     "sync_status": SyncStatus.SYNCED.value,
-                    "last_sync_time": datetime.utcnow(),
+                    "last_sync_time": now_shanghai(),
                     "status": AssetStatus.ACTIVE,
                     "labels_data": pc_info_labels,
                     "ip_address": pc_info_labels.get("ipAddress"),
@@ -219,7 +209,7 @@ async def sync_terminals_from_pc_info(
                 synced_count += 1
 
             except Exception as e:
-                logger.error(f"Failed to sync terminal {hostname}: {e}")
+                logger.error(f"Failed to sync terminal {hostname}: {e}", extra={"action": "asset.sync", "hostname": hostname, "error": str(e)})
                 errors.append({"hostname": hostname, "error": str(e)})
 
         await db.commit()
@@ -234,7 +224,7 @@ async def sync_terminals_from_pc_info(
         }
 
     except Exception as e:
-        logger.error(f"Terminal sync failed: {e}")
+        logger.error(f"Terminal sync failed: {e}", extra={"action": "asset.sync", "error": str(e)})
         raise ConflictError(detail=f"Terminal sync failed: {str(e)}") from e
 
 
@@ -333,16 +323,13 @@ async def import_prometheus_asset(
     _: None = Depends(require_permissions(["asset:write"])),
 ):
     """从 Prometheus 导入指定节点为资产"""
-    import logging
     from urllib.parse import unquote
 
     from app.services.prometheus.asset_sync_optimized import OptimizedAssetSyncService
 
-    logger = logging.getLogger(__name__)
-
     try:
         decoded_instance = unquote(instance)
-        logger.info(f"Importing asset from Prometheus: {decoded_instance}")
+        logger.info(f"Importing asset from Prometheus: {decoded_instance}", extra={"action": "asset.import", "instance": decoded_instance})
 
         service = OptimizedAssetSyncService(db)
         result = await service.sync_single_asset(decoded_instance)
@@ -350,7 +337,7 @@ async def import_prometheus_asset(
         if result["success"]:
             asset_obj = result.get("asset")
             asset_id = asset_obj.asset_id if asset_obj else "unknown"
-            logger.info(f"Successfully imported asset: {asset_id}")
+            logger.info(f"Successfully imported asset: {asset_id}", extra={"action": "asset.import", "asset_id": asset_id})
             return {
                 "message": f"Asset imported successfully from {decoded_instance}",
                 "action": result.get("action"),
@@ -365,10 +352,10 @@ async def import_prometheus_asset(
             }
         else:
             error_msg = result.get("error", "Unknown error")
-            logger.error(f"Failed to import asset {decoded_instance}: {error_msg}")
+            logger.error(f"Failed to import asset {decoded_instance}: {error_msg}", extra={"action": "asset.import", "instance": decoded_instance, "error": error_msg})
             raise ConflictError(detail=f"Failed to import asset: {error_msg}")
     except Exception as e:
-        logger.exception(f"Exception during asset import: {e}")
+        logger.exception(f"Exception during asset import: {e}", extra={"action": "asset.import", "error": str(e)})
         raise ConflictError(detail=f"Failed to import asset: {str(e)}") from e
 
 
@@ -587,7 +574,7 @@ async def get_asset_metrics(
         "asset_name": asset.name,
         "ip_address": asset.ip_address,
         "metrics": metrics,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": now_shanghai().isoformat(),
     }
 
 

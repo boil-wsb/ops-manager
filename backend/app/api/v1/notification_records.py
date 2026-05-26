@@ -2,7 +2,7 @@
 Notification Record API endpoints.
 """
 
-import logging
+from app.core.logging import get_logger
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +14,7 @@ from app.schemas.notification_record import (
     NotificationRecordResponse,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/notification-records", tags=["通知记录"])
 

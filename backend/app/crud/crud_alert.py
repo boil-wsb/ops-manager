@@ -7,6 +7,7 @@ from datetime import datetime
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.tz import now_shanghai
 from app.crud.base import CRUDBase
 from app.models.alert import AlertHistory, AlertSilence, AlertTemplate
 from app.schemas.alert import (
@@ -25,7 +26,7 @@ class CRUDAlertSilence(CRUDBase[AlertSilence, AlertSilenceCreate, AlertSilenceUp
     ) -> list[AlertSilence]:
         """Get all active and currently effective silences."""
         if current_time is None:
-            current_time = datetime.utcnow()
+            current_time = now_shanghai()
 
         result = await db.execute(
             select(AlertSilence).where(

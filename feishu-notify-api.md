@@ -7,7 +7,9 @@
 - [发送卡片接口](#发送卡片接口)
 - [更新卡片接口](#更新卡片接口)
 - [通知记录管理接口](#通知记录管理接口)
+- [回调转发日志接口](#回调转发日志接口)
 - [API 调用示例](#api-调用示例)
+- [回调转发机制](#回调转发机制)
 - [数据库记录](#数据库记录)
 - [相关文件](#相关文件)
 
@@ -21,6 +23,7 @@
 | 查询通知记录列表 | `GET` | `/api/v1/notification-records` | 分页查询通知记录，支持筛选 |
 | 查询通知记录详情 | `GET` | `/api/v1/notification-records/{id}` | 获取单条通知记录详情 |
 | 删除通知记录 | `DELETE` | `/api/v1/notification-records/{id}` | 删除指定通知记录 |
+| 查询回调转发日志 | `GET` | `/api/v1/feishu/callback-logs` | 查询卡片回调转发日志，支持分页和筛选 |
 
 **认证方式**：所有接口需要 Bearer Token 认证（`Authorization: Bearer <token>`）
 
@@ -195,7 +198,8 @@ Authorization: Bearer <your_token>
   "user": "string | null",
   "chat_id": "string | null",
   "callback_id": "string | null",
-  "open_message_id": "string | null"
+  "open_message_id": "string | null",
+  "callback_url": "string | null"
 }
 ```
 
@@ -206,6 +210,7 @@ Authorization: Bearer <your_token>
 | `chat_id` | `string \| null` | 条件必填 | 飞书群聊 ID，如 `oc_cb42cb69eb9703e4cb284b516272c920`（与 `user` 二选一） |
 | `callback_id` | `string \| null` | 否 | 业务回调标识，用于后续卡片更新时验证归属 |
 | `open_message_id` | `string \| null` | 否 | 自定义消息标识，用于后续按此标识更新卡片（无需记住飞书返回的 `message_id`） |
+| `callback_url` | `string \| null` | 否 | 回调转发地址，卡片按钮点击时 POST 回调数据到该地址（提供时必须同时提供 `open_message_id`，仅支持 http/https 协议） |
 
 > **关于 `open_message_id`**：发送卡片时飞书会返回一个 `message_id`（如 `om_xxxxx`），后续更新卡片需要使用该 ID。如果发送时指定了 `open_message_id`，则后续可以通过 `PATCH /notify-by-open-id/{open_message_id}` 更新卡片，无需记住飞书的 `message_id`。
 
@@ -240,6 +245,7 @@ card_content = {
   "chat_id": null,
   "callback_id": "alert_123",
   "open_message_id": "my_custom_id",
+  "callback_url": null,
   "error": null
 }
 ```
@@ -252,6 +258,7 @@ card_content = {
 | `chat_id` | `string \| null` | 群聊 ID（发送给个人时为 null） |
 | `callback_id` | `string \| null` | 业务回调标识 |
 | `open_message_id` | `string \| null` | 自定义消息标识（发送时传入的值） |
+| `callback_url` | `string \| null` | 回调转发地址（发送时传入的值） |
 | `error` | `string \| null` | 错误信息（成功时为 null） |
 
 #### 失败响应
@@ -262,6 +269,7 @@ card_content = {
 | `400 Bad Request` | 用户无 `feishu_open_id` | `{"detail": "User zhangsan does not have a feishu_open_id"}` |
 | `404 Not Found` | 未找到匹配的用户 | `{"detail": "User not found"}` |
 | `401 Unauthorized` | 未认证 | - |
+| `422 Unprocessable Entity` | callback_url 提供但未提供 open_message_id，或协议不支持 | `{"detail": [{"msg": "提供 callback_url 时必须同时提供 open_message_id"}]}` |
 | `500 Internal Server Error` | 服务器内部错误 | - |
 
 ## 更新卡片接口
@@ -444,6 +452,7 @@ card_content = {
 | `receive_type` | `string` | 接收类型：`open_id`（个人）或 `chat_id`（群聊） |
 | `callback_id` | `string \| null` | 业务回调标识 |
 | `open_message_id` | `string \| null` | 自定义消息标识 |
+| `callback_url` | `string \| null` | 回调转发地址 |
 | `card_content` | `object \| null` | 卡片 JSON 内容 |
 | `message_id` | `string \| null` | 飞书返回的消息 ID |
 | `success` | `boolean` | 发送是否成功 |
@@ -533,6 +542,84 @@ curl "http://localhost:8000/api/v1/notification-records?success=true&page=2&page
 | HTTP 状态码 | 说明 | 示例 |
 |-------------|------|------|
 | `404 Not Found` | 记录不存在 | `{"detail": "Notification record not found"}` |
+
+## 回调转发日志接口
+
+### `GET /api/v1/feishu/callback-logs`
+
+分页查询卡片回调转发日志，支持按状态和通知记录 ID 筛选。
+
+#### 请求参数
+
+**查询参数 (Query Parameters)：**
+
+| 参数名 | 类型 | 必填 | 默认值 | 约束 | 说明 |
+|--------|------|------|--------|------|------|
+| `page` | `int` | 否 | `1` | `1 ~ 100` | 页码 |
+| `page_size` | `int` | 否 | `10` | `10 ~ 100` | 每页条数 |
+| `status` | `string` | 否 | - | `success` / `failed` | 按回调状态筛选 |
+| `notification_record_id` | `int` | 否 | - | - | 按通知记录 ID 筛选 |
+
+#### 成功响应 (200 OK)
+
+```json
+{
+  "total": 50,
+  "items": [
+    {
+      "id": 1,
+      "notification_record_id": 10,
+      "callback_url": "https://example.com/callback",
+      "request_data": {
+        "open_message_id": "alert_server_cpu",
+        "open_chat_id": "oc_xxxxx",
+        "operator": {"user_id": "ou_xxxxx"},
+        "action": {"value": "confirm"},
+        "callback_id": "alert_123",
+        "timestamp": "2026-05-21T10:00:00+08:00"
+      },
+      "status": "success",
+      "status_code": 200,
+      "error": null,
+      "created_at": "2026-05-21T10:00:00+08:00"
+    }
+  ]
+}
+```
+
+| 参数名 | 类型 | 说明 |
+|--------|------|------|
+| `total` | `int` | 符合筛选条件的总记录数 |
+| `items` | `array` | 当前页的回调转发日志列表 |
+
+**items 中每条记录的字段：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | `int` | 日志 ID |
+| `notification_record_id` | `int` | 关联的通知记录 ID |
+| `callback_url` | `string` | 回调转发地址 |
+| `request_data` | `object \| null` | 转发的回调数据 |
+| `status` | `string` | 回调状态：`success` 或 `failed` |
+| `status_code` | `int \| null` | 外部服务返回的 HTTP 状态码 |
+| `error` | `string \| null` | 错误信息（成功时为 null） |
+| `created_at` | `datetime` | 创建时间 |
+
+#### 请求示例
+
+```bash
+# 获取第一页（默认每页 10 条）
+curl "http://localhost:8000/api/v1/feishu/callback-logs" \
+  -H "Authorization: Bearer <your_token>"
+
+# 按回调状态筛选
+curl "http://localhost:8000/api/v1/feishu/callback-logs?status=failed" \
+  -H "Authorization: Bearer <your_token>"
+
+# 按通知记录 ID 筛选 + 自定义分页
+curl "http://localhost:8000/api/v1/feishu/callback-logs?notification_record_id=10&page=1&page_size=20" \
+  -H "Authorization: Bearer <your_token>"
+```
 
 ## API 调用示例
 
@@ -733,6 +820,33 @@ chat_payload = {
 chat_response = requests.post(notify_url, json=chat_payload, headers=headers)
 print("群聊发送结果:", chat_response.json())
 
+# 2c. 发送飞书通知卡片（带 callback_url，卡片按钮点击时转发回调到外部应用）
+callback_payload = {
+    "card_content": {
+        "schema": "2.0",
+        "header": {
+            "title": {"tag": "plain_text", "content": "审批通知"},
+            "template": "blue"
+        },
+        "body": {
+            "elements": [
+                {"tag": "markdown", "content": "**您有一条待审批任务**"},
+                {"tag": "action", "actions": [
+                    {"tag": "button", "text": {"tag": "plain_text", "content": "通过"}, "value": {"action": "approve"}},
+                    {"tag": "button", "text": {"tag": "plain_text", "content": "拒绝"}, "value": {"action": "reject"}}
+                ]}
+            ]
+        }
+    },
+    "user": "zhangsan",
+    "callback_id": "approval_001",
+    "open_message_id": "approval_task_001",
+    "callback_url": "https://example.com/api/feishu-callback"
+}
+
+callback_response = requests.post(notify_url, json=callback_payload, headers=headers)
+print("带回调发送结果:", callback_response.json())
+
 # 3a. 按消息 ID 更新卡片
 if result.get("success") and result.get("message_id"):
     message_id = result["message_id"]
@@ -785,6 +899,59 @@ records_response = requests.get(
 print("通知记录:", records_response.json())
 ```
 
+## 回调转发机制
+
+发送卡片时可通过 `callback_url` 参数注册回调转发地址，实现卡片按钮交互数据的自动转发。
+
+### 工作流程
+
+1. **注册回调**：发送卡片时提供 `callback_url` 和 `open_message_id`，系统将 `callback_url` 与 `open_message_id` 绑定存储到 `notification_records` 表
+2. **触发回调**：用户点击飞书卡片按钮时，飞书向系统发送卡片交互回调
+3. **匹配转发**：系统通过回调中的 `open_message_id` 查找对应的 `callback_url`，将回调数据 POST 转发到该地址
+4. **记录日志**：转发结果（成功/失败）记录到 `notification_callback_logs` 表
+
+### 回调数据格式
+
+转发到 `callback_url` 的 POST 请求体格式：
+
+```json
+{
+  "open_message_id": "alert_server_cpu",
+  "open_chat_id": "oc_xxxxx",
+  "operator": {
+    "user_id": "ou_xxxxx",
+    "name": "张三"
+  },
+  "action": {
+    "value": "confirm",
+    "tag": "button"
+  },
+  "callback_id": "alert_123",
+  "timestamp": "2026-05-21T10:00:00+08:00"
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `open_message_id` | `string` | 自定义消息标识（发送卡片时指定） |
+| `open_chat_id` | `string` | 飞书群聊 ID |
+| `operator` | `object` | 操作者信息，包含 `user_id` 和 `name` |
+| `action` | `object` | 按钮动作信息，包含 `value` 和 `tag` |
+| `callback_id` | `string \| null` | 业务回调标识（发送卡片时指定） |
+| `timestamp` | `string` | 回调触发时间（ISO 8601 格式） |
+
+### 回调失败处理
+
+- 转发请求超时时间为 **5 秒**，超时视为失败
+- 失败的回调会记录到 `notification_callback_logs` 表，包含错误信息和 HTTP 状态码
+- 可通过 `GET /api/v1/feishu/callback-logs?status=failed` 查询失败的回调日志
+
+### 安全考虑
+
+- `callback_url` 仅支持 `http://` 和 `https://` 协议，防止 SSRF 攻击
+- 提供时必须同时提供 `open_message_id`，否则返回 422 错误
+- 转发数据中对敏感字段进行脱敏处理（如 `operator.user_id` 仅保留前 4 位）
+
 ## 数据库记录
 
 每次调用发送/更新接口都会在 `notification_records` 表创建或更新记录：
@@ -799,6 +966,7 @@ print("通知记录:", records_response.json())
 | `receive_type` | `string` | 接收类型：`open_id`（个人）或 `chat_id`（群聊） |
 | `callback_id` | `string \| null` | 业务回调标识 |
 | `open_message_id` | `string \| null` | 自定义消息标识 |
+| `callback_url` | `string \| null` | 回调转发地址 |
 | `card_content` | `jsonb \| null` | 卡片 JSON 内容 |
 | `message_id` | `string \| null` | 飞书返回的消息 ID |
 | `success` | `boolean` | 发送是否成功 |
@@ -817,4 +985,8 @@ print("通知记录:", records_response.json())
 | `app/crud/crud_notification_record.py` | 通知记录 CRUD |
 | `app/models/notification_record.py` | 通知记录数据模型（含 `chat_id`, `receive_type`, `open_message_id` 字段） |
 | `app/schemas/notification_record.py` | 通知记录 Pydantic schemas |
+| `app/models/notification_callback_log.py` | 回调转发日志数据模型 |
+| `app/schemas/notification_callback_log.py` | 回调转发日志 Pydantic schemas |
+| `app/crud/crud_notification_callback_log.py` | 回调转发日志 CRUD |
+| `app/api/v1/notification_callback_logs.py` | 回调转发日志 API |
 | `frontend/src/pages/System/NotificationRecordList.tsx` | 前端通知记录页面 |

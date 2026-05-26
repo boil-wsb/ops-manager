@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
+from app.core.tz import now_shanghai
 from app.crud.crud_alert import crud_alert_silence
 from app.models.alert import AlertSilence
 
@@ -33,7 +34,7 @@ class AlertInhibitionService:
 
     def _is_cache_valid(self, cached_time: datetime) -> bool:
         """Check if cache is still valid."""
-        elapsed = (datetime.utcnow() - cached_time).total_seconds()
+        elapsed = (now_shanghai() - cached_time).total_seconds()
         return elapsed < self._cache_ttl
 
     async def get_active_silences_cached(
@@ -42,7 +43,7 @@ class AlertInhibitionService:
     ) -> list[AlertSilence]:
         """Get active silences with caching."""
         cache_key = "__all_active_silences__"
-        now = datetime.utcnow()
+        now = now_shanghai()
 
         if cache_key in self._cache:
             silences, cached_time = self._cache[cache_key]
@@ -79,7 +80,7 @@ class AlertInhibitionService:
             labels_str = str(sorted(alert_labels.items()))
             return regex.search(labels_str) is not None
         except re.error:
-            logger.warning(f"Invalid regex pattern: {pattern}")
+            logger.warning(f"无效的正则表达式: {pattern}", extra={"action": "alert.silence"})
             return False
 
     def is_alert_suppressed(
@@ -100,13 +101,13 @@ class AlertInhibitionService:
             if silence.match_labels and self._match_exact_labels(
                 alert_labels, silence.match_labels
             ):
-                logger.info(f"Alert matched silence rule: {silence.name}")
+                logger.info(f"告警匹配静默规则: {silence.name}", extra={"action": "alert.silence", "silence_name": silence.name})
                 return True, silence
 
             if silence.match_pattern and self._match_regex_pattern(
                 alert_labels, silence.match_pattern
             ):
-                logger.info(f"Alert matched silence regex pattern: {silence.name}")
+                logger.info(f"告警匹配静默正则: {silence.name}", extra={"action": "alert.silence", "silence_name": silence.name})
                 return True, silence
 
         return False, None

@@ -77,7 +77,8 @@ class FeishuNotificationService:
             if response.success():
                 message_id = response.data.message_id if response.data else None
                 logger.info(
-                    f"P2P card message sent to open_id: {open_id}, message_id: {message_id}"
+                    f"P2P卡片已发送: open_id={open_id}, message_id={message_id}",
+                    extra={"action": "feishu.notify", "open_id": open_id, "message_id": message_id},
                 )
                 self._record_outbound_interaction(
                     feishu_open_id=open_id,
@@ -89,7 +90,7 @@ class FeishuNotificationService:
                 )
                 return {"success": True, "message_id": message_id}
             else:
-                logger.error(f"Failed to send P2P card: code={response.code}, msg={response.msg}")
+                logger.error(f"P2P卡片发送失败: code={response.code}, msg={response.msg}", extra={"action": "feishu.notify", "open_id": open_id})
                 self._record_outbound_interaction(
                     feishu_open_id=open_id,
                     msg_type="interactive",
@@ -101,7 +102,7 @@ class FeishuNotificationService:
                 return {"success": False, "message_id": None}
 
         except Exception as exc:
-            logger.error(f"Error sending P2P card message: {str(exc)}")
+            logger.error(f"P2P卡片发送异常: {str(exc)}", extra={"action": "feishu.notify", "open_id": open_id})
             self._record_outbound_interaction(
                 feishu_open_id=open_id,
                 msg_type="interactive",
@@ -140,7 +141,7 @@ class FeishuNotificationService:
             response = self._get_client().im.v1.message.create(request)
 
             if response.success():
-                logger.info(f"P2P text message sent to open_id: {open_id}")
+                logger.info(f"P2P文本消息已发送: open_id={open_id}", extra={"action": "feishu.notify", "open_id": open_id})
                 self._record_outbound_interaction(
                     feishu_open_id=open_id,
                     msg_type="text",
@@ -150,7 +151,7 @@ class FeishuNotificationService:
                 )
                 return True
             else:
-                logger.error(f"Failed to send P2P text: code={response.code}, msg={response.msg}")
+                logger.error(f"P2P文本发送失败: code={response.code}, msg={response.msg}", extra={"action": "feishu.notify", "open_id": open_id})
                 self._record_outbound_interaction(
                     feishu_open_id=open_id,
                     msg_type="text",
@@ -162,7 +163,7 @@ class FeishuNotificationService:
                 return False
 
         except Exception as exc:
-            logger.error(f"Error sending P2P text message: {str(exc)}")
+            logger.error(f"P2P文本发送异常: {str(exc)}", extra={"action": "feishu.notify", "open_id": open_id})
             self._record_outbound_interaction(
                 feishu_open_id=open_id,
                 msg_type="text",
@@ -198,7 +199,7 @@ class FeishuNotificationService:
                 error=error,
             )
         except Exception as e:
-            logger.error(f"Failed to record outbound interaction: {e}")
+            logger.error(f"记录出站交互失败: {e}", extra={"action": "feishu.notify"})
 
     def build_alert_card(
         self,
@@ -281,14 +282,14 @@ class FeishuNotificationService:
             response = self._get_client().im.v1.message.patch(request)
 
             if response.success():
-                logger.info(f"Card message updated: open_message_id={open_message_id}")
+                logger.info(f"卡片消息已更新: open_message_id={open_message_id}", extra={"action": "feishu.notify", "open_message_id": open_message_id})
                 return {"success": True}
             else:
-                logger.error(f"Failed to update card: code={response.code}, msg={response.msg}")
+                logger.error(f"更新卡片失败: code={response.code}, msg={response.msg}", extra={"action": "feishu.notify", "open_message_id": open_message_id})
                 return {"success": False, "error": f"{response.code} - {response.msg}"}
 
         except Exception as exc:
-            logger.error(f"Error updating card message: {str(exc)}")
+            logger.error(f"更新卡片消息异常: {str(exc)}", extra={"action": "feishu.notify", "open_message_id": open_message_id})
             return {"success": False, "error": str(exc)}
 
     def build_resolved_card(

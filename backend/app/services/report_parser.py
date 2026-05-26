@@ -13,7 +13,7 @@ def parse_health_check_report(html_content: str) -> dict | None:
 
         return _parse_with_bs4(html_content)
     except ImportError:
-        logger.warning("bs4 not available, using regex parser")
+        logger.warning("bs4不可用，使用正则解析", extra={"action": "it_reporter.parse"})
         return _parse_with_regex(html_content)
 
 
@@ -236,7 +236,7 @@ def build_inspection_card_elements(
     if generate_time:
         meta_parts.append(f"🕐 巡检时间：{generate_time}")
     meta_parts.append(f"📁 报告大小：{file_size_mb} MB")
-    meta_parts.append(f"⏱️ 下载链接有效期：{expires_hours}小时")
+    meta_parts.append(f"⏱️ 下载链接有效期：{expires_hours}小时（自动续期）")
     elements.append({"tag": "markdown", "content": "\n".join(meta_parts)})
 
     elements.append({"tag": "hr"})
@@ -268,7 +268,7 @@ def _build_fallback_elements(
     elements = [
         {
             "tag": "markdown",
-            "content": f"📁 报告路径：{report_path}\n📏 文件大小：{file_size_mb} MB\n⏱️ 有效期：{expires_hours}小时\n\n> ⚠️ **安全提醒**: 下载链接有效期为{expires_hours}小时，请尽快下载",
+            "content": f"📁 报告路径：{report_path}\n📏 文件大小：{file_size_mb} MB\n⏱️ 有效期：{expires_hours}小时（自动续期）\n\n> 📥 点击下方按钮下载报告",
         },
         {"tag": "hr"},
     ]

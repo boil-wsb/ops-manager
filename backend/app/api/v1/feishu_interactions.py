@@ -1,4 +1,4 @@
-import logging
+from app.core.logging import get_logger
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -12,7 +12,7 @@ from app.schemas.feishu_interaction import (
     FeishuInteractionResponse,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/feishu", tags=["飞书交互记录"])
 

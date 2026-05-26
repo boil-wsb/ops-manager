@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.security import get_password_hash
+from app.core.tz import now_shanghai
 from app.crud.base import CRUDBase
 from app.models.permission import Role
 from app.models.user import User
@@ -102,7 +103,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             hashed_password=hashed_password,
             feishu_open_id=feishu_open_id,
             feishu_union_id=feishu_union_id,
-            feishu_sync_at=datetime.utcnow(),
+            feishu_sync_at=now_shanghai(),
             is_feishu_user=True,
             is_active=True,
         )
@@ -142,7 +143,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             user.full_name = full_name
         if email is not None:
             user.email = email
-        user.feishu_sync_at = datetime.utcnow()
+        user.feishu_sync_at = now_shanghai()
 
         await db.commit()
         await db.refresh(user)

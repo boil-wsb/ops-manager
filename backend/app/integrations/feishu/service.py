@@ -2,12 +2,12 @@
 Feishu service for sending messages.
 """
 
-import logging
 from typing import Any
 
 from app.config import settings
+from app.core.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class FeishuService:
@@ -68,7 +68,8 @@ class FeishuService:
 
         if not response.success():
             logger.error(
-                f"[Feishu] Failed to send message - user_id={user_id}, code={response.code}, msg={response.msg}"
+                f"发送消息失败: user_id={user_id}, code={response.code}, msg={response.msg}",
+                extra={"action": "feishu.api", "user_id": user_id, "code": response.code},
             )
             self._record_outbound_interaction(
                 feishu_open_id=user_id if receive_id_type == "open_id" else None,
@@ -81,7 +82,8 @@ class FeishuService:
             raise RuntimeError(f"Failed to send message: {response.msg}")
 
         logger.info(
-            f"[Feishu] Message sent successfully - user_id={user_id}, message_id={response.data.message_id if response.data else None}"
+            f"消息发送成功: user_id={user_id}, message_id={response.data.message_id if response.data else None}",
+            extra={"action": "feishu.api", "user_id": user_id},
         )
 
         msg_id = None
@@ -134,7 +136,7 @@ class FeishuService:
                 error=error,
             )
         except Exception as e:
-            logger.error(f"Failed to record outbound interaction: {e}")
+            logger.error(f"记录出站交互失败: {e}", extra={"action": "feishu.interaction", "error": str(e)})
 
     def send_text_message(self, user_id: str, text: str) -> dict[str, Any]:
         return self.send_message_to_user(
@@ -169,7 +171,8 @@ class FeishuService:
 
         if not response.success():
             logger.error(
-                f"[Feishu] Failed to add reaction - message_id={message_id}, emoji_type={emoji_type}, code={response.code}, msg={response.msg}"
+                f"添加表情回应失败: message_id={message_id}, emoji_type={emoji_type}, code={response.code}, msg={response.msg}",
+                extra={"action": "feishu.api", "message_id": message_id, "emoji_type": emoji_type},
             )
             return {
                 "reaction_id": None,
@@ -178,7 +181,8 @@ class FeishuService:
             }
 
         logger.info(
-            f"[Feishu] Reaction added successfully - message_id={message_id}, emoji_type={emoji_type}"
+            f"表情回应成功: message_id={message_id}, emoji_type={emoji_type}",
+            extra={"action": "feishu.api", "message_id": message_id},
         )
 
         if response.data:
@@ -442,16 +446,18 @@ class FeishuService:
             response = client.im.v1.message.patch(request)
 
             if response.success():
-                logger.info(f"[Feishu] Card updated successfully - message_id={open_message_id}")
+                logger.info(f"卡片更新成功: message_id={open_message_id}", extra={"action": "feishu.api", "message_id": open_message_id})
                 return {"success": True}
             else:
                 logger.error(
-                    f"[Feishu] Failed to update card - message_id={open_message_id}, code={response.code}, msg={response.msg}"
+                    f"卡片更新失败: message_id={open_message_id}, code={response.code}, msg={response.msg}",
+                    extra={"action": "feishu.api", "message_id": open_message_id, "code": response.code},
                 )
                 return {"success": False, "error": f"{response.code} - {response.msg}"}
         except Exception as e:
             logger.error(
-                f"[Feishu] Error patching message - message_id={open_message_id}, error={e}"
+                f"更新卡片消息异常: message_id={open_message_id}, error={e}",
+                extra={"action": "feishu.api", "message_id": open_message_id, "error": str(e)},
             )
             return {"success": False, "error": str(e)}
 

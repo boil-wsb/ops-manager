@@ -4,19 +4,17 @@
 从 Prometheus 同步终端指标数据
 """
 
-import asyncio
-import logging
+from app.core.logging import get_logger
 from datetime import UTC, datetime
 from typing import Any
 
-from celery import shared_task
 from sqlalchemy import select
-
+from app.db.session import db_operation_with_retry
 from app.models.asset import Asset, AssetType
+from app.core.tz import now_shanghai
 from app.services.prometheus.client import PrometheusClient
-from app.tasks.utils import get_celery_async_session
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 async def get_or_create_asset(
@@ -47,120 +45,93 @@ async def get_or_create_asset(
     return asset.id
 
 
-@shared_task(
-    name="tasks.sync_terminal_metrics",
-    bind=True,
-    max_retries=3,
-    default_retry_delay=60,
-)
-def sync_terminal_metrics_task(self) -> dict[str, Any]:
-    """从 Prometheus 同步终端指标的 Celery 任务
+async def _sync_terminal_metrics_db(db) -> dict[str, Any]:
+    from app.crud import crud_terminal_metric
+
+    start_time = now_shanghai()
+
+    client = PrometheusClient()
+
+    terminals = await client.get_all_terminals_with_metrics()
+    logger.debug(f"发现 {len(terminals)} 个终端", extra={"action": "terminal.metrics"})
+
+    synced_count = 0
+    for terminal in terminals:
+        hostname = terminal.get("hostname", "")
+        if not hostname:
+            continue
+
+        customer = terminal.get("customer", "")
+        instance = terminal.get("instance", "")
+
+        disk_usage = terminal.get("disk_usage", 0)
+        memory_usage = terminal.get("memory_usage", 0)
+        cpu_usage = terminal.get("cpu_usage", 0)
+        disk_total_bytes = terminal.get("disk_total", 0)
+        memory_total_bytes = terminal.get("memory_total", 0)
+        disk_total_gb = (
+            round(disk_total_bytes / (1024**3), 1) if disk_total_bytes else None
+        )
+        memory_total_gb = (
+            round(memory_total_bytes / (1024**3), 1) if memory_total_bytes else None
+        )
+
+        asset_id = await get_or_create_asset(db, hostname, instance, customer)
+
+        await crud_terminal_metric.upsert_metric(
+            db,
+            asset_id=asset_id,
+            hostname=hostname,
+            owner_username=customer,
+            ip_address=instance.split(":")[0] if instance else None,
+            cpu_usage=cpu_usage,
+            memory_usage=memory_usage,
+            memory_total_gb=memory_total_gb,
+            disk_usage=disk_usage,
+            disk_total_gb=disk_total_gb,
+            network_in=None,
+            network_out=None,
+            uptime_hours=None,
+            last_heartbeat=datetime.now(UTC),
+            current_status="online",
+            alert_count=0,
+            alert_severity=None,
+            monitor_name="pcinfo",
+        )
+        synced_count += 1
+
+    await db.commit()
+
+    end_time = now_shanghai()
+    duration = (end_time - start_time).total_seconds()
+
+    task_result = {
+        "status": "success",
+        "start_time": start_time.isoformat(),
+        "end_time": end_time.isoformat(),
+        "duration_seconds": duration,
+        "total_terminals": len(terminals),
+        "synced": synced_count,
+    }
+
+    logger.info("终端指标同步完成", extra={"action": "terminal.metrics", "total": task_result['total_terminals'], "synced": task_result['synced'], "duration_seconds": duration})
+
+    return task_result
+
+
+async def sync_terminal_metrics_task() -> dict[str, Any]:
+    """从 Prometheus 同步终端指标的异步任务
 
     每 5 分钟执行一次，同步终端性能指标到 terminal_metrics 表
     """
-    logger.debug("Starting scheduled terminal metrics sync from Prometheus")
-    start_time = datetime.utcnow()
-
-    async def _sync():
-        session_local = get_celery_async_session()
-
-        async with session_local() as db:
-            try:
-                from app.crud import crud_terminal_metric
-
-                client = PrometheusClient()
-
-                terminals = await client.get_all_terminals_with_metrics()
-                logger.debug(f"Found {len(terminals)} terminals from Prometheus")
-
-                synced_count = 0
-                for terminal in terminals:
-                    hostname = terminal.get("hostname", "")
-                    if not hostname:
-                        continue
-
-                    customer = terminal.get("customer", "")
-                    instance = terminal.get("instance", "")
-
-                    disk_usage = terminal.get("disk_usage", 0)
-                    memory_usage = terminal.get("memory_usage", 0)
-                    cpu_usage = terminal.get("cpu_usage", 0)
-                    disk_total_bytes = terminal.get("disk_total", 0)
-                    memory_total_bytes = terminal.get("memory_total", 0)
-                    disk_total_gb = (
-                        round(disk_total_bytes / (1024**3), 1) if disk_total_bytes else None
-                    )
-                    memory_total_gb = (
-                        round(memory_total_bytes / (1024**3), 1) if memory_total_bytes else None
-                    )
-
-                    asset_id = await get_or_create_asset(db, hostname, instance, customer)
-
-                    await crud_terminal_metric.upsert_metric(
-                        db,
-                        asset_id=asset_id,
-                        hostname=hostname,
-                        owner_username=customer,
-                        ip_address=instance.split(":")[0] if instance else None,
-                        cpu_usage=cpu_usage,
-                        memory_usage=memory_usage,
-                        memory_total_gb=memory_total_gb,
-                        disk_usage=disk_usage,
-                        disk_total_gb=disk_total_gb,
-                        network_in=None,
-                        network_out=None,
-                        uptime_hours=None,
-                        last_heartbeat=datetime.now(UTC),
-                        current_status="online",
-                        alert_count=0,
-                        alert_severity=None,
-                        monitor_name="pcinfo",
-                    )
-                    synced_count += 1
-
-                await db.commit()
-
-                end_time = datetime.utcnow()
-                duration = (end_time - start_time).total_seconds()
-
-                task_result = {
-                    "status": "success",
-                    "start_time": start_time.isoformat(),
-                    "end_time": end_time.isoformat(),
-                    "duration_seconds": duration,
-                    "total_terminals": len(terminals),
-                    "synced": synced_count,
-                }
-
-                logger.debug(
-                    f"Terminal metrics sync completed in {duration:.2f}s: "
-                    f"total={task_result['total_terminals']}, synced={task_result['synced']}"
-                )
-
-                return task_result
-
-            except Exception as e:
-                await db.rollback()
-                raise e from e
+    logger.debug("开始定时终端指标同步", extra={"action": "terminal.metrics"})
 
     try:
-        return asyncio.run(_sync())
-    except Exception as exc:
-        logger.error(f"Terminal metrics sync task failed: {exc}")
-
-        if self.request.retries < self.max_retries:
-            logger.debug(
-                f"Retrying terminal metrics sync task (attempt {self.request.retries + 1}/{self.max_retries})"
-            )
-            raise self.retry(exc=exc) from exc
-
-        return {
-            "status": "failed",
-            "start_time": start_time.isoformat(),
-            "end_time": datetime.utcnow().isoformat(),
-            "error": str(exc),
-            "retry_exhausted": True,
-        }
+        return await db_operation_with_retry(
+            _sync_terminal_metrics_db, max_retries=3, retry_delay=2.0
+        )
+    except Exception as e:
+        raise
 
 
 def get_sync_interval() -> float:

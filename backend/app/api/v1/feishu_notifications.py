@@ -2,7 +2,7 @@
 Feishu notification API endpoints.
 """
 
-import logging
+from app.core.logging import get_logger
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -20,7 +20,7 @@ from app.schemas.notification_record import (
     NotificationRecordUpdate,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def get_feishu_service():
@@ -38,6 +38,7 @@ class FeishuCardSendRequest(BaseModel):
     chat_id: str | None = Field(None, description="飞书群聊 ID（发送到群聊）")
     callback_id: str | None = Field(None, description="业务回调标识，用于后续卡片更新")
     open_message_id: str | None = Field(None, description="自定义消息标识，用于后续按此标识更新卡片")
+    callback_url: str | None = Field(None, description="回调转发地址，卡片按钮点击时 POST 回调数据到该地址")
 
     @model_validator(mode="after")
     def validate_target(self):
@@ -45,6 +46,10 @@ class FeishuCardSendRequest(BaseModel):
             raise ValueError("user 和 chat_id 必须提供其中一个")
         if self.user and self.chat_id:
             raise ValueError("user 和 chat_id 不能同时提供")
+        if self.callback_url and not self.open_message_id:
+            raise ValueError("提供 callback_url 时必须同时提供 open_message_id")
+        if self.callback_url and not self.callback_url.startswith(("http://", "https://")):
+            raise ValueError("callback_url 仅支持 http:// 或 https:// 协议")
         return self
 
 
@@ -55,11 +60,12 @@ class FeishuCardSendResponse(BaseModel):
     chat_id: str | None = None
     callback_id: str | None = None
     open_message_id: str | None = None
+    callback_url: str | None = None
     error: str | None = None
 
 
 class FeishuCardUpdateRequest(BaseModel):
-    card_content: dict[str, Any] = Field(..., description="更新后的飞书卡片 JSON 内容")
+    card_content: dict[str, Any] | None = Field(None, description="更新后的飞书卡片 JSON 内容，为空时使用数据库中保存的内容")
     callback_id: str | None = Field(None, description="业务回调标识，用于验证卡片归属（按 message_id 更新时必填）")
 
 
@@ -96,7 +102,7 @@ async def send_feishu_card_notification(
     request: FeishuCardSendRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    logger.info(f"[Feishu Notify] Received request: user={request.user}, chat_id={request.chat_id}")
+    logger.info(f"Received request: user={request.user}, chat_id={request.chat_id}", extra={"action": "feishu.notify", "user": request.user, "chat_id": request.chat_id})
     """Send Feishu interactive card notification to a user or chat.
 
     - If `chat_id` is provided, sends directly to the group chat.
@@ -113,6 +119,7 @@ async def send_feishu_card_notification(
             receive_type="chat_id",
             callback_id=request.callback_id,
             open_message_id=request.open_message_id,
+            callback_url=request.callback_url,
             card_content=request.card_content,
             success=False,
             error=None,
@@ -144,6 +151,7 @@ async def send_feishu_card_notification(
                     chat_id=request.chat_id,
                     callback_id=request.callback_id,
                     open_message_id=request.open_message_id,
+                    callback_url=request.callback_url,
                 )
             else:
                 await notification_record.update(
@@ -159,10 +167,11 @@ async def send_feishu_card_notification(
                     chat_id=request.chat_id,
                     callback_id=request.callback_id,
                     open_message_id=request.open_message_id,
+                    callback_url=request.callback_url,
                     error=result.get("msg", "Unknown error"),
                 )
         except RuntimeError as e:
-            logger.error(f"[Feishu] Failed to send card to chat: {e}")
+            logger.error(f"Failed to send card to chat: {e}", extra={"action": "feishu.notify", "chat_id": request.chat_id, "error": str(e)})
             await notification_record.update(
                 db,
                 record_id=notification_record_db.id,
@@ -173,11 +182,12 @@ async def send_feishu_card_notification(
                 chat_id=request.chat_id,
                 callback_id=request.callback_id,
                 open_message_id=request.open_message_id,
+                callback_url=request.callback_url,
                 error=str(e),
             )
 
         except Exception as e:
-            logger.error(f"[Feishu] Unexpected error sending card to chat: {e}")
+            logger.error(f"Unexpected error sending card to chat: {e}", extra={"action": "feishu.notify", "chat_id": request.chat_id, "error": str(e)})
             await notification_record.update(
                 db,
                 record_id=notification_record_db.id,
@@ -188,13 +198,14 @@ async def send_feishu_card_notification(
                 chat_id=request.chat_id,
                 callback_id=request.callback_id,
                 open_message_id=request.open_message_id,
+                callback_url=request.callback_url,
                 error=str(e),
             )
 
     user = await _get_user_by_identifier(db, request.user)
 
     if not user:
-        logger.warning(f"[Feishu Notify] User not found: {request.user}")
+        logger.warning(f"User not found: {request.user}", extra={"action": "feishu.notify", "user": request.user})
         raise HTTPException(status_code=404, detail="User not found")
 
     if not user.feishu_open_id:
@@ -210,6 +221,7 @@ async def send_feishu_card_notification(
         receive_type="open_id",
         callback_id=request.callback_id,
         open_message_id=request.open_message_id,
+        callback_url=request.callback_url,
         card_content=request.card_content,
         success=False,
         error=None,
@@ -240,6 +252,7 @@ async def send_feishu_card_notification(
                 matched_user=user.username,
                 callback_id=request.callback_id,
                 open_message_id=request.open_message_id,
+                callback_url=request.callback_url,
             )
         else:
             await notification_record.update(
@@ -255,10 +268,11 @@ async def send_feishu_card_notification(
                 matched_user=user.username,
                 callback_id=request.callback_id,
                 open_message_id=request.open_message_id,
+                callback_url=request.callback_url,
                 error=result.get("msg", "Unknown error"),
             )
     except RuntimeError as e:
-        logger.error(f"[Feishu] Failed to send card notification: {e}")
+        logger.error(f"Failed to send card notification: {e}", extra={"action": "feishu.notify", "user": user.username, "error": str(e)})
         await notification_record.update(
             db,
             record_id=notification_record_db.id,
@@ -269,11 +283,12 @@ async def send_feishu_card_notification(
             matched_user=user.username,
             callback_id=request.callback_id,
             open_message_id=request.open_message_id,
+            callback_url=request.callback_url,
             error=str(e),
         )
 
     except Exception as e:
-        logger.error(f"[Feishu] Unexpected error sending card notification: {e}")
+        logger.error(f"Unexpected error sending card notification: {e}", extra={"action": "feishu.notify", "user": user.username, "error": str(e)})
         await notification_record.update(
             db,
             record_id=notification_record_db.id,
@@ -284,6 +299,7 @@ async def send_feishu_card_notification(
             matched_user=user.username,
             callback_id=request.callback_id,
             open_message_id=request.open_message_id,
+            callback_url=request.callback_url,
             error=str(e),
         )
 
@@ -309,11 +325,15 @@ async def update_feishu_card(
     if request.callback_id and record.callback_id != request.callback_id:
         raise HTTPException(status_code=403, detail="callback_id does not match")
 
+    card_content = request.card_content or record.card_content
+    if not card_content:
+        raise HTTPException(status_code=400, detail="No card_content provided and no saved content found")
+
     try:
         feishu_service = get_feishu_service()
         update_result = feishu_service.update_card_message(
             open_message_id=message_id,
-            card_content=request.card_content,
+            card_content=card_content,
         )
 
         if update_result.get("success"):
@@ -344,7 +364,7 @@ async def update_feishu_card(
                 error=update_result.get("error", "Unknown error"),
             )
     except RuntimeError as e:
-        logger.error(f"[Feishu] Failed to update card: {e}")
+        logger.error(f"Failed to update card: {e}", extra={"action": "feishu.notify", "message_id": message_id, "error": str(e)})
         await notification_record.update(
             db,
             record_id=record.id,
@@ -353,7 +373,7 @@ async def update_feishu_card(
         return FeishuCardUpdateResponse(success=False, message_id=message_id, error=str(e))
 
     except Exception as e:
-        logger.error(f"[Feishu] Unexpected error updating card: {e}")
+        logger.error(f"Unexpected error updating card: {e}", extra={"action": "feishu.notify", "message_id": message_id, "error": str(e)})
         await notification_record.update(
             db,
             record_id=record.id,
@@ -389,11 +409,15 @@ async def update_feishu_card_by_open_message_id(
     if request.callback_id and record.callback_id and record.callback_id != request.callback_id:
         raise HTTPException(status_code=403, detail="callback_id does not match")
 
+    card_content = request.card_content or record.card_content
+    if not card_content:
+        raise HTTPException(status_code=400, detail="No card_content provided and no saved content found")
+
     try:
         feishu_service = get_feishu_service()
         update_result = feishu_service.update_card_message(
             open_message_id=record.message_id,
-            card_content=request.card_content,
+            card_content=card_content,
         )
 
         if update_result.get("success"):
@@ -401,7 +425,7 @@ async def update_feishu_card_by_open_message_id(
                 db,
                 record_id=record.id,
                 obj_in=NotificationRecordUpdate(
-                    card_content=request.card_content,
+                    card_content=card_content,
                     success=True,
                 ),
             )
@@ -424,7 +448,7 @@ async def update_feishu_card_by_open_message_id(
                 error=update_result.get("error", "Unknown error"),
             )
     except RuntimeError as e:
-        logger.error(f"[Feishu] Failed to update card by open_message_id: {e}")
+        logger.error(f"Failed to update card by open_message_id: {e}", extra={"action": "feishu.notify", "open_message_id": open_message_id, "error": str(e)})
         await notification_record.update(
             db,
             record_id=record.id,
@@ -433,7 +457,7 @@ async def update_feishu_card_by_open_message_id(
         return FeishuCardUpdateResponse(success=False, message_id=record.message_id, error=str(e))
 
     except Exception as e:
-        logger.error(f"[Feishu] Unexpected error updating card by open_message_id: {e}")
+        logger.error(f"Unexpected error updating card by open_message_id: {e}", extra={"action": "feishu.notify", "open_message_id": open_message_id, "error": str(e)})
         await notification_record.update(
             db,
             record_id=record.id,

@@ -18,9 +18,10 @@ from app.api.v1 import (
     feishu_sync,
     it_feedback,
     it_feedback_notifications,
+    health_check,
     it_reporter,
-    monitor,
     navigation,
+    notification_callback_logs,
     notification_groups,
     notification_records,
     open_id,
@@ -42,7 +43,6 @@ api_router.include_router(roles.router, prefix="/v1", tags=["角色"])
 api_router.include_router(permissions.router, prefix="/v1", tags=["权限"])
 api_router.include_router(assets.router, prefix="/v1", tags=["资产"])
 api_router.include_router(ops.router, prefix="/v1", tags=["运维"])
-api_router.include_router(monitor.router, prefix="/v1", tags=["监控"])
 api_router.include_router(audit_logs.router, prefix="/v1", tags=["审计日志"])
 api_router.include_router(navigation.router, prefix="/v1", tags=["导航管理"])
 api_router.include_router(notification_groups.router, prefix="/v1", tags=["通知组管理"])
@@ -51,6 +51,7 @@ api_router.include_router(it_feedback_notifications.router, prefix="/v1", tags=[
 api_router.include_router(pc_client_version.router, prefix="/v1", tags=["PC客户端版本"])
 api_router.include_router(feishu_sync.router, prefix="/v1", tags=["飞书同步"])
 api_router.include_router(feishu_notifications.router, prefix="/v1", tags=["飞书通知"])
+api_router.include_router(notification_callback_logs.router, prefix="/v1", tags=["飞书通知"])
 api_router.include_router(feishu_interactions.router, prefix="/v1", tags=["飞书交互记录"])
 api_router.include_router(notification_records.router, prefix="/v1", tags=["通知记录"])
 api_router.include_router(alerts.router, prefix="/v1", tags=["告警中心"])
@@ -60,4 +61,5 @@ api_router.include_router(alert_history.router, prefix="/v1/alert", tags=["告�
 api_router.include_router(scheduled_tasks.router, prefix="/v1", tags=["定时任务"])
 api_router.include_router(system_configs.router, prefix="/v1", tags=["系统配置"])
 api_router.include_router(it_reporter.router, prefix="/v1", tags=["IT巡检报告"])
+api_router.include_router(health_check.router, prefix="/v1", tags=["每日健康巡检"])
 api_router.include_router(open_id.router, prefix="/v1", tags=["Open ID 查询"])

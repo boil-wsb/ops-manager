@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
+from app.core.tz import now_shanghai
 from app.crud.crud_alert import crud_alert_template
 from app.models.alert import AlertTemplate
 
@@ -29,7 +30,7 @@ class AlertTemplateService:
 
     def _is_cache_valid(self, cached_time: datetime) -> bool:
         """Check if template cache is still valid."""
-        elapsed = (datetime.utcnow() - cached_time).total_seconds()
+        elapsed = (now_shanghai() - cached_time).total_seconds()
         return elapsed < self._cache_ttl
 
     async def get_template_cached(
@@ -45,7 +46,7 @@ class AlertTemplateService:
 
         template = await crud_alert_template.get(db, id=template_id)
         if template:
-            self._cache[template_id] = (template, datetime.utcnow())
+            self._cache[template_id] = (template, now_shanghai())
         return template
 
     def _escape_go_template(self, text: str) -> str:
@@ -336,7 +337,7 @@ class AlertTemplateService:
                 "severity": "critical",
                 "instance": "server-01",
                 "description": "Memory usage is above 90%",
-                "starts_at": datetime.utcnow(),
+                "starts_at": now_shanghai(),
                 "labels": {
                     "alertname": "HighMemoryUsage",
                     "severity": "critical",

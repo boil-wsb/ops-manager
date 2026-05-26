@@ -3,7 +3,6 @@ import { Tree, Tooltip, Typography } from 'antd';
 import {
   DashboardOutlined,
   DatabaseOutlined,
-  MonitorOutlined,
   DeploymentUnitOutlined,
   SettingOutlined,
   CheckCircleOutlined,
@@ -25,7 +24,6 @@ const { Text } = Typography;
 const iconMap: Record<string, React.ReactNode> = {
   DashboardOutlined: <DashboardOutlined />,
   DatabaseOutlined: <DatabaseOutlined />,
-  MonitorOutlined: <MonitorOutlined />,
   DeploymentUnitOutlined: <DeploymentUnitOutlined />,
   SettingOutlined: <SettingOutlined />,
   AppstoreOutlined: <AppstoreOutlined />,

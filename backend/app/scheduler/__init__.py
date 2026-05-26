@@ -10,22 +10,13 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from app.config import settings
 from app.core.logging import get_logger
-from app.db.session import get_session_maker
+from app.db.session import db_operation_with_retry, get_session_maker
 
 logger = get_logger(__name__)
 
 scheduler: AsyncIOScheduler | None = None
 
 BUILTIN_TASKS = [
-    {
-        "task_id": "check-all-monitors",
-        "name": "监控检查",
-        "task_function": "app.tasks.monitor_tasks.check_all_monitors",
-        "trigger_type": "interval",
-        "trigger_config": {"seconds": 60},
-        "category": "monitor",
-        "description": "检查所有启用的监控项状态",
-    },
     {
         "task_id": "cleanup-audit-logs-db",
         "name": "审计日志数据库清理",
@@ -101,6 +92,15 @@ BUILTIN_TASKS = [
         "category": "ops",
         "description": "处理IT系统健康巡检报告并发送飞书通知",
     },
+    {
+        "task_id": "daily-health-check",
+        "name": "每日健康巡检",
+        "task_function": "app.tasks.health_check_tasks.daily_health_check_task",
+        "trigger_type": "cron",
+        "trigger_config": {"hour": 9, "minute": 0},
+        "category": "ops",
+        "description": "基于 Prometheus 的每日系统健康巡检",
+    },
 ]
 
 
@@ -111,35 +111,50 @@ def get_scheduler() -> AsyncIOScheduler:
     return scheduler
 
 
-async def register_builtin_tasks():
+async def _register_all_tasks(db):
     from app.crud.crud_scheduled_task import crud_scheduled_task
     from app.crud.crud_system_config import crud_system_config
 
-    session_maker = get_session_maker()
-    async with session_maker() as db:
-        for task_def in BUILTIN_TASKS:
-            try:
-                await crud_scheduled_task.upsert_by_task_id(
-                    db,
-                    task_id=task_def["task_id"],
-                    name=task_def["name"],
-                    task_function=task_def["task_function"],
-                    trigger_type=task_def["trigger_type"],
-                    trigger_config=task_def["trigger_config"],
-                    category=task_def["category"],
-                    description=task_def.get("description"),
-                )
-                await crud_system_config.upsert_by_key(
-                    db,
-                    key=f"scheduler.task_mapping.{task_def['task_id']}",
-                    value=task_def["task_function"],
-                    group="scheduler",
-                    description=f"定时任务「{task_def['name']}」对应的代码函数路径",
-                )
-            except Exception as e:
-                logger.error(f"Failed to register builtin task {task_def['task_id']}: {e}")
+    builtin_task_ids = {t["task_id"] for t in BUILTIN_TASKS}
 
-        await _init_default_configs(db)
+    all_tasks, _ = await crud_scheduled_task.get_multi(db, limit=1000)
+    for task in all_tasks:
+        if task.task_id not in builtin_task_ids:
+            try:
+                sched = get_scheduler()
+                if sched.get_job(task.task_id):
+                    sched.remove_job(task.task_id)
+                for log in task.execution_logs:
+                    await db.delete(log)
+                await db.delete(task)
+                logger.info(f"清理已移除的内置任务: {task.task_id}", extra={"action": "scheduler.register", "task_id": task.task_id})
+            except Exception as e:
+                logger.error(f"清理任务失败: {task.task_id}", extra={"action": "scheduler.register", "task_id": task.task_id, "error": str(e)})
+    await db.commit()
+
+    for task_def in BUILTIN_TASKS:
+        try:
+            await crud_scheduled_task.upsert_by_task_id(
+                db,
+                task_id=task_def["task_id"],
+                name=task_def["name"],
+                task_function=task_def["task_function"],
+                trigger_type=task_def["trigger_type"],
+                trigger_config=task_def["trigger_config"],
+                category=task_def["category"],
+                description=task_def.get("description"),
+            )
+            await crud_system_config.upsert_by_key(
+                db,
+                key=f"scheduler.task_mapping.{task_def['task_id']}",
+                value=task_def["task_function"],
+                group="scheduler",
+                description=f"定时任务「{task_def['name']}」对应的代码函数路径",
+            )
+        except Exception as e:
+            logger.error(f"注册内置任务失败: {task_def['task_id']}", extra={"action": "scheduler.register", "task_id": task_def['task_id'], "error": str(e)})
+
+    await _init_default_configs(db)
 
 
 async def _init_default_configs(db):
@@ -175,67 +190,149 @@ async def _init_default_configs(db):
         try:
             existing = await crud_system_config.get_by_key(db, config["key"])
             if existing:
-                if not existing.value and config.get("value"):
+                if existing.value != config.get("value", ""):
                     existing.value = config["value"]
                     await db.commit()
                 continue
             await crud_system_config.upsert_by_key(db, **config)
         except Exception as e:
-            logger.error(f"Failed to init default config {config['key']}: {e}")
+            logger.error(f"初始化默认配置失败: {config['key']}", extra={"action": "scheduler.register", "config_key": config['key'], "error": str(e)})
+
+
+async def register_builtin_tasks():
+    try:
+        await db_operation_with_retry(
+            _register_all_tasks,
+            max_retries=3,
+            retry_delay=2.0,
+        )
+    except Exception as e:
+        logger.error(f"注册内置任务失败: {e}", extra={"action": "scheduler.register"})
+
+
+async def _load_enabled_tasks(db):
+    from app.crud.crud_scheduled_task import crud_scheduled_task
+    tasks, _ = await crud_scheduled_task.get_multi(db, limit=1000, is_enabled=True)
+    return tasks
 
 
 async def load_tasks_from_db():
-    from app.crud.crud_scheduled_task import crud_scheduled_task
-
     sched = get_scheduler()
-    session_maker = get_session_maker()
-    async with session_maker() as db:
-        tasks, _ = await crud_scheduled_task.get_multi(db, limit=1000, is_enabled=True)
-        for task in tasks:
+    try:
+        tasks = await db_operation_with_retry(
+            _load_enabled_tasks,
+            max_retries=3,
+            retry_delay=2.0,
+        )
+    except Exception as e:
+        logger.error(f"加载任务列表失败: {e}", extra={"action": "scheduler.load"})
+        return
+
+    for task in tasks:
+        try:
+            trigger = _build_trigger(task.trigger_type, task.trigger_config)
+            if trigger is None:
+                logger.error(f"构建触发器失败: {task.task_id}", extra={"action": "scheduler.load", "task_id": task.task_id})
+                continue
+            sched.add_job(
+                _execute_task_wrapper,
+                trigger=trigger,
+                id=task.task_id,
+                name=task.name,
+                args=[task.task_id],
+                replace_existing=True,
+            )
+            logger.info(f"加载定时任务: {task.task_id} ({task.trigger_type})", extra={"action": "scheduler.load", "task_id": task.task_id, "trigger_type": task.trigger_type})
+        except Exception as e:
+            logger.error(f"加载任务失败: {task.task_id}", extra={"action": "scheduler.load", "task_id": task.task_id, "error": str(e)})
+
+
+def _sanitize_trigger_config(config: dict) -> dict:
+    cleaned = {}
+    for key, value in config.items():
+        if isinstance(value, str):
+            value = value.strip()
+            if value == "":
+                continue
             try:
-                trigger = _build_trigger(task.trigger_type, task.trigger_config)
-                if trigger is None:
-                    logger.error(f"Failed to build trigger for task {task.task_id}")
+                value = int(value)
+            except ValueError:
+                try:
+                    value = float(value)
+                except ValueError:
                     continue
-                sched.add_job(
-                    _execute_task_wrapper,
-                    trigger=trigger,
-                    id=task.task_id,
-                    name=task.name,
-                    args=[task.task_id],
-                    replace_existing=True,
-                )
-                logger.info(f"Loaded scheduled task: {task.task_id} ({task.trigger_type})")
-            except Exception as e:
-                logger.error(f"Failed to load task {task.task_id}: {e}")
+        cleaned[key] = value
+    return cleaned
 
 
 def _build_trigger(trigger_type: str, trigger_config: dict):
     try:
+        cleaned = _sanitize_trigger_config(trigger_config)
         if trigger_type == "cron":
-            return CronTrigger(timezone="Asia/Shanghai", **trigger_config)
+            return CronTrigger(timezone="Asia/Shanghai", **cleaned)
         elif trigger_type == "interval":
-            return IntervalTrigger(timezone="Asia/Shanghai", **trigger_config)
+            if not cleaned:
+                logger.error("间隔触发器配置为空", extra={"action": "scheduler.load", "trigger_type": trigger_type, "trigger_config": trigger_config})
+                return None
+            return IntervalTrigger(timezone="Asia/Shanghai", **cleaned)
         else:
-            logger.error(f"Unknown trigger type: {trigger_type}")
+            logger.error(f"未知触发器类型: {trigger_type}", extra={"action": "scheduler.load", "trigger_type": trigger_type})
             return None
     except Exception as e:
-        logger.error(f"Failed to build trigger ({trigger_type}, {trigger_config}): {e}")
+        logger.error(f"构建触发器失败: ({trigger_type}, {trigger_config})", extra={"action": "scheduler.load", "trigger_type": trigger_type, "error": str(e)})
         return None
 
 
-async def _execute_task_wrapper(task_id: str):
+async def _get_task_function_path(db, task_id: str) -> str | None:
     from app.crud.crud_scheduled_task import crud_scheduled_task
+    task = await crud_scheduled_task.get_by_task_id(db, task_id)
+    if not task:
+        return None
+    return task.task_function
 
-    session_maker = get_session_maker()
 
+async def _update_task_execution_log(
+    db, task_id, status, started_at, finished_at, duration,
+    error_message, result_summary, trigger_type="scheduled", triggered_by=None,
+):
+    from app.crud.crud_scheduled_task import crud_scheduled_task
+    await crud_scheduled_task.create_execution_log(
+        db,
+        task_id=task_id,
+        status=status,
+        started_at=started_at,
+        finished_at=finished_at,
+        duration=duration,
+        error_message=error_message,
+        result_summary=result_summary,
+        trigger_type=trigger_type,
+        triggered_by=triggered_by,
+    )
+    await crud_scheduled_task.update_run_status(
+        db,
+        task_id=task_id,
+        status=status,
+        duration=duration,
+        result_summary=result_summary,
+        error_message=error_message,
+    )
+
+
+async def _execute_task_wrapper(task_id: str):
     task_function_path = None
-    async with session_maker() as db:
-        task = await crud_scheduled_task.get_by_task_id(db, task_id)
-        if not task:
-            logger.debug(f"Task {task_id} not found in database")
-            return
-        task_function_path = task.task_function
+    try:
+        task_function_path = await db_operation_with_retry(
+            lambda db: _get_task_function_path(db, task_id),
+            max_retries=2,
+            retry_delay=1.0,
+        )
+    except Exception as e:
+        logger.error(f"查询任务配置失败: {task_id}", extra={"action": "scheduler.run", "task_id": task_id, "error": str(e)})
+        return
+
+    if not task_function_path:
+        logger.debug(f"任务 {task_id} 未找到", extra={"action": "scheduler.run", "task_id": task_id})
+        return
 
     started_at = datetime.now(ZoneInfo("Asia/Shanghai"))
     error_message = None
@@ -262,8 +359,8 @@ async def _execute_task_wrapper(task_id: str):
         if isinstance(result, dict):
             if result.get("result_summary"):
                 result_summary = result["result_summary"]
-            elif result.get("presigned_url"):
-                result_summary = f"status={result.get('status', 'success')}, presigned_url={result['presigned_url']}"
+            elif result.get("download_url"):
+                result_summary = f"status={result.get('status', 'success')}, download_url={result['download_url']}"
             else:
                 result_summary = str(result.get("status", ""))
             if result.get("error"):
@@ -279,80 +376,79 @@ async def _execute_task_wrapper(task_id: str):
             result_summary = result
 
         if status == "success":
-            logger.debug(f"Task {task_id} completed in {duration:.2f}s")
+            logger.debug(f"任务 {task_id} 完成，耗时 {duration:.2f}s", extra={"action": "scheduler.run", "task_id": task_id, "duration": duration})
         else:
-            logger.debug(f"Task {task_id} failed: {error_message}")
+            logger.debug(f"任务 {task_id} 失败: {error_message}", extra={"action": "scheduler.run", "task_id": task_id, "error": error_message})
 
     except Exception as e:
         duration = time.time() - start_time
         status = "failed"
         error_message = str(e)
-        logger.debug(f"Task {task_id} execution error: {e}")
+        logger.debug(f"任务 {task_id} 执行异常: {e}", extra={"action": "scheduler.run", "task_id": task_id, "error": str(e)})
 
     finished_at = datetime.now(ZoneInfo("Asia/Shanghai"))
 
     try:
-        async with session_maker() as db:
-            await crud_scheduled_task.create_execution_log(
-                db,
-                task_id=task_id,
-                status=status,
-                started_at=started_at,
-                finished_at=finished_at,
-                duration=duration,
-                error_message=error_message,
-                result_summary=result_summary,
-                trigger_type="scheduled",
-            )
-            await crud_scheduled_task.update_run_status(
-                db,
-                task_id=task_id,
-                status=status,
-                duration=duration,
-                result_summary=result_summary,
-                error_message=error_message,
-            )
+        await db_operation_with_retry(
+            lambda db: _update_task_execution_log(
+                db, task_id, status, started_at, finished_at, duration,
+                error_message, result_summary,
+            ),
+            max_retries=2,
+            retry_delay=1.0,
+        )
     except Exception as e:
-        logger.debug(f"Failed to update task status for {task_id}: {e}")
+        logger.debug(f"更新任务状态失败: {task_id}", extra={"action": "scheduler.run", "task_id": task_id, "error": str(e)})
+
+
+async def _update_scheduler_job_db(db, task_id: str, sched):
+    from app.crud.crud_scheduled_task import crud_scheduled_task
+    task = await crud_scheduled_task.get_by_task_id(db, task_id)
+    if not task:
+        return None
+
+    if not task.is_enabled:
+        return "remove"
+
+    trigger = _build_trigger(task.trigger_type, task.trigger_config)
+    if trigger is None:
+        return None
+
+    sched.add_job(
+        _execute_task_wrapper,
+        trigger=trigger,
+        id=task.task_id,
+        name=task.name,
+        args=[task.task_id],
+        replace_existing=True,
+    )
+
+    try:
+        job = sched.get_job(task_id)
+        if job:
+            task.next_run_time = job.next_run_time
+            db.add(task)
+            await db.commit()
+    except Exception:
+        pass
+
+    return "updated"
 
 
 def update_scheduler_job(task_id: str):
-    from app.crud.crud_scheduled_task import crud_scheduled_task
-
     sched = get_scheduler()
 
     async def _update():
-        session_maker = get_session_maker()
-        async with session_maker() as db:
-            task = await crud_scheduled_task.get_by_task_id(db, task_id)
-            if not task:
-                return
-
-            if not task.is_enabled:
-                remove_scheduler_job(task_id)
-                return
-
-            trigger = _build_trigger(task.trigger_type, task.trigger_config)
-            if trigger is None:
-                return
-
-            sched.add_job(
-                _execute_task_wrapper,
-                trigger=trigger,
-                id=task.task_id,
-                name=task.name,
-                args=[task.task_id],
-                replace_existing=True,
+        try:
+            result = await db_operation_with_retry(
+                lambda db: _update_scheduler_job_db(db, task_id, sched),
+                max_retries=2,
+                retry_delay=1.0,
             )
-
-            try:
-                job = sched.get_job(task_id)
-                if job:
-                    task.next_run_time = job.next_run_time
-                    db.add(task)
-                    await db.commit()
-            except Exception:
-                pass
+            if result == "remove":
+                remove_scheduler_job(task_id)
+        except Exception as e:
+            logger.error(f"更新调度任务失败: {task_id}", extra={"action": "scheduler.update", "task_id": task_id, "error": str(e)})
 
     try:
         loop = asyncio.get_event_loop()
@@ -368,7 +464,7 @@ def remove_scheduler_job(task_id: str):
     sched = get_scheduler()
     try:
         sched.remove_job(task_id)
-        logger.info(f"Removed scheduler job: {task_id}")
+        logger.info(f"移除定时任务: {task_id}", extra={"action": "scheduler.register", "task_id": task_id})
     except Exception:
         pass
 
@@ -378,22 +474,25 @@ def add_scheduler_job(task_id: str):
 
 
 async def run_task_manually(task_id: str, triggered_by: str | None = None):
-    from app.crud.crud_scheduled_task import crud_scheduled_task
-
-    session_maker = get_session_maker()
-
     task_function_path = None
-    async with session_maker() as db:
-        task = await crud_scheduled_task.get_by_task_id(db, task_id)
-        if not task:
-            raise ValueError(f"Task {task_id} not found")
-        task_function_path = task.task_function
+    try:
+        task_function_path = await db_operation_with_retry(
+            lambda db: _get_task_function_path(db, task_id),
+            max_retries=2,
+            retry_delay=1.0,
+        )
+    except Exception as e:
+        raise ValueError(f"Task {task_id} not found or DB error: {e}")
+
+    if not task_function_path:
+        raise ValueError(f"Task {task_id} not found")
 
     started_at = datetime.now(ZoneInfo("Asia/Shanghai"))
     error_message = None
     result_summary = None
     status = "success"
     duration = 0.0
+    start_time = time.time()
 
     try:
         module_path, func_name = task_function_path.rsplit(".", 1)
@@ -413,8 +512,8 @@ async def run_task_manually(task_id: str, triggered_by: str | None = None):
         if isinstance(result, dict):
             if result.get("result_summary"):
                 result_summary = result["result_summary"]
-            elif result.get("presigned_url"):
-                result_summary = f"status={result.get('status', 'success')}, presigned_url={result['presigned_url']}"
+            elif result.get("download_url"):
+                result_summary = f"status={result.get('status', 'success')}, download_url={result['download_url']}"
             else:
                 result_summary = str(result.get("status", ""))
             if result.get("error"):
@@ -436,27 +535,18 @@ async def run_task_manually(task_id: str, triggered_by: str | None = None):
 
     finished_at = datetime.now(ZoneInfo("Asia/Shanghai"))
 
-    async with session_maker() as db:
-        await crud_scheduled_task.create_execution_log(
-            db,
-            task_id=task_id,
-            status=status,
-            started_at=started_at,
-            finished_at=finished_at,
-            duration=duration,
-            error_message=error_message,
-            result_summary=result_summary,
-            trigger_type="manual",
-            triggered_by=triggered_by,
+    try:
+        await db_operation_with_retry(
+            lambda db: _update_task_execution_log(
+                db, task_id, status, started_at, finished_at, duration,
+                error_message, result_summary,
+                trigger_type="manual", triggered_by=triggered_by,
+            ),
+            max_retries=2,
+            retry_delay=1.0,
         )
-        await crud_scheduled_task.update_run_status(
-            db,
-            task_id=task_id,
-            status=status,
-            duration=duration,
-            result_summary=result_summary,
-            error_message=error_message,
-        )
+    except Exception as e:
+        logger.error(f"手动任务状态更新失败: {task_id}", extra={"action": "scheduler.run", "task_id": task_id, "error": str(e)})
 
     return {
         "status": status,
@@ -483,7 +573,7 @@ def start_scheduler():
         asyncio.run(_init())
 
     sched.start()
-    logger.info("APScheduler started")
+    logger.info("APScheduler已启动", extra={"action": "scheduler.register"})
 
 
 def stop_scheduler():
@@ -491,4 +581,4 @@ def stop_scheduler():
     if scheduler is not None:
         scheduler.shutdown()
         scheduler = None
-        logger.info("APScheduler stopped")
+        logger.info("APScheduler已停止", extra={"action": "scheduler.register"})

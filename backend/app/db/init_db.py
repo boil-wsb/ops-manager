@@ -10,13 +10,15 @@ from datetime import datetime
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import get_logger
 from app.core.security import get_password_hash
+from app.core.tz import now_shanghai
 from app.db.session import get_async_session_local, get_engine
 from app.models.permission import Permission, Role
 from app.models.user import User
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 DEFAULT_ADMIN_USERNAME = "admin"
@@ -136,41 +138,6 @@ DEFAULT_PERMISSIONS = [
         "module": "asset",
         "action": "admin",
         "description": "管理资产同步等高级操作",
-    },
-    {
-        "code": "monitor:read",
-        "name": "查看监控",
-        "module": "monitor",
-        "action": "read",
-        "description": "查看监控项列表和详情",
-    },
-    {
-        "code": "monitor:create",
-        "name": "创建监控",
-        "module": "monitor",
-        "action": "create",
-        "description": "创建新监控项",
-    },
-    {
-        "code": "monitor:update",
-        "name": "编辑监控",
-        "module": "monitor",
-        "action": "update",
-        "description": "修改监控配置",
-    },
-    {
-        "code": "monitor:delete",
-        "name": "删除监控",
-        "module": "monitor",
-        "action": "delete",
-        "description": "删除监控项",
-    },
-    {
-        "code": "monitor:test",
-        "name": "测试监控",
-        "module": "monitor",
-        "action": "execute",
-        "description": "手动测试监控项",
     },
     {
         "code": "deployment:read",
@@ -353,11 +320,6 @@ DEFAULT_ROLES = {
             "asset:import",
             "asset:export",
             "asset:admin",
-            "monitor:read",
-            "monitor:create",
-            "monitor:update",
-            "monitor:delete",
-            "monitor:test",
             "deployment:read",
             "deployment:create",
             "deployment:approve",
@@ -386,7 +348,6 @@ DEFAULT_ROLES = {
         "description": "运维人员",
         "permissions": [
             "asset:read",
-            "monitor:read",
             "deployment:read",
             "deployment:create",
             "deployment:execute",
@@ -398,7 +359,6 @@ DEFAULT_ROLES = {
         "description": "只读用户",
         "permissions": [
             "asset:read",
-            "monitor:read",
             "deployment:read",
             "ops:read",
             "certificate:read",
@@ -418,9 +378,9 @@ async def create_tables_if_not_exist():
         existing_tables = await conn.run_sync(lambda conn: inspector.get_table_names())
         if not existing_tables:
             await conn.run_sync(Base.metadata.create_all)
-            logger.info("Database tables created successfully")
+            logger.info("数据库表创建成功", extra={"action": "db.create_table"})
         else:
-            logger.info("Database tables already exist, skipping creation")
+            logger.info("数据库表已存在，跳过创建", extra={"action": "db.create_table"})
 
 
 async def init_permissions(db: AsyncSession) -> dict:
@@ -435,12 +395,12 @@ async def init_permissions(db: AsyncSession) -> dict:
             permission = Permission(**perm_data)
             db.add(permission)
             await db.flush()
-            logger.info(f"Created permission: {perm_data['code']}")
+            logger.info(f"创建权限: {perm_data['code']}", extra={"action": "db.seed"})
 
         permission_map[perm_data["code"]] = permission.id
 
     await db.commit()
-    logger.info(f"Permissions initialized: {len(permission_map)}")
+    logger.info(f"权限初始化完成", extra={"action": "db.seed", "permissions": len(permission_map)})
     return permission_map
 
 
@@ -461,7 +421,7 @@ async def init_roles(db: AsyncSession, permission_map: dict) -> dict:
             )
             db.add(role)
             await db.flush()
-            logger.info(f"Created role: {role_name}")
+            logger.info(f"创建角色: {role_name}", extra={"action": "db.seed"})
 
         role_map[role_name] = role.id
 
@@ -477,7 +437,7 @@ async def init_roles(db: AsyncSession, permission_map: dict) -> dict:
                     text(
                         "INSERT INTO role_permissions (role_id, permission_id, created_at) VALUES (:role_id, :perm_id, :created_at)"
                     ),
-                    {"role_id": role.id, "perm_id": perm_id, "created_at": datetime.utcnow()},
+                    {"role_id": role.id, "perm_id": perm_id, "created_at": now_shanghai()},
                 )
         else:
             for code in perm_codes:
@@ -487,11 +447,11 @@ async def init_roles(db: AsyncSession, permission_map: dict) -> dict:
                         text(
                             "INSERT INTO role_permissions (role_id, permission_id, created_at) VALUES (:role_id, :perm_id, :created_at)"
                         ),
-                        {"role_id": role.id, "perm_id": perm_id, "created_at": datetime.utcnow()},
+                        {"role_id": role.id, "perm_id": perm_id, "created_at": now_shanghai()},
                     )
 
     await db.commit()
-    logger.info(f"Roles initialized: {len(role_map)}")
+    logger.info(f"角色初始化完成", extra={"action": "db.seed", "roles": len(role_map)})
     return role_map
 
 
@@ -501,12 +461,12 @@ async def init_admin_user(db: AsyncSession, role_map: dict) -> None:
     admin_user = result.scalar_one_or_none()
 
     if admin_user:
-        logger.info(f"Admin user '{DEFAULT_ADMIN_USERNAME}' already exists")
+        logger.info(f"管理员用户已存在", extra={"action": "db.seed", "username": DEFAULT_ADMIN_USERNAME})
         return
 
     superadmin_role_id = role_map.get("superadmin")
     if not superadmin_role_id:
-        logger.error("Superadmin role not found")
+        logger.error("超级管理员角色未找到", extra={"action": "db.seed"})
         return
 
     admin_user = User(
@@ -524,14 +484,14 @@ async def init_admin_user(db: AsyncSession, role_map: dict) -> None:
         text(
             "INSERT INTO user_roles (user_id, role_id, created_at) VALUES (:user_id, :role_id, :created_at)"
         ),
-        {"user_id": admin_user.id, "role_id": superadmin_role_id, "created_at": datetime.utcnow()},
+        {"user_id": admin_user.id, "role_id": superadmin_role_id, "created_at": now_shanghai()},
     )
 
     await db.commit()
 
-    logger.info(f"Created default admin user: {DEFAULT_ADMIN_USERNAME}")
-    logger.info(f"Default password: {DEFAULT_ADMIN_PASSWORD}")
-    logger.warning("Please change the default password after first login!")
+    logger.info(f"创建默认管理员用户", extra={"action": "db.seed", "username": DEFAULT_ADMIN_USERNAME})
+    logger.info(f"默认密码已设置", extra={"action": "db.seed"})
+    logger.warning("请首次登录后修改默认密码", extra={"action": "db.seed"})
 
 
 async def check_db_initialized(db: AsyncSession) -> bool:
@@ -553,52 +513,49 @@ async def check_db_initialized(db: AsyncSession) -> bool:
         perm_count = row.perm_count
 
         if not admin_exists:
-            logger.info("Admin user not found, database needs initialization")
+            logger.info("管理员用户未找到，数据库需要初始化", extra={"action": "db.init"})
             return False
 
         if role_count < len(DEFAULT_ROLES):
-            logger.info(f"Only {role_count} roles found, expected {len(DEFAULT_ROLES)}")
+            logger.info(f"角色数量不足", extra={"action": "db.init", "found": role_count, "expected": len(DEFAULT_ROLES)})
             return False
 
         if perm_count < len(DEFAULT_PERMISSIONS):
-            logger.info(f"Only {perm_count} permissions found, expected {len(DEFAULT_PERMISSIONS)}")
+            logger.info(f"权限数量不足", extra={"action": "db.init", "found": perm_count, "expected": len(DEFAULT_PERMISSIONS)})
             return False
 
-        logger.info("Database already initialized with default data")
-        logger.info("  - Users: 1 (admin)")
-        logger.info(f"  - Roles: {role_count}")
-        logger.info(f"  - Permissions: {perm_count}")
+        logger.info("数据库已初始化", extra={"action": "db.init", "users": 1, "roles": role_count, "permissions": perm_count})
         return True
 
     except Exception as e:
-        logger.warning(f"Error checking database state: {e}")
+        logger.warning(f"检查数据库状态失败: {e}", extra={"action": "db.init", "error": str(e)})
         return False
 
 
 async def init_db() -> None:
     """Initialize database with default data."""
-    logger.info("Checking database initialization...")
+    logger.info("检查数据库初始化状态", extra={"action": "db.init"})
 
     try:
         await create_tables_if_not_exist()
     except Exception as e:
-        logger.warning(f"Error creating tables (may already exist): {e}")
+        logger.warning(f"创建表失败: {e}", extra={"action": "db.create_table", "error": str(e)})
 
     async with await get_async_session_local() as db:
         try:
             if await check_db_initialized(db):
-                logger.info("Database already initialized, skipping initialization")
+                logger.info("数据库已初始化，跳过", extra={"action": "db.init"})
                 return
 
-            logger.info("Starting database initialization...")
+            logger.info("开始数据库初始化", extra={"action": "db.init"})
 
             permission_map = await init_permissions(db)
             role_map = await init_roles(db, permission_map)
             await init_admin_user(db, role_map)
 
-            logger.info("Database initialization completed successfully!")
+            logger.info("数据库初始化完成", extra={"action": "db.init", "roles": len(role_map), "permissions": len(permission_map)})
         except Exception as e:
-            logger.error(f"Error initializing database: {e}")
+            logger.error(f"数据库初始化失败: {e}", extra={"action": "db.init", "error": str(e)})
             await db.rollback()
             raise
 

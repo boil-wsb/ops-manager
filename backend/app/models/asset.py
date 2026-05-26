@@ -6,6 +6,7 @@ import enum
 from datetime import datetime
 from typing import Any, Optional
 
+from app.core.tz import now_shanghai
 from sqlalchemy import (
     JSON,
     Column,
@@ -64,7 +65,7 @@ asset_labels = Table(
     BaseModel.metadata,
     Column("asset_id", Integer, ForeignKey("assets.id", ondelete="CASCADE"), primary_key=True),
     Column("label_id", Integer, ForeignKey("labels.id", ondelete="CASCADE"), primary_key=True),
-    Column("created_at", DateTime(timezone=True), default=datetime.utcnow),
+    Column("created_at", DateTime(timezone=True), default=now_shanghai),
 )
 
 
@@ -146,9 +147,6 @@ class Asset(BaseModel):
     owner: Mapped[Optional["User"]] = relationship("User", lazy="selectin")
     labels: Mapped[list["Label"]] = relationship(
         "Label", secondary=asset_labels, back_populates="assets", lazy="selectin"
-    )
-    monitors: Mapped[list["Monitor"]] = relationship(
-        "Monitor", back_populates="asset", lazy="selectin"
     )
     terminal_metrics: Mapped[list["TerminalMetric"]] = relationship(
         "TerminalMetric", back_populates="asset", lazy="selectin"

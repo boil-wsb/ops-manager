@@ -1,20 +1,17 @@
-"""
-Request logging middleware.
-"""
-
-import logging
 import time
+import uuid
 from collections.abc import Callable
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-logger = logging.getLogger(__name__)
+from app.core.log_context import clear_request_context, set_request_context
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    """Middleware to log all HTTP requests and responses."""
-
     SKIP_AUDIT_PATHS = [
         "/health",
         "/",
@@ -34,6 +31,18 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         if request.url.path in self.SKIP_AUDIT_PATHS:
             return await call_next(request)
 
+        request_id = uuid.uuid4().hex[:8]
+
+        user_id = ""
+        if hasattr(request.state, "user"):
+            user = request.state.user
+            if hasattr(user, "username"):
+                user_id = user.username
+            elif isinstance(user, dict):
+                user_id = user.get("username", "")
+
+        set_request_context(request_id=request_id, user_id=user_id)
+
         start_time = time.time()
 
         method = request.method
@@ -41,7 +50,10 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         query = str(request.query_params) if request.query_params else None
         client_ip = request.client.host if request.client else None
 
-        logger.info(f"[请求] {method} {path} | IP: {client_ip} | 参数: {query or '无'}")
+        logger.info(
+            f"{method} {path} | IP: {client_ip} | 参数: {query or '无'}",
+            extra={"action": "request.enter"},
+        )
 
         response = await call_next(request)
 
@@ -59,15 +71,20 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         user_str = f"用户: {user_info} | " if user_info else ""
         if response.status_code < 400:
             logger.info(
-                f"[响应] {method} {path} | {user_str}状态: {response.status_code} | 耗时: {duration_ms}ms"
+                f"{method} {path} | {user_str}状态: {response.status_code} | 耗时: {duration_ms}ms",
+                extra={"action": "request.exit"},
             )
         elif response.status_code < 500:
             logger.warning(
-                f"[响应] {method} {path} | {user_str}状态: {response.status_code} | 耗时: {duration_ms}ms | 客户端错误"
+                f"{method} {path} | {user_str}状态: {response.status_code} | 耗时: {duration_ms}ms | 客户端错误",
+                extra={"action": "request.exit"},
             )
         else:
             logger.error(
-                f"[响应] {method} {path} | {user_str}状态: {response.status_code} | 耗时: {duration_ms}ms | 服务器错误"
+                f"{method} {path} | {user_str}状态: {response.status_code} | 耗时: {duration_ms}ms | 服务器错误",
+                extra={"action": "request.exit"},
             )
+
+        clear_request_context()
 
         return response
