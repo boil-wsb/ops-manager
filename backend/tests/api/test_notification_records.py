@@ -36,6 +36,7 @@ class MockCrudNotificationRecord:
         record.receive_type = getattr(obj_in, "receive_type", "open_id")
         record.callback_id = getattr(obj_in, "callback_id", None)
         record.open_message_id = getattr(obj_in, "open_message_id", None)
+        record.callback_url = getattr(obj_in, "callback_url", None)
         record.card_content = obj_in.card_content
         record.success = obj_in.success
         record.error = obj_in.error
@@ -93,6 +94,7 @@ class TestNotificationRecordsAPI:
         mock_record.receive_type = "open_id"
         mock_record.callback_id = None
         mock_record.open_message_id = None
+        mock_record.callback_url = None
         mock_record.card_content = {"schema": "2.0"}
         mock_record.message_id = "msg_123"
         mock_record.success = True
@@ -122,6 +124,7 @@ class TestNotificationRecordsAPI:
         mock_record1.receive_type = "open_id"
         mock_record1.callback_id = None
         mock_record1.open_message_id = None
+        mock_record1.callback_url = None
         mock_record1.card_content = {}
         mock_record1.message_id = None
         mock_record1.success = False
@@ -137,6 +140,7 @@ class TestNotificationRecordsAPI:
         mock_record2.receive_type = "open_id"
         mock_record2.callback_id = None
         mock_record2.open_message_id = None
+        mock_record2.callback_url = None
         mock_record2.card_content = {}
         mock_record2.message_id = None
         mock_record2.success = True
@@ -166,6 +170,7 @@ class TestNotificationRecordsAPI:
         mock_record1.receive_type = "open_id"
         mock_record1.callback_id = None
         mock_record1.open_message_id = None
+        mock_record1.callback_url = None
         mock_record1.card_content = {}
         mock_record1.message_id = "msg_1"
         mock_record1.success = True
@@ -181,6 +186,7 @@ class TestNotificationRecordsAPI:
         mock_record2.receive_type = "open_id"
         mock_record2.callback_id = None
         mock_record2.open_message_id = None
+        mock_record2.callback_url = None
         mock_record2.card_content = {}
         mock_record2.message_id = None
         mock_record2.success = False
@@ -211,6 +217,7 @@ class TestNotificationRecordsAPI:
         mock_record.receive_type = "open_id"
         mock_record.callback_id = None
         mock_record.open_message_id = None
+        mock_record.callback_url = None
         mock_record.card_content = {"schema": "2.0"}
         mock_record.message_id = "msg_123"
         mock_record.success = True
@@ -245,6 +252,7 @@ class TestNotificationRecordsAPI:
         mock_record.receive_type = "open_id"
         mock_record.callback_id = None
         mock_record.open_message_id = None
+        mock_record.callback_url = None
         mock_record.card_content = {}
         mock_record.message_id = None
         mock_record.success = False
