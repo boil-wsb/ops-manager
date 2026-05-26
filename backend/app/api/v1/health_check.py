@@ -97,7 +97,7 @@ async def get_report_history(
         }
     except Exception as e:
         logger.error(f"获取巡检历史失败: {e}", extra={"action": "health_check.history", "error": str(e)})
-        raise HTTPException(status_code=500, detail="获取巡检历史记录失败，请稍后重试")
+        raise HTTPException(status_code=500, detail="获取巡检历史记录失败，请稍后重试") from None
 
 
 @router.get("/reports/{report_id}")
