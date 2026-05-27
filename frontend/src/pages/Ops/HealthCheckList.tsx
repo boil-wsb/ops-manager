@@ -188,7 +188,12 @@ const HostCard = ({ detail, thresholds, dark }: { detail: HealthCheckDetail; thr
         </div>
       </div>
 
-      {detail.osInfo && (
+      {detail.env && (
+        <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 10 }}>
+          {detail.env}{detail.kernelVersion ? ` | ${detail.kernelVersion}` : ''}
+        </div>
+      )}
+      {!detail.env && detail.osInfo && (
         <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 10 }}>
           {detail.osInfo}{detail.kernelVersion ? ` | ${detail.kernelVersion}` : ''}
         </div>

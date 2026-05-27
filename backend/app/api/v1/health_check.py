@@ -37,6 +37,7 @@ def _serialize_detail(detail) -> dict:
         "instance": detail.instance,
         "asset_type": detail.asset_type,
         "host_status": detail.host_status,
+        "env": detail.env,
         "os_info": detail.os_info,
         "kernel_version": detail.kernel_version,
         "cpu_count": detail.cpu_count,

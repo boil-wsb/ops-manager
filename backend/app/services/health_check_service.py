@@ -252,6 +252,7 @@ class HealthCheckService:
                 "nodename": nodename,
                 "asset_type": asset_type,
                 "host_status": host_status,
+                "env": metrics.get("env", ""),
                 "check_details": check_details,
                 "os_info": f"{metrics.get('sysname', '')} {metrics.get('machine', '')}".strip(),
                 "kernel_version": metrics.get("release", ""),
@@ -388,6 +389,7 @@ class HealthCheckService:
                 "nodename": hostname,
                 "asset_type": asset_type,
                 "host_status": host_status,
+                "env": metrics.get("env", ""),
                 "check_details": check_details,
                 "os_info": metrics.get("os_caption", ""),
                 "kernel_version": metrics.get("os_version", ""),
@@ -441,6 +443,7 @@ class HealthCheckService:
                 instance=result.get("instance", ""),
                 asset_type=result.get("asset_type", "server"),
                 host_status=result.get("host_status", "ok"),
+                env=result.get("env", ""),
                 os_info=result.get("os_info", ""),
                 kernel_version=result.get("kernel_version", ""),
                 cpu_count=result.get("cpu_count"),
@@ -538,7 +541,7 @@ class HealthCheckService:
                     display_name = detail.instance
                     if detail.asset_type == "terminal" and detail.os_info:
                         display_name = f"{detail.instance} ({detail.os_info})"
-                    host_line = f"{status_icon} **{display_name}** ({detail.asset_type})"
+                    host_line = f"{status_icon} **{display_name}** ({detail.env or detail.asset_type})"
                     if check_lines:
                         host_line += "\n" + "\n".join(check_lines)
                     elements.append({"tag": "markdown", "content": host_line})
@@ -746,7 +749,7 @@ class HealthCheckService:
                 <div class="host-name">{detail.instance}</div>
                 <div class="host-status {status_class}">{status_text}</div>
                 <div class="host-info">
-                    <span>类型: {detail.asset_type}</span>
+                    <span>环境: {detail.env or detail.asset_type}</span>
                     <span>OS: {detail.os_info or '-'}</span>
                     <span>内核: {detail.kernel_version or '-'}</span>
                 </div>
@@ -876,7 +879,7 @@ class HealthCheckService:
 
                 row_data = [
                     detail.instance,
-                    detail.asset_type,
+                    detail.env or detail.asset_type,
                     status_text,
                     detail.os_info or "",
                     detail.kernel_version or "",

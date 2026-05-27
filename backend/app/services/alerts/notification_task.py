@@ -245,6 +245,7 @@ async def _send_notification_by_instance(
                         instance=instance,
                         description=description,
                         starts_at=starts_at_str,
+                        env=labels.get("env"),
                     )
                     logger.info("使用默认build_alert_card", extra={"action": "alert.notify"})
 

@@ -16,6 +16,7 @@ export interface HealthCheckDetail {
   instance: string;
   assetType: string;
   hostStatus: string;
+  env: string | null;
   osInfo: string | null;
   kernelVersion: string | null;
   cpuCount: number | null;

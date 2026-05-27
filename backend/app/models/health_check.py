@@ -43,6 +43,7 @@ class HealthCheckDetail(BaseModel):
     instance: Mapped[str] = mapped_column(String(255))
     asset_type: Mapped[str] = mapped_column(String(50))  # "server" / "terminal"
     host_status: Mapped[str] = mapped_column(String(20))  # "ok" / "warning" / "critical"
+    env: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     os_info: Mapped[str | None] = mapped_column(String(255), nullable=True)
     kernel_version: Mapped[str | None] = mapped_column(String(255), nullable=True)

@@ -209,11 +209,14 @@ class FeishuNotificationService:
         instance: str,
         description: str,
         starts_at: str,
+        env: str | None = None,
     ) -> dict[str, Any]:
         """Build Feishu interactive card for alert notification."""
         header_template = (
             "red" if severity == "critical" else ("orange" if severity == "warning" else "blue")
         )
+
+        instance_display = f"{instance}（{env}）" if env else instance
 
         card = {
             "schema": "2.0",
@@ -236,7 +239,7 @@ class FeishuNotificationService:
                     },
                     {
                         "tag": "div",
-                        "text": {"tag": "lark_md", "content": f"🖥️ **故障主机**：{instance}"},
+                        "text": {"tag": "lark_md", "content": f"🖥️ **故障主机**：{instance_display}"},
                     },
                     {
                         "tag": "div",
