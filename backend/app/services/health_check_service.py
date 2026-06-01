@@ -560,7 +560,9 @@ class HealthCheckService:
         elements.append({"tag": "hr"})
         elements.append({"tag": "markdown", "content": meta_line})
 
-        detail_url = "http://192.168.23.36:8080/ops/health-check"
+        from app.config import settings
+
+        detail_url = f"{settings.itreporter_download_base_url}/ops/health-check"
         elements.append({
             "tag": "button",
             "type": "primary",

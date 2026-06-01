@@ -9,6 +9,7 @@ import logging
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.core.logging import get_logger
 from app.core.security import get_password_hash
 from app.core.tz import now_shanghai
@@ -20,8 +21,8 @@ logging.basicConfig(level=logging.INFO)
 logger = get_logger(__name__)
 
 
-DEFAULT_ADMIN_USERNAME = "admin"
-DEFAULT_ADMIN_PASSWORD = "admin123"
+DEFAULT_ADMIN_USERNAME = settings.default_admin_username
+DEFAULT_ADMIN_PASSWORD = settings.default_admin_password
 DEFAULT_ADMIN_EMAIL = "admin@opsmanager.local"
 
 

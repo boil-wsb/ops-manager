@@ -251,7 +251,7 @@ const HealthCheckList = () => {
   const c = dark ? darkColors : lightColors;
 
   const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null);
-  const [activeTab, setActiveTab] = useState('abnormal');
+  const [activeTab, setActiveTab] = useState('server');
   const [thresholdDrawerOpen, setThresholdDrawerOpen] = useState(false);
   const [thresholdForm] = Form.useForm<HealthCheckThresholds>();
 

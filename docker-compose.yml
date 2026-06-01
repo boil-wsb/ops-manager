@@ -2,6 +2,8 @@ services:
   postgres:
     image: 192.168.100.213:8083/devops/postgres:15-alpine
     container_name: ops-postgres
+    ports:
+      - "15432:5432"
     environment:
       POSTGRES_USER: ${DB_USER:-opsmanager}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-opsmanager}
@@ -20,6 +22,8 @@ services:
   redis:
     image: 192.168.100.213:8083/devops/redis:7-alpine
     container_name: ops-redis
+    ports:
+      - "16379:6379"
     environment:
       - TZ=Asia/Shanghai
     command: redis-server --appendonly yes
@@ -41,10 +45,6 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://${DB_USER:-opsmanager}:${DB_PASSWORD:-opsmanager}@postgres:5432/${DB_NAME:-opsmanager}
       - REDIS_URL=redis://redis:6379/0
-      - MINIO_ENDPOINT=${MINIO_ENDPOINT:-192.168.23.36:9000}
-      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-fYIukgJZaLOivnFimLVX}
-      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-shdyfYIukgJZaLOivnFimLVX123}
-      - MINIO_SECURE=${MINIO_SECURE:-false}
       - TZ=Asia/Shanghai
     volumes:
       - ./logs:/app/logs

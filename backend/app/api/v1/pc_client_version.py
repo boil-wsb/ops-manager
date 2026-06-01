@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api import deps
+from app.config import settings
 from app.core.logging import get_logger
 from app.crud import crud_pc_client_version
 from app.schemas.pc_client_version import (
@@ -69,6 +70,15 @@ async def download_personalized_pc_client(
 
     username = current_user.username
     conf["CustInfo"]["id"] = username
+
+    if "HttpReport" in conf and settings.pcinfo_pushgateway_url:
+        conf["HttpReport"]["Endpoint"] = settings.pcinfo_pushgateway_url
+
+    if "UpdateServer" in conf:
+        if settings.pcinfo_update_server_host:
+            conf["UpdateServer"]["Host"] = settings.pcinfo_update_server_host
+        if settings.pcinfo_update_server_port:
+            conf["UpdateServer"]["Port"] = str(settings.pcinfo_update_server_port)
 
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:

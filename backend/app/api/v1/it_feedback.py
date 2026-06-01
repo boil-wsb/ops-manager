@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
+from app.config import settings
 from app.core.tz import now_shanghai
 from app.crud.crud_notification_group import notification_group
 from app.models.it_feedback import ITFeedback
@@ -82,10 +83,7 @@ async def create_feedback(
 
     from app.models.asset import Asset, AssetType
 
-    local_ip_mapping = {
-        "127.0.0.1": "192.168.113.120",
-        "localhost": "192.168.113.120",
-    }
+    local_ip_mapping = settings.local_ip_mapping
     lookup_ip = local_ip_mapping.get(client_ip, client_ip)
 
     result = await db.execute(
@@ -205,7 +203,7 @@ def send_it_feedback_created_notification(
         ]
 
         jump_url = (
-            f"http://192.168.23.36:8080/ops/it-management?feedback_id={feedback_id}&action=handle"
+            f"{settings.itreporter_download_base_url}/ops/it-management?feedback_id={feedback_id}&action=handle"
         )
 
         result = get_feishu_service().send_interactive_message(

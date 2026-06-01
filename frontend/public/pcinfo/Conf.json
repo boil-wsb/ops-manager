@@ -19,14 +19,14 @@
   },
   "HttpReport":  {
     "Enabled":  true,
-    "Endpoint":  "http://192.168.23.31:9091/metrics/job/pcinfo",
+    "Endpoint":  "",
     "RetryCount":  3,
     "Timeout":  30000,
     "Format":  "prometheus"
   },
   "UpdateServer":  {
-    "Host":  "192.168.23.36",
-    "Port":  "8080"
+    "Host":  "",
+    "Port":  ""
   },
   "DataRetention":  {
     "KeepDays":  30,

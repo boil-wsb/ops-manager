@@ -17,9 +17,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-os.environ.setdefault("SECRET_KEY", "dev-secret-key-for-init-only")
-os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://opsmanager:opsmanager@192.168.23.36:15432/opsmanager")
-os.environ.setdefault("ENVIRONMENT", "production")
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 from app.config import settings
 from app.db.base_class import Base

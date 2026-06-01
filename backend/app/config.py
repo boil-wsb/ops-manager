@@ -72,7 +72,7 @@ class Settings(BaseSettings):
     audit_log_backup_count: int = Field(default=10, alias="AUDIT_LOG_BACKUP_COUNT")
 
     # Prometheus Configuration
-    prometheus_url: str = Field(default="http://192.168.23.31:9090", alias="PROMETHEUS_URL")
+    prometheus_url: str = Field(default="http://localhost:9090", alias="PROMETHEUS_URL")
     prometheus_sync_interval: int = Field(default=30, alias="PROMETHEUS_SYNC_INTERVAL")  # minutes
     prometheus_timeout: int = Field(default=10, alias="PROMETHEUS_TIMEOUT")  # seconds
     prometheus_retry_count: int = Field(default=3, alias="PROMETHEUS_RETRY_COUNT")
@@ -86,9 +86,9 @@ class Settings(BaseSettings):
     feishu_enable: bool = Field(default=False, alias="FEISHU_ENABLE")
 
     # MinIO Configuration
-    minio_endpoint: str = Field(default="192.168.23.36:9000", alias="MINIO_ENDPOINT")
-    minio_access_key: str = Field(default="minioadmin", alias="MINIO_ACCESS_KEY")
-    minio_secret_key: str = Field(default="minioadmin", alias="MINIO_SECRET_KEY")
+    minio_endpoint: str = Field(default="localhost:9000", alias="MINIO_ENDPOINT")
+    minio_access_key: str = Field(default="", alias="MINIO_ACCESS_KEY")
+    minio_secret_key: str = Field(default="", alias="MINIO_SECRET_KEY")
     minio_secure: bool = Field(default=False, alias="MINIO_SECURE")
 
     # IT Reporter Configuration
@@ -96,13 +96,13 @@ class Settings(BaseSettings):
     itreporter_minio_bucket: str = Field(default="devops-scripts", alias="ITREPORTER_MINIO_BUCKET")
     itreporter_presigned_url_expires_hours: int = Field(default=2, alias="ITREPORTER_PRESIGNED_URL_EXPIRES_HOURS")
     itreporter_report_path: str = Field(default="IT-days-reporter/health_check_detailed_report_{date_compact}", alias="ITREPORTER_REPORT_PATH")
-    itreporter_download_base_url: str = Field(default="http://192.168.23.36:8080", alias="ITREPORTER_DOWNLOAD_BASE_URL")
+    itreporter_download_base_url: str = Field(default="http://localhost:8080", alias="ITREPORTER_DOWNLOAD_BASE_URL")
 
     # Ansible SSH Configuration
-    ansible_ssh_host: str = Field(default="192.168.23.38", alias="ANSIBLE_SSH_HOST")
+    ansible_ssh_host: str = Field(default="localhost", alias="ANSIBLE_SSH_HOST")
     ansible_ssh_port: int = Field(default=22, alias="ANSIBLE_SSH_PORT")
-    ansible_ssh_username: str = Field(default="root", alias="ANSIBLE_SSH_USERNAME")
-    ansible_ssh_password: str = Field(default="P@ssw0rd123", alias="ANSIBLE_SSH_PASSWORD")
+    ansible_ssh_username: str = Field(default="", alias="ANSIBLE_SSH_USERNAME")
+    ansible_ssh_password: str = Field(default="", alias="ANSIBLE_SSH_PASSWORD")
     ansible_ssh_key_path: str | None = Field(default=None, alias="ANSIBLE_SSH_KEY_PATH")
     ansible_command: str = Field(
         default="cd /home/shdy/.ansible && ansible-playbook -i inventory/incloud_all/hosts playbooks/site.yml -l all",
@@ -125,12 +125,40 @@ class Settings(BaseSettings):
     auth_excluded_paths: str = Field(default="", alias="AUTH_EXCLUDED_PATHS")
     auth_trusted_networks: str = Field(default="", alias="AUTH_TRUSTED_NETWORKS")
 
+    # Default Admin Configuration
+    default_admin_username: str = Field(default="admin", alias="DEFAULT_ADMIN_USERNAME")
+    default_admin_password: str = Field(default="admin123", alias="DEFAULT_ADMIN_PASSWORD")
+
+    # Feishu Sync Default Password
+    feishu_sync_default_password: str = Field(default="mh123456", alias="FEISHU_SYNC_DEFAULT_PASSWORD")
+
+    # IT Feedback Local IP Mapping
+    local_ip_mapping_str: str = Field(default="", alias="LOCAL_IP_MAPPING")
+
+    # PC Client Info Configuration
+    pcinfo_pushgateway_url: str = Field(default="http://localhost:9091/metrics/job/pcinfo", alias="PCINFO_PUSHGATEWAY_URL")
+    pcinfo_update_server_host: str = Field(default="localhost", alias="PCINFO_UPDATE_SERVER_HOST")
+    pcinfo_update_server_port: int = Field(default=8080, alias="PCINFO_UPDATE_SERVER_PORT")
+
     @property
     def cors_origins(self) -> list[str]:
         """Parse CORS origins from string."""
         if not self.cors_origins_str:
             return ["http://localhost:3000", "http://localhost:5173"]
         return [origin.strip() for origin in self.cors_origins_str.split(",")]
+
+    @property
+    def local_ip_mapping(self) -> dict[str, str]:
+        """Parse local IP mapping from string."""
+        if not self.local_ip_mapping_str:
+            return {}
+        mapping = {}
+        for pair in self.local_ip_mapping_str.split(","):
+            pair = pair.strip()
+            if ":" in pair:
+                key, value = pair.split(":", 1)
+                mapping[key.strip()] = value.strip()
+        return mapping
 
     @property
     def async_database_url(self) -> str:

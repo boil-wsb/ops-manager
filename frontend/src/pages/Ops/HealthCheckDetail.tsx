@@ -268,7 +268,7 @@ const HealthCheckDetailPage = () => {
   const c = dark ? darkColors : lightColors;
   const reportId = Number(id);
 
-  const [activeTab, setActiveTab] = useState('abnormal');
+  const [activeTab, setActiveTab] = useState('server');
 
   const { data: report, isLoading } = useQuery({
     queryKey: ['healthCheckReport', reportId],

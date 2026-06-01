@@ -213,21 +213,8 @@ async def register_builtin_tasks():
 async def _load_enabled_tasks(db):
     from app.crud.crud_scheduled_task import crud_scheduled_task
     tasks, _ = await crud_scheduled_task.get_multi(db, limit=1000, is_enabled=True)
-    return tasks
 
-
-async def load_tasks_from_db():
     sched = get_scheduler()
-    try:
-        tasks = await db_operation_with_retry(
-            _load_enabled_tasks,
-            max_retries=3,
-            retry_delay=2.0,
-        )
-    except Exception as e:
-        logger.error(f"加载任务列表失败: {e}", extra={"action": "scheduler.load"})
-        return
-
     for task in tasks:
         try:
             trigger = _build_trigger(task.trigger_type, task.trigger_config)
@@ -245,6 +232,19 @@ async def load_tasks_from_db():
             logger.info(f"加载定时任务: {task.task_id} ({task.trigger_type})", extra={"action": "scheduler.load", "task_id": task.task_id, "trigger_type": task.trigger_type})
         except Exception as e:
             logger.error(f"加载任务失败: {task.task_id}", extra={"action": "scheduler.load", "task_id": task.task_id, "error": str(e)})
+
+    await db.commit()
+
+
+async def load_tasks_from_db():
+    try:
+        await db_operation_with_retry(
+            _load_enabled_tasks,
+            max_retries=3,
+            retry_delay=2.0,
+        )
+    except Exception as e:
+        logger.error(f"加载任务列表失败: {e}", extra={"action": "scheduler.load"})
 
 
 def _sanitize_trigger_config(config: dict) -> dict:
@@ -316,6 +316,16 @@ async def _update_task_execution_log(
         result_summary=result_summary,
         error_message=error_message,
     )
+    try:
+        sched = get_scheduler()
+        job = sched.get_job(task_id)
+        if job and job.next_run_time:
+            task_obj = await crud_scheduled_task.get_by_task_id(db, task_id)
+            if task_obj:
+                task_obj.next_run_time = job.next_run_time
+                await db.commit()
+    except Exception:
+        pass
 
 
 async def _execute_task_wrapper(task_id: str):
@@ -574,6 +584,42 @@ def start_scheduler():
 
     sched.start()
     logger.info("APScheduler已启动", extra={"action": "scheduler.register"})
+
+    async def _sync_after_start():
+        await asyncio.sleep(10)
+        await db_operation_with_retry(
+            _sync_all_next_run_times,
+            max_retries=2,
+            retry_delay=1.0,
+        )
+
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(_sync_after_start())
+        else:
+            loop.run_until_complete(_sync_after_start())
+    except RuntimeError:
+        asyncio.run(_sync_after_start())
+
+
+async def _sync_all_next_run_times(db):
+    from app.crud.crud_scheduled_task import crud_scheduled_task
+    sched = get_scheduler()
+    tasks, _ = await crud_scheduled_task.get_multi(db, limit=1000, is_enabled=True)
+    updated = 0
+    for task in tasks:
+        try:
+            job = sched.get_job(task.task_id)
+            if job and job.next_run_time:
+                task.next_run_time = job.next_run_time
+                db.add(task)
+                updated += 1
+        except Exception:
+            pass
+    if updated > 0:
+        await db.commit()
+    logger.info(f"同步下次执行时间完成: {updated} 个任务", extra={"action": "scheduler.sync", "updated": updated})
 
 
 def stop_scheduler():

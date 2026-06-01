@@ -10,7 +10,7 @@ from app.core.security import get_password_hash
 
 logger = get_logger(__name__)
 
-DEFAULT_PASSWORD = "mh123456"
+DEFAULT_PASSWORD = settings.feishu_sync_default_password
 
 FEISHU_CLIENT: "lark.Client | None" = None  # noqa: F821
 
