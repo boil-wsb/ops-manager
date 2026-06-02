@@ -5,6 +5,7 @@ Revision ID: 20250316_0004
 Revises: 0003_add_prometheus_sync_fields
 Create Date: 2026-03-16
 """
+import os
 from typing import Sequence, Union
 
 from alembic import op
@@ -45,11 +46,13 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('navigation_link_id', 'role_id'),
     )
     
-    op.execute("""
+    prometheus_url = os.environ.get("PROMETHEUS_URL", "http://localhost:9090")
+    pushgateway_url = prometheus_url.rsplit(":", 1)[0] + ":9091"
+    op.execute(f"""
         INSERT INTO navigation_links (category, name, url, icon, description, sort_order, is_active)
         VALUES 
-            ('监控', '监控目标', 'http://192.168.23.31:9090/targets', 'MonitorOutlined', 'Prometheus监控目标页面', 1, true),
-            ('监控', 'Pushgateway', 'http://192.168.23.31:9091/#', 'CloudUploadOutlined', 'Prometheus Pushgateway', 2, true)
+            ('监控', '监控目标', '{prometheus_url}/targets', 'MonitorOutlined', 'Prometheus监控目标页面', 1, true),
+            ('监控', 'Pushgateway', '{pushgateway_url}/#', 'CloudUploadOutlined', 'Prometheus Pushgateway', 2, true)
     """)
 
 

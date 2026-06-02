@@ -1,11 +1,17 @@
 """
 Query user info by open_id from Feishu.
 """
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).parent.parent / ".env")
+
 import lark_oapi as lark
 from lark_oapi.api.contact.v3 import GetUserRequest
 
-APP_ID = "cli_a94a4a8cd3241bd7"
-APP_SECRET = "UiYalhbNMevKiES2mD2GGbk4VrahTzUp"
+APP_ID = os.environ.get("FEISHU_APP_ID", "")
+APP_SECRET = os.environ.get("FEISHU_APP_SECRET", "")
 USER_ID = "ou_e7e3a761a4bc2e3ae17402c67d7685ae"
 
 client = lark.Client.builder() \

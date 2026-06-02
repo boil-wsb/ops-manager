@@ -5,6 +5,12 @@ Query all users in app scope using combined APIs:
 3. find_by_department - 获取部门直属用户
 4. get - 获取用户详情
 """
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).parent.parent / ".env")
+
 import lark_oapi as lark
 from lark_oapi.api.contact.v3 import (
     ListScopeRequest,
@@ -13,8 +19,8 @@ from lark_oapi.api.contact.v3 import (
     GetUserRequest,
 )
 
-APP_ID = "cli_a94a4a8cd3241bd7"
-APP_SECRET = "UiYalhbNMevKiES2mD2GGbk4VrahTzUp"
+APP_ID = os.environ.get("FEISHU_APP_ID", "")
+APP_SECRET = os.environ.get("FEISHU_APP_SECRET", "")
 
 client = lark.Client.builder() \
     .app_id(APP_ID) \
