@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     algorithm: str = Field(default="HS256", alias="ALGORITHM")
 
     # Database
+    db_user: str = Field(default="opsmanager", alias="DB_USER")
+    db_password: str = Field(default="opsmanager", alias="DB_PASSWORD")
+    db_name: str = Field(default="opsmanager", alias="DB_NAME")
     database_url: str = Field(
         default="postgresql+asyncpg://opsmanager:opsmanager@localhost:5432/opsmanager",
         alias="DATABASE_URL",
