@@ -31,9 +31,6 @@ WORKDIR /app
 RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources && \
     sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources
 
-# Create non-root user
-RUN groupadd -r appuser && useradd -r -g appuser appuser
-
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
@@ -41,8 +38,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Python packages from builder
-COPY --from=builder /root/.local /home/appuser/.local
-ENV PATH=/home/appuser/.local/bin:$PATH
+COPY --from=builder /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
 
 # Copy application code
 COPY app/ ./app/
@@ -50,10 +47,7 @@ COPY alembic/ ./alembic/
 COPY alembic.ini .
 
 # Create logs directory
-RUN mkdir -p /app/logs && chown -R appuser:appuser /app
-
-# Switch to non-root user
-USER appuser
+RUN mkdir -p /app/logs
 
 # Expose port
 EXPOSE 8000
