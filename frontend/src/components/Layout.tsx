@@ -156,7 +156,7 @@ const Layout = () => {
           left: 0,
           top: 0,
           bottom: 0,
-          background: '#001529',
+          background: 'var(--sider-bg)',
         }}
       >
         <div
@@ -246,11 +246,11 @@ const Layout = () => {
         </Header>
         <Content
           style={{
-            margin: '12px 16px',
+            margin: '0 0 0 0',
             padding: 16,
             background: 'var(--bg-card)',
-            borderRadius: 'var(--radius-lg)',
-            minHeight: 'calc(100vh - 88px)',
+            borderRadius: 0,
+            minHeight: 'calc(100vh - 64px)',
             boxShadow: 'var(--shadow-sm)',
             overflow: 'auto',
           }}

@@ -190,7 +190,19 @@ async def _send_notification_by_instance(
             )
 
             asset_owner_open_id = await _get_asset_owner_open_id(db, instance)
+            
+            # Get notification group members as fallback/additional recipients
+            notification_group_open_ids = await _get_alert_notification_group_open_ids(db)
+            
+            # Collect all recipient open_ids (asset owner + notification group, deduplicated)
+            recipient_open_ids = []
             if asset_owner_open_id:
+                recipient_open_ids.append(asset_owner_open_id)
+            for oid in notification_group_open_ids:
+                if oid and oid not in recipient_open_ids:
+                    recipient_open_ids.append(oid)
+            
+            if recipient_open_ids:
                 feishu_svc = get_feishu_notification_service()
 
                 card = None
@@ -259,31 +271,40 @@ async def _send_notification_by_instance(
                         severity=severity,
                     )
                 else:
-                    result = feishu_svc.send_p2p_card_message(
-                        open_id=asset_owner_open_id,
-                        card_content=card,
-                    )
-                    if result.get("success"):
-                        message_id = result.get("message_id")
-                        if message_id:
-                            await _save_firing_alert_message_id(
-                                db=db,
-                                alertname=alertname,
-                                instance=instance,
-                                severity=severity,
-                                message_id=message_id,
+                    # Send to all recipients (asset owner + notification group)
+                    first_message_id = None
+                    for recipient_open_id in recipient_open_ids:
+                        result = feishu_svc.send_p2p_card_message(
+                            open_id=recipient_open_id,
+                            card_content=card,
+                        )
+                        if result.get("success"):
+                            message_id = result.get("message_id")
+                            if message_id and first_message_id is None:
+                                first_message_id = message_id
+                            logger.info(
+                                f"P2P飞书卡片已发送: instance={instance}, open_id={recipient_open_id}",
+                                extra={"action": "alert.notify", "instance": instance, "open_id": recipient_open_id},
                             )
-                        await _update_alert_history_notification_sent(
+                        else:
+                            logger.warning(
+                                f"P2P飞书卡片发送失败: instance={instance}, open_id={recipient_open_id}",
+                                extra={"action": "alert.notify", "instance": instance, "open_id": recipient_open_id},
+                            )
+                    
+                    if first_message_id:
+                        await _save_firing_alert_message_id(
                             db=db,
                             alertname=alertname,
                             instance=instance,
+                            severity=severity,
+                            message_id=first_message_id,
                         )
-                        logger.info(f"P2P飞书卡片已发送: instance={instance}", extra={"action": "alert.notify", "instance": instance})
-                    else:
-                        logger.warning(
-                            f"P2P飞书卡片发送失败: instance={instance}",
-                            extra={"action": "alert.notify", "instance": instance},
-                        )
+                    await _update_alert_history_notification_sent(
+                        db=db,
+                        alertname=alertname,
+                        instance=instance,
+                    )
             else:
                 logger.info(
                     f"未找到资产负责人: instance={instance}，跳过飞书通知",
@@ -487,6 +508,38 @@ async def _get_asset_owner_open_id(db: AsyncSession, instance: str) -> str | Non
     except Exception as exc:
         logger.error(f"查询资产负责人异常: {instance}: {str(exc)}", extra={"action": "alert.notify", "instance": instance})
         return None
+
+
+NOTIFICATION_TYPE_ALERT_FIRING = "alert_firing"
+
+
+async def _get_alert_notification_group_open_ids(db: AsyncSession) -> list[str]:
+    """Get feishu_open_ids from alert_firing notification group members.
+
+    Args:
+        db: Database session
+
+    Returns:
+        List of feishu open_ids from the notification group
+    """
+    try:
+        from app.crud.crud_notification_group import notification_group
+        groups = await notification_group.get_by_notification_type(db, NOTIFICATION_TYPE_ALERT_FIRING)
+        open_ids = []
+        for group in groups:
+            if group.is_active:
+                for member in group.members:
+                    if member.feishu_open_id and member.feishu_open_id not in open_ids:
+                        open_ids.append(member.feishu_open_id)
+        if open_ids:
+            logger.info(
+                f"告警通知组成员: {len(open_ids)} 人",
+                extra={"action": "alert.notify", "notification_type": NOTIFICATION_TYPE_ALERT_FIRING, "member_count": len(open_ids)},
+            )
+        return open_ids
+    except Exception as exc:
+        logger.error(f"查询告警通知组异常: {str(exc)}", extra={"action": "alert.notify"})
+        return []
 
 
 def check_silence_expiry():

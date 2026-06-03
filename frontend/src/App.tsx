@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { ConfigProvider, theme, App as AntApp } from 'antd';
+import { ConfigProvider, App as AntApp } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect } from 'react';
@@ -50,15 +50,11 @@ const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   }, [mode]);
 
   const currentTheme = mode === 'dark' ? darkTheme : lightTheme;
-  const algorithm = mode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm;
 
   return (
     <ConfigProvider
       locale={zhCN}
-      theme={{
-        ...currentTheme,
-        algorithm,
-      }}
+      theme={currentTheme}
     >
       {children}
     </ConfigProvider>

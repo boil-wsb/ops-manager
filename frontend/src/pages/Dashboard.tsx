@@ -1,11 +1,9 @@
 import { Row, Col, Card, Statistic, Table, Tag, Space, Button, Tooltip, Tabs, Progress } from 'antd';
-import { LinkOutlined, MonitorOutlined, CloudUploadOutlined, DatabaseOutlined, CloudOutlined, SettingOutlined, DashboardOutlined, SafetyOutlined, ApiOutlined, DesktopOutlined } from '@ant-design/icons';
+import { LinkOutlined, MonitorOutlined, CloudUploadOutlined, DatabaseOutlined, CloudOutlined, SettingOutlined, DashboardOutlined, SafetyOutlined, ApiOutlined, DesktopOutlined, CustomerServiceOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import { opsApi } from '../services/ops';
-import { assetApi } from '../services/assets';
 import { navigationApi } from '../services/navigation';
 import { dashboardApi } from '../services/dashboard';
-import alertApi from '../services/alert';
+import type { RecentAlert, RecentDeployment } from '../services/dashboard';
 import { useAuthStore } from '../stores/authStore';
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -19,6 +17,14 @@ const iconMap: Record<string, React.ReactNode> = {
   DashboardOutlined: <DashboardOutlined />,
   SafetyOutlined: <SafetyOutlined />,
   ApiOutlined: <ApiOutlined />,
+};
+
+const REFRESH_INTERVAL = 60 * 1000;
+
+const formatTime = (isoStr: string | null): string => {
+  if (!isoStr) return '-';
+  const d = new Date(isoStr);
+  return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
 };
 
 const Dashboard = () => {
@@ -36,58 +42,20 @@ const Dashboard = () => {
     queryFn: () => navigationApi.getPublicLinks(),
     staleTime: 5 * 60 * 1000,
   });
-  const { data: alertStats, isLoading: alertLoading } = useQuery({
-    queryKey: ['alert-stats'],
-    queryFn: async () => {
-      const firing = await alertApi.getAlertHistory({ page: 1, pageSize: 1, status: 'firing' });
-      const resolved = await alertApi.getAlertHistory({ page: 1, pageSize: 1, status: 'resolved' });
-      return {
-        firing: firing.total || 0,
-        resolved: resolved.total || 0,
-      };
-    },
+
+  const { data: overview, isLoading: overviewLoading } = useQuery({
+    queryKey: ['dashboard-overview'],
+    queryFn: () => dashboardApi.getOverview(),
+    enabled: !isViewer,
+    refetchInterval: REFRESH_INTERVAL,
   });
 
-  const { data: certStats, isLoading: certLoading } = useQuery({
-    queryKey: ['cert-stats'],
-    queryFn: async () => {
-      const all = await opsApi.getCertificates({ limit: 100 });
-      const certArray = Array.isArray(all) ? all : [];
-      const valid = certArray.filter((c) => c.status === 'active');
-      const expiring = certArray.filter((c) => c.status === 'expiring');
-      const expired = certArray.filter((c) => c.status === 'expired');
-      return {
-        total: certArray.length,
-        valid: valid.length,
-        expiring: expiring.length,
-        expired: expired.length,
-      };
-    },
-  });
-
-  const { data: assetStats, isLoading: assetLoading } = useQuery({
-    queryKey: ['asset-stats'],
-    queryFn: async () => {
-      const all = await assetApi.getAssets({ limit: 1 });
-      const servers = await assetApi.getAssets({ assetType: 'SERVER', limit: 1 });
-      const domains = await assetApi.getAssets({ assetType: 'DOMAIN', limit: 1 });
-      return {
-        total: all?.total || 0,
-        servers: servers?.total || 0,
-        domains: domains?.total || 0,
-      };
-    },
-  });
-
-  const { data: recentAlerts, isLoading: alertsLoading } = useQuery({
-    queryKey: ['recent-alerts'],
-    queryFn: () => alertApi.getAlertHistory({ page: 1, pageSize: 5 }),
-  });
-
-  const { data: recentDeployments, isLoading: deploymentsLoading } = useQuery({
-    queryKey: ['recent-deployments'],
-    queryFn: () => opsApi.getDeployments({ limit: 5 }),
-  });
+  const alertStats = overview?.alert_stats;
+  const itFeedbackStats = overview?.it_feedback_stats;
+  const assetStats = overview?.asset_stats;
+  const certStats = overview?.cert_stats;
+  const recentAlerts = alertStats?.recent_alerts || [];
+  const recentDeployments = overview?.recent_deployments || [];
 
   return (
     <div>
@@ -130,69 +98,85 @@ const Dashboard = () => {
         {!isViewer && (
           <>
             <Col xs={24} sm={12} lg={6}>
-              <Card loading={alertLoading}>
+              <Card loading={overviewLoading}>
                 <Statistic
                   title="活跃告警"
-                  value={alertStats?.firing || 0}
+                  value={alertStats?.firing_count || 0}
                   suffix="个"
-                  style={{ color: (alertStats?.firing ?? 0) > 0 ? '#ff4d4f' : '#52c41a' }}
+                  style={{ color: (alertStats?.firing_count ?? 0) > 0 ? '#ff4d4f' : '#52c41a' }}
                 />
                 <div style={{ marginTop: 8 }}>
-                  <Tag color="orange">待处理: {alertStats?.firing || 0}</Tag>
-                  <Tag color="green">已解决: {alertStats?.resolved || 0}</Tag>
+                  <Tag color="orange">待处理: {alertStats?.firing_count || 0}</Tag>
+                  <Tag color="green">已解决: {alertStats?.resolved_count || 0}</Tag>
                 </div>
               </Card>
             </Col>
 
             <Col xs={24} sm={12} lg={6}>
-              <Card loading={certLoading}>
+              <Card loading={overviewLoading}>
+                <Statistic
+                  title="IT反馈"
+                  value={itFeedbackStats?.pending_count || 0}
+                  suffix="个待处理"
+                  valueStyle={{ color: (itFeedbackStats?.pending_count ?? 0) > 0 ? '#faad14' : '#52c41a' }}
+                  prefix={<CustomerServiceOutlined />}
+                />
+                <div style={{ marginTop: 8 }}>
+                  <Tag color="orange">待处理: {itFeedbackStats?.pending_count || 0}</Tag>
+                  <Tag color="blue">处理中: {itFeedbackStats?.handling_count || 0}</Tag>
+                  <Tag color="green">已解决: {itFeedbackStats?.resolved_count || 0}</Tag>
+                </div>
+              </Card>
+            </Col>
+
+            <Col xs={24} sm={12} lg={6}>
+              <Card loading={overviewLoading}>
                 <Statistic
                   title="证书总数"
-                  value={certStats?.total || 0}
+                  value={certStats?.total_count || 0}
                   suffix="个"
                   style={{ color: '#722ed1' }}
                 />
                 <div style={{ marginTop: 8 }}>
-                  <Tag color="green">有效: {certStats?.valid || 0}</Tag>
-                  <Tag color="orange">即将过期: {certStats?.expiring || 0}</Tag>
-                  <Tag color="red">已过期: {certStats?.expired || 0}</Tag>
+                  <Tag color="green">有效: {certStats?.valid_count || 0}</Tag>
+                  <Tag color="orange">即将过期: {certStats?.expiring_count || 0}</Tag>
+                  <Tag color="red">已过期: {certStats?.expired_count || 0}</Tag>
+                </div>
+              </Card>
+            </Col>
+
+            <Col xs={24} sm={12} lg={6}>
+              <Card loading={overviewLoading}>
+                <Statistic
+                  title="资产总数"
+                  value={assetStats?.total_count || 0}
+                  suffix="个"
+                  style={{ color: '#13c2c2' }}
+                />
+                <div style={{ marginTop: 8 }}>
+                  <Tag color="blue">服务器: {assetStats?.server_count || 0}</Tag>
+                  <Tag color="purple">域名: {assetStats?.domain_count || 0}</Tag>
+                  <Tag color="cyan">终端: {assetStats?.terminal_count || 0}</Tag>
                 </div>
               </Card>
             </Col>
           </>
-        )}
-
-        {!isViewer && (
-          <Col xs={24} sm={12} lg={6}>
-            <Card loading={assetLoading}>
-              <Statistic
-                title="资产总数"
-                value={assetStats?.total || 0}
-                suffix="个"
-                style={{ color: '#13c2c2' }}
-              />
-              <div style={{ marginTop: 8 }}>
-                <Tag color="blue">服务器: {assetStats?.servers || 0}</Tag>
-                <Tag color="purple">域名: {assetStats?.domains || 0}</Tag>
-              </div>
-            </Card>
-          </Col>
         )}
       </Row>
 
       {isViewer && terminalMetrics && (
         <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
           <Col xs={12}>
-            <Card loading={assetLoading}>
+            <Card loading={overviewLoading}>
               <Statistic
                 title="我的资产"
-                value={assetStats?.total || 0}
+                value={assetStats?.total_count || 0}
                 suffix="个"
                 style={{ color: '#13c2c2' }}
               />
               <div style={{ marginTop: 8 }}>
-                <Tag color="blue">服务器: {assetStats?.servers || 0}</Tag>
-                <Tag color="purple">域名: {assetStats?.domains || 0}</Tag>
+                <Tag color="blue">服务器: {assetStats?.server_count || 0}</Tag>
+                <Tag color="purple">域名: {assetStats?.domain_count || 0}</Tag>
               </div>
             </Card>
           </Col>
@@ -336,9 +320,9 @@ const Dashboard = () => {
           <Col xs={24} lg={12}>
             <Card title="最近告警" extra={<a href="/alerts/alertmanager">查看全部</a>}>
               <Table
-                dataSource={recentAlerts?.items || []}
-                rowKey="id"
-                loading={alertsLoading}
+                dataSource={recentAlerts}
+                rowKey={(r: RecentAlert) => `${r.alertname}-${r.starts_at}`}
+                loading={overviewLoading}
                 pagination={false}
                 size="small"
                 columns={[
@@ -347,6 +331,14 @@ const Dashboard = () => {
                     dataIndex: 'alertname',
                     key: 'alertname',
                     ellipsis: true,
+                  },
+                  {
+                    title: '实例',
+                    dataIndex: 'instance',
+                    key: 'instance',
+                    width: 140,
+                    ellipsis: true,
+                    render: (v: string | null) => v || '-',
                   },
                   {
                     title: '严重程度',
@@ -376,6 +368,13 @@ const Dashboard = () => {
                       return <Tag color={colorMap[status] || 'default'}>{status?.toUpperCase()}</Tag>;
                     },
                   },
+                  {
+                    title: '时间',
+                    dataIndex: 'starts_at',
+                    key: 'starts_at',
+                    width: 100,
+                    render: (v: string | null) => formatTime(v),
+                  },
                 ]}
               />
             </Card>
@@ -384,16 +383,16 @@ const Dashboard = () => {
           <Col xs={24} lg={12}>
             <Card title="最近发布" extra={<a href="/ops/deployments">查看全部</a>}>
               <Table
-                dataSource={recentDeployments?.items || []}
-                rowKey="id"
-                loading={deploymentsLoading}
+                dataSource={recentDeployments}
+                rowKey={(r: RecentDeployment) => `${r.project_name}-${r.created_at}`}
+                loading={overviewLoading}
                 pagination={false}
                 size="small"
                 columns={[
                   {
                     title: '项目',
-                    dataIndex: 'projectName',
-                    key: 'projectName',
+                    dataIndex: 'project_name',
+                    key: 'project_name',
                     ellipsis: true,
                   },
                   {
@@ -425,6 +424,13 @@ const Dashboard = () => {
                       };
                       return <Tag color={colorMap[status] || 'default'}>{status?.toUpperCase()}</Tag>;
                     },
+                  },
+                  {
+                    title: '时间',
+                    dataIndex: 'created_at',
+                    key: 'created_at',
+                    width: 100,
+                    render: (v: string | null) => formatTime(v),
                   },
                 ]}
               />

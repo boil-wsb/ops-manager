@@ -4,29 +4,56 @@ import { theme } from 'antd';
 export const lightTheme: ThemeConfig = {
   token: {
     colorPrimary: '#1890ff',
-    colorBgContainer: '#ffffff',
-    colorBgLayout: '#f5f5f5',
-    colorText: 'rgba(0, 0, 0, 0.88)',
-    colorTextSecondary: 'rgba(0, 0, 0, 0.65)',
-    colorBorder: '#d9d9d9',
-    colorBorderSecondary: '#f0f0f0',
+    colorBgContainer: '#1a1a2e',
+    colorBgLayout: '#121220',
+    colorText: 'rgba(255, 255, 255, 0.88)',
+    colorTextSecondary: 'rgba(255, 255, 255, 0.65)',
+    colorBorder: '#2a2a4a',
+    colorBorderSecondary: '#222240',
   },
+  algorithm: theme.darkAlgorithm,
   components: {
     Card: {
-      colorBgContainer: '#ffffff',
+      colorBgContainer: '#1e1e36',
     },
     Table: {
-      colorBgContainer: '#ffffff',
-      headerBg: '#fafafa',
+      colorBgContainer: '#1a1a2e',
+      headerBg: '#22223a',
+      rowHoverBg: '#22223a',
     },
     Menu: {
-      darkItemBg: '#001529',
+      darkItemBg: '#1e1e2d',
       darkItemSelectedBg: '#1890ff',
     },
     Layout: {
-      headerBg: '#ffffff',
-      siderBg: '#001529',
-      bodyBg: '#f5f5f5',
+      headerBg: '#1a1a2e',
+      siderBg: '#1e1e2d',
+      bodyBg: '#121220',
+    },
+    Input: {
+      colorBgContainer: '#22223a',
+    },
+    Select: {
+      colorBgContainer: '#22223a',
+    },
+    Modal: {
+      colorBgElevated: '#1e1e36',
+    },
+    Drawer: {
+      colorBgElevated: '#1e1e36',
+    },
+    Dropdown: {
+      colorBgElevated: '#1e1e36',
+    },
+    Statistic: {
+      colorText: 'rgba(255, 255, 255, 0.88)',
+    },
+    Tabs: {
+      colorBgContainer: '#1a1a2e',
+      inkBarColor: '#1890ff',
+    },
+    Tag: {
+      colorBgContainer: 'transparent',
     },
   },
 };
@@ -34,69 +61,79 @@ export const lightTheme: ThemeConfig = {
 export const darkTheme: ThemeConfig = {
   token: {
     colorPrimary: '#177ddc',
-    colorBgContainer: '#141414',
-    colorBgLayout: '#000000',
-    colorText: 'rgba(255, 255, 255, 0.85)',
+    colorBgContainer: '#1a1a2e',
+    colorBgLayout: '#0e0e1a',
+    colorText: 'rgba(255, 255, 255, 0.88)',
     colorTextSecondary: 'rgba(255, 255, 255, 0.65)',
-    colorBorder: '#434343',
-    colorBorderSecondary: '#303030',
+    colorBorder: '#2a2a4a',
+    colorBorderSecondary: '#222240',
   },
   algorithm: theme.darkAlgorithm,
   components: {
     Card: {
-      colorBgContainer: '#1f1f1f',
+      colorBgContainer: '#1e1e36',
     },
     Table: {
-      colorBgContainer: '#1f1f1f',
-      headerBg: '#2a2a2a',
-      rowHoverBg: '#2a2a2a',
+      colorBgContainer: '#1a1a2e',
+      headerBg: '#22223a',
+      rowHoverBg: '#22223a',
     },
     Menu: {
-      darkItemBg: '#001529',
+      darkItemBg: '#1e1e2d',
       darkItemSelectedBg: '#177ddc',
     },
     Layout: {
-      headerBg: '#1f1f1f',
-      siderBg: '#001529',
-      bodyBg: '#000000',
+      headerBg: '#1a1a2e',
+      siderBg: '#1e1e2d',
+      bodyBg: '#0e0e1a',
     },
     Input: {
-      colorBgContainer: '#1f1f1f',
+      colorBgContainer: '#22223a',
     },
     Select: {
-      colorBgContainer: '#1f1f1f',
+      colorBgContainer: '#22223a',
     },
     Modal: {
-      colorBgElevated: '#1f1f1f',
+      colorBgElevated: '#1e1e36',
     },
     Drawer: {
-      colorBgElevated: '#1f1f1f',
+      colorBgElevated: '#1e1e36',
     },
     Dropdown: {
-      colorBgElevated: '#1f1f1f',
+      colorBgElevated: '#1e1e36',
+    },
+    Statistic: {
+      colorText: 'rgba(255, 255, 255, 0.88)',
+    },
+    Tabs: {
+      colorBgContainer: '#1a1a2e',
+      inkBarColor: '#177ddc',
+    },
+    Tag: {
+      colorBgContainer: 'transparent',
     },
   },
 };
 
 export const cssVarTheme = {
   light: {
-    '--bg-color': '#f5f5f5',
-    '--bg-card': '#ffffff',
-    '--text-primary': 'rgba(0, 0, 0, 0.88)',
-    '--text-secondary': 'rgba(0, 0, 0, 0.65)',
-    '--border-color': '#d9d9d9',
-    '--shadow-sm': '0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02)',
-    '--shadow-md': '0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 9px 28px 8px rgba(0, 0, 0, 0.05)',
+    '--bg-color': '#121220',
+    '--bg-card': '#1a1a2e',
+    '--text-primary': 'rgba(255, 255, 255, 0.88)',
+    '--text-secondary': 'rgba(255, 255, 255, 0.65)',
+    '--border-color': '#2a2a4a',
+    '--shadow-sm': '0 1px 2px 0 rgba(0, 0, 0, 0.3), 0 1px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px 0 rgba(0, 0, 0, 0.3)',
+    '--shadow-md': '0 6px 16px 0 rgba(0, 0, 0, 0.5), 0 3px 6px -4px rgba(0, 0, 0, 0.6), 0 9px 28px 8px rgba(0, 0, 0, 0.4)',
     '--radius-sm': '4px',
     '--radius-md': '6px',
     '--radius-lg': '8px',
   },
   dark: {
-    '--bg-color': '#141414',
-    '--bg-card': '#1f1f1f',
-    '--text-primary': 'rgba(255, 255, 255, 0.85)',
+    '--bg-color': '#0e0e1a',
+    '--bg-card': '#1a1a2e',
+    '--text-primary': 'rgba(255, 255, 255, 0.88)',
     '--text-secondary': 'rgba(255, 255, 255, 0.65)',
-    '--border-color': '#434343',
+    '--border-color': '#2a2a4a',
     '--shadow-sm': '0 1px 2px 0 rgba(0, 0, 0, 0.3), 0 1px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px 0 rgba(0, 0, 0, 0.3)',
     '--shadow-md': '0 6px 16px 0 rgba(0, 0, 0, 0.5), 0 3px 6px -4px rgba(0, 0, 0, 0.6), 0 9px 28px 8px rgba(0, 0, 0, 0.4)',
     '--radius-sm': '4px',

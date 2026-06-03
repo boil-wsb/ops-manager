@@ -181,26 +181,59 @@ async def process_alert(
     if is_suppressed:
         alert_status = AlertHistoryStatus.SUPPRESSED
 
-    # Create alert history record
+    # Create or update alert history record
     try:
         logger.info(
-            f"Creating history record: alertname={alertname}, status={alert_status.value}, severity={severity}",
+            f"Processing history record: alertname={alertname}, status={alert_status.value}, severity={severity}",
             extra={"action": "alert.receive", "alertname": alertname, "status": alert_status.value, "severity": severity}
         )
-        logger.info(f"  labels type: {type(labels)}, annotations type: {type(annotations)}", extra={"action": "alert.receive"})
-        history = await crud_alert_history.create_from_alertmanager(
-            db=db,
-            alertname=alertname,
-            status=alert_status.value,
-            severity=severity,
-            labels=labels,
-            annotations=annotations,
-            starts_at=starts_at or now_shanghai(),
-            ends_at=ends_at,
-            is_suppressed=is_suppressed,
-            silence_id=silence_id,
-        )
-        logger.info(f"History record created successfully: id={history.id}", extra={"action": "alert.receive", "history_id": history.id})
+
+        # For firing alerts, check if a matching record already exists (same alertname + instance + starts_at)
+        existing_record = None
+        if alert_status == AlertHistoryStatus.FIRING and instance:
+            existing_query = select(AlertHistory).where(
+                and_(
+                    AlertHistory.alertname == alertname,
+                    AlertHistory.labels.op("->>")("instance").astext == instance,
+                    AlertHistory.starts_at == starts_at or now_shanghai(),
+                    AlertHistory.status != AlertHistoryStatus.RESOLVED.value,
+                )
+            ).order_by(AlertHistory.id.desc()).limit(1)
+            existing_result = await db.execute(existing_query)
+            existing_record = existing_result.scalar_one_or_none()
+
+        if existing_record:
+            # Update existing record instead of creating a duplicate
+            existing_record.status = alert_status.value
+            existing_record.severity = severity
+            existing_record.labels = labels
+            existing_record.annotations = annotations
+            existing_record.is_suppressed = is_suppressed
+            existing_record.silence_id = silence_id
+            await db.commit()
+            await db.refresh(existing_record)
+            history = existing_record
+            logger.info(
+                f"Updated existing history record: id={history.id}",
+                extra={"action": "alert.receive", "history_id": history.id},
+            )
+        else:
+            history = await crud_alert_history.create_from_alertmanager(
+                db=db,
+                alertname=alertname,
+                status=alert_status.value,
+                severity=severity,
+                labels=labels,
+                annotations=annotations,
+                starts_at=starts_at or now_shanghai(),
+                ends_at=ends_at,
+                is_suppressed=is_suppressed,
+                silence_id=silence_id,
+            )
+            logger.info(
+                f"Created new history record: id={history.id}",
+                extra={"action": "alert.receive", "history_id": history.id},
+            )
     except Exception as exc:
         import traceback
 
