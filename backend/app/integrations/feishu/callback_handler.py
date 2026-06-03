@@ -25,29 +25,117 @@ def _try_forward_callback(
     value: dict | str,
     operator_open_id: str | None,
 ) -> None:
-    if not open_message_id:
+    # 提取 callback_id 用于查询
+    callback_id = None
+    if isinstance(value, dict):
+        callback_id = value.get("callback_id")
+
+    if not open_message_id and not callback_id:
         return
 
     try:
-        from sqlalchemy import select
+        from sqlalchemy import create_engine, text
 
-        from app.crud.crud_notification_callback_log import notification_callback_log
-        from app.db.session import SessionLocal
-        from app.models.notification_record import NotificationRecord
+        from app.config import settings
 
-        with SessionLocal() as db:
-            result = db.execute(
-                select(NotificationRecord).where(
-                    NotificationRecord.open_message_id == open_message_id,
-                    NotificationRecord.callback_url.isnot(None),
+        sync_db_url = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
+        engine = create_engine(sync_db_url, pool_pre_ping=True)
+
+        record_id = None
+        callback_url = None
+        card_content = None
+
+        with engine.connect() as conn:
+            # 优先通过 callback_id 查找，其次通过 open_message_id
+            if callback_id:
+                result = conn.execute(
+                    text(
+                        "SELECT id, callback_url, card_content FROM notification_records "
+                        "WHERE callback_id = :callback_id "
+                        "ORDER BY id DESC LIMIT 1"
+                    ),
+                    {"callback_id": callback_id},
                 )
-            )
-            record = result.scalar_one_or_none()
+                row = result.fetchone()
+            if not row or not row[0]:
+                row = None
+                if open_message_id:
+                    result = conn.execute(
+                        text(
+                            "SELECT id, callback_url, card_content FROM notification_records "
+                            "WHERE open_message_id = :open_message_id "
+                            "ORDER BY id DESC LIMIT 1"
+                        ),
+                        {"open_message_id": open_message_id},
+                    )
+                    row = result.fetchone()
+            if row:
+                record_id = row[0]
+                callback_url = row[1]
+                card_content = row[2]
 
-        if not record or not record.callback_url:
+        logger.info(
+            f"回调查询记录: open_message_id={open_message_id}, callback_id={callback_id}, record_id={record_id}, "
+            f"has_callback_url={callback_url is not None}, has_card_content={card_content is not None}",
+            extra={
+                "action": "feishu.callback.forward",
+                "open_message_id": open_message_id,
+                "callback_id": callback_id,
+                "record_id": record_id,
+                "card_content": card_content,
+            },
+        )
+
+        # 处理转发给指定人的场景
+        if button_action == "forward_to_assignee" and isinstance(value, dict):
+            assignee_open_id = value.get("assignee_open_id")
+            if assignee_open_id and card_content:
+                import json
+
+                card_dict = card_content if isinstance(card_content, dict) else json.loads(card_content)
+                logger.info(
+                    f"转发卡片给指定用户: assignee_open_id={assignee_open_id}",
+                    extra={
+                        "action": "feishu.callback.forward",
+                        "assignee_open_id": assignee_open_id,
+                        "card_content": card_dict,
+                    },
+                )
+                try:
+                    from app.services.alerts.feishu_notification import get_feishu_notification_service
+
+                    feishu_svc = get_feishu_notification_service()
+                    result = feishu_svc.send_p2p_card_message(
+                        open_id=assignee_open_id,
+                        card_content=card_dict,
+                    )
+                    if result.get("success"):
+                        logger.info(
+                            f"卡片转发成功: assignee_open_id={assignee_open_id}, message_id={result.get('message_id')}",
+                            extra={"action": "feishu.callback.forward", "assignee_open_id": assignee_open_id},
+                        )
+                    else:
+                        logger.warning(
+                            f"卡片转发失败: assignee_open_id={assignee_open_id}",
+                            extra={"action": "feishu.callback.forward", "assignee_open_id": assignee_open_id},
+                        )
+                except Exception as send_err:
+                    logger.error(
+                        f"发送转发卡片异常: {send_err}",
+                        extra={"action": "feishu.callback.forward", "assignee_open_id": assignee_open_id, "error": str(send_err)},
+                    )
+            else:
+                logger.warning(
+                    f"转发缺少必要参数: assignee_open_id={assignee_open_id}, has_card_content={card_content is not None}",
+                    extra={"action": "feishu.callback.forward", "assignee_open_id": assignee_open_id},
+                )
+            engine.dispose()
             return
 
-        callback_url = record.callback_url
+        # 处理回调 URL 转发
+        if not record_id or not callback_url:
+            engine.dispose()
+            return
 
         operator_info = {}
         if hasattr(data.event, "operator") and data.event.operator:
@@ -81,21 +169,29 @@ def _try_forward_callback(
         with httpx.Client(timeout=5.0) as client:
             response = client.post(callback_url, json=callback_data)
 
-        with SessionLocal() as db:
-            notification_callback_log.create(
-                db,
-                notification_record_id=record.id,
-                callback_url=callback_url,
-                request_body=callback_data,
-                response_status=response.status_code,
-                response_body=response.text[:2000],
-                status="success",
+        with engine.connect() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO notification_callback_logs "
+                    "(notification_record_id, callback_url, request_body, response_status, response_body, status, created_at) "
+                    "VALUES (:record_id, :callback_url, :request_body, :response_status, :response_body, 'success', NOW())"
+                ),
+                {
+                    "record_id": record_id,
+                    "callback_url": callback_url,
+                    "request_body": __import__("json").dumps(callback_data, ensure_ascii=False),
+                    "response_status": response.status_code,
+                    "response_body": response.text[:2000],
+                },
             )
+            conn.commit()
 
         logger.info(
             f"回调转发成功: {callback_url}",
             extra={"action": "feishu.callback.forward", "callback_url": callback_url, "status_code": response.status_code},
         )
+
+        engine.dispose()
 
     except Exception as e:
         logger.warning(
@@ -103,18 +199,29 @@ def _try_forward_callback(
             extra={"action": "feishu.callback.forward", "error": str(e), "open_message_id": open_message_id},
         )
         try:
-            from app.crud.crud_notification_callback_log import notification_callback_log
-            from app.db.session import SessionLocal
+            from sqlalchemy import create_engine as _create_engine, text as _text
 
-            with SessionLocal() as db:
-                notification_callback_log.create(
-                    db,
-                    notification_record_id=record.id if "record" in dir() else None,
-                    callback_url=callback_url if "callback_url" in dir() else "",
-                    request_body=callback_data if "callback_data" in dir() else None,
-                    status="failed",
-                    error_message=str(e),
+            from app.config import settings as _settings
+
+            _sync_db_url = _settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
+            _engine = _create_engine(_sync_db_url, pool_pre_ping=True)
+
+            with _engine.connect() as conn:
+                conn.execute(
+                    _text(
+                        "INSERT INTO notification_callback_logs "
+                        "(notification_record_id, callback_url, request_body, status, error_message, created_at) "
+                        "VALUES (:record_id, :callback_url, :request_body, 'failed', :error_message, NOW())"
+                    ),
+                    {
+                        "record_id": record_id if "record_id" in dir() else None,
+                        "callback_url": callback_url if "callback_url" in dir() else "",
+                        "request_body": __import__("json").dumps(callback_data, ensure_ascii=False) if "callback_data" in dir() else None,
+                        "error_message": str(e),
+                    },
                 )
+                conn.commit()
+            _engine.dispose()
         except Exception as log_err:
             logger.error(f"记录回调失败日志出错: {log_err}")
 

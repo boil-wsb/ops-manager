@@ -141,6 +141,7 @@ async def send_feishu_card_notification(
                     record_id=notification_record_db.id,
                     obj_in=NotificationRecordUpdate(
                         message_id=result["message_id"],
+                        open_message_id=request.open_message_id or result["message_id"],
                         success=True,
                         error=result.get("msg"),
                     ),
@@ -242,6 +243,7 @@ async def send_feishu_card_notification(
                 record_id=notification_record_db.id,
                 obj_in=NotificationRecordUpdate(
                     message_id=result["message_id"],
+                    open_message_id=request.open_message_id or result["message_id"],
                     success=True,
                     error=result.get("msg"),
                 ),
@@ -342,6 +344,7 @@ async def update_feishu_card(
                 record_id=record.id,
                 obj_in=NotificationRecordUpdate(
                     card_content=request.card_content,
+                    open_message_id=message_id,
                     success=True,
                 ),
             )
@@ -426,6 +429,7 @@ async def update_feishu_card_by_open_message_id(
                 record_id=record.id,
                 obj_in=NotificationRecordUpdate(
                     card_content=card_content,
+                    open_message_id=record.message_id,
                     success=True,
                 ),
             )

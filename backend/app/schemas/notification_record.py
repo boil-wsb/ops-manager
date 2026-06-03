@@ -47,6 +47,8 @@ class NotificationRecordUpdate(BaseModel):
     """Schema for updating Notification Record."""
 
     callback_id: str | None = None
+    open_message_id: str | None = None
+    card_content: dict | None = None
     message_id: str | None = None
     success: bool | None = None
     error: str | None = None
