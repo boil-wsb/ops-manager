@@ -13,9 +13,7 @@ class SystemConfig(BaseModel):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_secret: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    __table_args__ = (
-        Index("ix_system_configs_group", "group"),
-    )
+    __table_args__ = (Index("ix_system_configs_group", "group"),)
 
     def __repr__(self) -> str:
         return f"<SystemConfig {self.group}.{self.key}>"

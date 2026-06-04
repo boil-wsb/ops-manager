@@ -97,9 +97,16 @@ class Settings(BaseSettings):
     # IT Reporter Configuration
     itreporter_chat_id: str = Field(default="", alias="ITREPORTER_CHAT_ID")
     itreporter_minio_bucket: str = Field(default="devops-scripts", alias="ITREPORTER_MINIO_BUCKET")
-    itreporter_presigned_url_expires_hours: int = Field(default=2, alias="ITREPORTER_PRESIGNED_URL_EXPIRES_HOURS")
-    itreporter_report_path: str = Field(default="IT-days-reporter/health_check_detailed_report_{date_compact}", alias="ITREPORTER_REPORT_PATH")
-    itreporter_download_base_url: str = Field(default="http://localhost:8080", alias="ITREPORTER_DOWNLOAD_BASE_URL")
+    itreporter_presigned_url_expires_hours: int = Field(
+        default=2, alias="ITREPORTER_PRESIGNED_URL_EXPIRES_HOURS"
+    )
+    itreporter_report_path: str = Field(
+        default="IT-days-reporter/health_check_detailed_report_{date_compact}",
+        alias="ITREPORTER_REPORT_PATH",
+    )
+    itreporter_download_base_url: str = Field(
+        default="http://localhost:8080", alias="ITREPORTER_DOWNLOAD_BASE_URL"
+    )
 
     # Ansible SSH Configuration
     ansible_ssh_host: str = Field(default="localhost", alias="ANSIBLE_SSH_HOST")
@@ -133,13 +140,17 @@ class Settings(BaseSettings):
     default_admin_password: str = Field(default="admin123", alias="DEFAULT_ADMIN_PASSWORD")
 
     # Feishu Sync Default Password
-    feishu_sync_default_password: str = Field(default="mh123456", alias="FEISHU_SYNC_DEFAULT_PASSWORD")
+    feishu_sync_default_password: str = Field(
+        default="mh123456", alias="FEISHU_SYNC_DEFAULT_PASSWORD"
+    )
 
     # IT Feedback Local IP Mapping
     local_ip_mapping_str: str = Field(default="", alias="LOCAL_IP_MAPPING")
 
     # PC Client Info Configuration
-    pcinfo_pushgateway_url: str = Field(default="http://localhost:9091/metrics/job/pcinfo", alias="PCINFO_PUSHGATEWAY_URL")
+    pcinfo_pushgateway_url: str = Field(
+        default="http://localhost:9091/metrics/job/pcinfo", alias="PCINFO_PUSHGATEWAY_URL"
+    )
     pcinfo_update_server_host: str = Field(default="localhost", alias="PCINFO_UPDATE_SERVER_HOST")
     pcinfo_update_server_port: int = Field(default=8080, alias="PCINFO_UPDATE_SERVER_PORT")
 

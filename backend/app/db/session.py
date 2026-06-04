@@ -3,17 +3,20 @@ Database session management.
 """
 
 import asyncio
+import contextlib
 from functools import lru_cache
 
 import asyncpg
+from sqlalchemy import text
 from sqlalchemy.exc import (
-    DBAPIError,
     DataError,
+    DBAPIError,
     IntegrityError,
-    InterfaceError as SAInterfaceError,
     ProgrammingError,
 )
-from sqlalchemy import text
+from sqlalchemy.exc import (
+    InterfaceError as SAInterfaceError,
+)
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
@@ -33,7 +36,11 @@ _TRANSIENT_ERRORS = (
 )
 
 _TRANSIENT_KEYWORDS = (
-    "connection", "closed", "interface", "timeout", "broken pipe",
+    "connection",
+    "closed",
+    "interface",
+    "timeout",
+    "broken pipe",
 )
 
 _pool_dispose_lock = asyncio.Lock()
@@ -86,6 +93,7 @@ def _is_transient_error(e: Exception) -> bool:
 
 async def _dispose_pool_safely():
     import time as _time
+
     global _last_pool_dispose_time
     now = _time.monotonic()
     if now - _last_pool_dispose_time < _POOL_DISPOSE_COOLDOWN:
@@ -133,33 +141,25 @@ async def db_operation_with_retry(operation, max_retries=2, retry_delay=1.0):
                 try:
                     return await operation(db)
                 except _NON_RETRYABLE_DB_ERRORS:
-                    try:
+                    with contextlib.suppress(Exception):
                         await db.rollback()
-                    except Exception:
-                        pass
                     raise
                 except asyncio.CancelledError:
                     raise
                 except _TRANSIENT_ERRORS as e:
                     last_error = e
-                    try:
+                    with contextlib.suppress(Exception):
                         await db.rollback()
-                    except Exception:
-                        pass
                     need_retry = True
                 except Exception as e:
                     if _is_transient_error(e):
                         last_error = e
-                        try:
+                        with contextlib.suppress(Exception):
                             await db.rollback()
-                        except Exception:
-                            pass
                         need_retry = True
                     else:
-                        try:
+                        with contextlib.suppress(Exception):
                             await db.rollback()
-                        except Exception:
-                            pass
                         raise
         except asyncio.CancelledError:
             raise
@@ -175,7 +175,7 @@ async def db_operation_with_retry(operation, max_retries=2, retry_delay=1.0):
 
         if need_retry:
             if attempt < max_retries:
-                delay = retry_delay * (2 ** attempt)
+                delay = retry_delay * (2**attempt)
                 logger.warning(
                     f"DB 连接错误，第 {attempt + 1} 次重试（等待 {delay}s）: {type(last_error).__name__}: {last_error}",
                     extra={"action": "db.retry", "attempt": attempt + 1},

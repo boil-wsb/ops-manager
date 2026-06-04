@@ -2,12 +2,10 @@
 Navigation link model for external quick links.
 """
 
-from datetime import datetime
-
-from app.core.tz import now_shanghai
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Table
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.tz import now_shanghai
 from app.models.base import BaseModel
 
 navigation_link_roles = Table(

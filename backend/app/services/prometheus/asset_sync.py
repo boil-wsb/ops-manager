@@ -7,7 +7,6 @@ Phase 2 实现：
 - 处理资产变更事件
 """
 
-from datetime import datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -234,7 +233,9 @@ class AssetSyncService:
         }
 
         try:
-            logger.info(f"开始同步实例: {instance}", extra={"action": "asset.sync", "instance": instance})
+            logger.info(
+                f"开始同步实例: {instance}", extra={"action": "asset.sync", "instance": instance}
+            )
 
             ip_address = self._extract_ip_from_instance(instance)
             logger.info(f"提取IP: {ip_address}", extra={"action": "asset.sync"})
@@ -269,7 +270,9 @@ class AssetSyncService:
             asset_data = self._map_prometheus_node_to_asset_data(node)
             logger.info(f"映射资产数据: {asset_data}", extra={"action": "asset.sync"})
 
-            logger.info(f"检查已有资产 IP: {asset_data['ip_address']}", extra={"action": "asset.sync"})
+            logger.info(
+                f"检查已有资产 IP: {asset_data['ip_address']}", extra={"action": "asset.sync"}
+            )
             existing_asset = await self._get_asset_by_ip(asset_data["ip_address"])
             logger.info(f"已有资产: {existing_asset}", extra={"action": "asset.sync"})
 
@@ -305,7 +308,11 @@ class AssetSyncService:
                 result["asset"] = existing_asset
                 logger.info(
                     f"更新资产: {existing_asset.asset_id} (IP: {asset_data['ip_address']})",
-                    extra={"action": "asset.update", "asset_id": existing_asset.asset_id, "ip_address": asset_data['ip_address']},
+                    extra={
+                        "action": "asset.update",
+                        "asset_id": existing_asset.asset_id,
+                        "ip_address": asset_data["ip_address"],
+                    },
                 )
             else:
                 logger.info("创建新资产...", extra={"action": "asset.create"})
@@ -342,13 +349,20 @@ class AssetSyncService:
                 result["asset"] = new_asset
                 logger.info(
                     f"创建资产: {new_asset.asset_id} (IP: {asset_data['ip_address']})",
-                    extra={"action": "asset.create", "asset_id": new_asset.asset_id, "ip_address": asset_data['ip_address']},
+                    extra={
+                        "action": "asset.create",
+                        "asset_id": new_asset.asset_id,
+                        "ip_address": asset_data["ip_address"],
+                    },
                 )
 
         except Exception as e:
             result["error"] = str(e)
             logger.exception(f"同步异常: {e}", extra={"action": "asset.sync", "instance": instance})
-            logger.error(f"同步资产失败: {instance}: {e}", extra={"action": "asset.sync", "instance": instance})
+            logger.error(
+                f"同步资产失败: {instance}: {e}",
+                extra={"action": "asset.sync", "instance": instance},
+            )
 
         return result
 
@@ -374,7 +388,9 @@ class AssetSyncService:
             nodes = await self.prometheus_client.get_all_nodes()
             stats["total"] = len(nodes)
 
-            logger.info(f"开始同步 {len(nodes)} 个节点", extra={"action": "asset.sync", "total": len(nodes)})
+            logger.info(
+                f"开始同步 {len(nodes)} 个节点", extra={"action": "asset.sync", "total": len(nodes)}
+            )
 
             for node in nodes:
                 instance = node.get("instance", "")
@@ -398,8 +414,14 @@ class AssetSyncService:
 
             stats["end_time"] = now_shanghai().isoformat()
             logger.info(
-                f"同步完成",
-                extra={"action": "asset.sync", "total": stats['total'], "created_count": stats['created'], "updated_count": stats['updated'], "failed_count": stats['failed']},
+                "同步完成",
+                extra={
+                    "action": "asset.sync",
+                    "total": stats["total"],
+                    "created_count": stats["created"],
+                    "updated_count": stats["updated"],
+                    "failed_count": stats["failed"],
+                },
             )
 
         except Exception as e:

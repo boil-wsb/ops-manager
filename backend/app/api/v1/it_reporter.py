@@ -36,7 +36,9 @@ async def process_it_report(
         )
         return ITReporterResponse(**result)
     except Exception as e:
-        logger.error(f"IT reporter error: {e}", extra={"action": "it_reporter.run", "error": str(e)})
+        logger.error(
+            f"IT reporter error: {e}", extra={"action": "it_reporter.run", "error": str(e)}
+        )
         return ITReporterResponse(
             status="error",
             message=str(e),

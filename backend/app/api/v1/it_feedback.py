@@ -2,9 +2,7 @@
 IT Feedback API endpoints.
 """
 
-from app.core.logging import get_logger
 from contextlib import suppress
-from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
@@ -12,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
 from app.config import settings
+from app.core.logging import get_logger
 from app.core.tz import now_shanghai
 from app.crud.crud_notification_group import notification_group
 from app.models.it_feedback import ITFeedback
@@ -104,7 +103,7 @@ async def create_feedback(
         open_msg_ids = []
         logger.info(
             f"Sending notifications to {len(notification_user_ids)} users: {notification_user_ids}",
-            extra={"action": "feedback.notify", "user_count": len(notification_user_ids)}
+            extra={"action": "feedback.notify", "user_count": len(notification_user_ids)},
         )
         for user_id in notification_user_ids:
             open_msg_id = send_it_feedback_created_notification(
@@ -124,7 +123,12 @@ async def create_feedback(
             await db.refresh(feedback)
             logger.info(
                 f"Saved open_message_id={open_msg_ids[0]} for feedback {feedback.id}, sent to {len(open_msg_ids)} users",
-                extra={"action": "feedback.notify", "feedback_id": feedback.id, "open_message_id": open_msg_ids[0], "sent_count": len(open_msg_ids)}
+                extra={
+                    "action": "feedback.notify",
+                    "feedback_id": feedback.id,
+                    "open_message_id": open_msg_ids[0],
+                    "sent_count": len(open_msg_ids),
+                },
             )
 
     return ITFeedbackResponse.model_validate(feedback)
@@ -202,9 +206,7 @@ def send_it_feedback_created_notification(
             },
         ]
 
-        jump_url = (
-            f"{settings.itreporter_download_base_url}/ops/it-management?feedback_id={feedback_id}&action=handle"
-        )
+        jump_url = f"{settings.itreporter_download_base_url}/ops/it-management?feedback_id={feedback_id}&action=handle"
 
         result = get_feishu_service().send_interactive_message(
             user_id=user_id,
@@ -219,11 +221,18 @@ def send_it_feedback_created_notification(
         if open_message_id:
             logger.info(
                 f"Notification sent to user_id={user_id}, message_id={open_message_id}",
-                extra={"action": "feedback.notify", "user_id": user_id, "message_id": open_message_id}
+                extra={
+                    "action": "feedback.notify",
+                    "user_id": user_id,
+                    "message_id": open_message_id,
+                },
             )
         return open_message_id
     except Exception as e:
-        logger.error(f"Failed to send notification to user_id={user_id}: {e}", extra={"action": "feedback.notify", "user_id": user_id, "error": str(e)})
+        logger.error(
+            f"Failed to send notification to user_id={user_id}: {e}",
+            extra={"action": "feedback.notify", "user_id": user_id, "error": str(e)},
+        )
         return None
 
 

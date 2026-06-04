@@ -4,12 +4,12 @@
 从 Prometheus 自动同步资产数据
 """
 
-from app.core.logging import get_logger
 from typing import Any
 
 from app.config import settings
-from app.db.session import db_operation_with_retry
+from app.core.logging import get_logger
 from app.core.tz import now_shanghai
+from app.db.session import db_operation_with_retry
 from app.services.prometheus.asset_sync_optimized import OptimizedAssetSyncService
 
 logger = get_logger(__name__)
@@ -54,7 +54,16 @@ async def sync_assets_from_prometheus_task() -> dict[str, Any]:
         "errors": result.get("errors", []),
     }
 
-    logger.info("资产同步完成", extra={"action": "asset.sync", "total": task_result['total'], "created_count": task_result['created'], "updated_count": task_result['updated'], "failed_count": task_result['failed']})
+    logger.info(
+        "资产同步完成",
+        extra={
+            "action": "asset.sync",
+            "total": task_result["total"],
+            "created_count": task_result["created"],
+            "updated_count": task_result["updated"],
+            "failed_count": task_result["failed"],
+        },
+    )
 
     return task_result
 
@@ -67,7 +76,9 @@ async def sync_single_asset_task(instance: str) -> dict[str, Any]:
     """
     logger.debug("开始单资产同步", extra={"action": "asset.sync", "instance": instance})
 
-    result = await db_operation_with_retry(lambda db: _sync_single_asset_op(db, instance), max_retries=3, retry_delay=2.0)
+    result = await db_operation_with_retry(
+        lambda db: _sync_single_asset_op(db, instance), max_retries=3, retry_delay=2.0
+    )
 
     if result["success"]:
         logger.info("资产同步成功", extra={"action": "asset.sync", "instance": instance})
@@ -79,7 +90,9 @@ async def sync_single_asset_task(instance: str) -> dict[str, Any]:
         }
     else:
         error_msg = result.get("error", "Unknown error")
-        logger.error(f"资产同步失败: {error_msg}", extra={"action": "asset.sync", "instance": instance})
+        logger.error(
+            f"资产同步失败: {error_msg}", extra={"action": "asset.sync", "instance": instance}
+        )
         return {
             "status": "failed",
             "instance": instance,

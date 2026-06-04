@@ -101,13 +101,19 @@ class AlertInhibitionService:
             if silence.match_labels and self._match_exact_labels(
                 alert_labels, silence.match_labels
             ):
-                logger.info(f"告警匹配静默规则: {silence.name}", extra={"action": "alert.silence", "silence_name": silence.name})
+                logger.info(
+                    f"告警匹配静默规则: {silence.name}",
+                    extra={"action": "alert.silence", "silence_name": silence.name},
+                )
                 return True, silence
 
             if silence.match_pattern and self._match_regex_pattern(
                 alert_labels, silence.match_pattern
             ):
-                logger.info(f"告警匹配静默正则: {silence.name}", extra={"action": "alert.silence", "silence_name": silence.name})
+                logger.info(
+                    f"告警匹配静默正则: {silence.name}",
+                    extra={"action": "alert.silence", "silence_name": silence.name},
+                )
                 return True, silence
 
         return False, None

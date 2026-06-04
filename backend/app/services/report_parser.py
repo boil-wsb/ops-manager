@@ -192,7 +192,10 @@ def _parse_with_regex(html_content: str) -> dict:
 
 
 def build_inspection_card_elements(
-    report_data: dict | None, presigned_url: str | None, file_size_mb: float, report_path: str,
+    report_data: dict | None,
+    presigned_url: str | None,
+    file_size_mb: float,
+    report_path: str,
     expires_hours: int = 2,
 ) -> tuple[list[dict], str]:
     if not report_data:

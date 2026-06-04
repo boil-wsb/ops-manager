@@ -2,6 +2,8 @@
 Health check service - collect metrics, evaluate status, save reports, send notifications.
 """
 
+from __future__ import annotations
+
 import json
 from datetime import datetime, timedelta
 from io import BytesIO
@@ -13,6 +15,7 @@ from sqlalchemy.orm import selectinload
 from app.core.logging import get_logger
 from app.db.session import db_operation_with_retry
 from app.integrations.feishu.service import get_feishu_service
+from app.models.health_check import HealthCheckDetail, HealthCheckReport
 from app.services.prometheus.client import get_prometheus_client
 
 logger = get_logger(__name__)
@@ -28,7 +31,7 @@ DEFAULT_THRESHOLDS = {
 
 
 class HealthCheckService:
-    async def generate_health_report(self) -> "HealthCheckReport":
+    async def generate_health_report(self) -> HealthCheckReport:
         """Execute full health check: collect -> evaluate -> save -> notify"""
 
         # 1. Read thresholds from system_configs
@@ -49,7 +52,10 @@ class HealthCheckService:
         server_metrics = []
         try:
             server_metrics = await client.get_all_nodes_health_check()
-            logger.info(f"采集服务器指标: {len(server_metrics)} 台", extra={"action": "health_check.run", "server_count": len(server_metrics)})
+            logger.info(
+                f"采集服务器指标: {len(server_metrics)} 台",
+                extra={"action": "health_check.run", "server_count": len(server_metrics)},
+            )
         except Exception as e:
             logger.error(f"采集服务器指标失败: {e}", extra={"action": "health_check.run"})
 
@@ -57,7 +63,10 @@ class HealthCheckService:
         terminal_metrics = []
         try:
             terminal_metrics = await client.get_all_terminals_with_metrics()
-            logger.info(f"采集终端指标: {len(terminal_metrics)} 台", extra={"action": "health_check.run", "terminal_count": len(terminal_metrics)})
+            logger.info(
+                f"采集终端指标: {len(terminal_metrics)} 台",
+                extra={"action": "health_check.run", "terminal_count": len(terminal_metrics)},
+            )
         except Exception as e:
             logger.error(f"采集终端指标失败: {e}", extra={"action": "health_check.run"})
 
@@ -68,9 +77,7 @@ class HealthCheckService:
             host_results.append(result)
 
         for metrics in terminal_metrics:
-            result = self._evaluate_host_status(
-                metrics, thresholds, asset_type="terminal"
-            )
+            result = self._evaluate_host_status(metrics, thresholds, asset_type="terminal")
             host_results.append(result)
 
         # 5. Build summary
@@ -264,8 +271,7 @@ class HealthCheckService:
                 "memory_usage": memory_usage_percent,
                 "memory_total_mb": metrics.get("memory_total_mb", 0.0),
                 "memory_used_mb": round(
-                    (metrics.get("memory_total_mb", 0.0) or 0.0)
-                    * (memory_usage_percent / 100),
+                    (metrics.get("memory_total_mb", 0.0) or 0.0) * (memory_usage_percent / 100),
                     2,
                 ),
                 "disk_usage": disk_usage_percent,
@@ -410,19 +416,16 @@ class HealthCheckService:
                 "is_online": True,
             }
 
-    async def _save_report(
-        self, summary: dict, host_results: list[dict]
-    ) -> "HealthCheckReport":
+    async def _save_report(self, summary: dict, host_results: list[dict]) -> HealthCheckReport:
         """Save report and details to database"""
 
         return await db_operation_with_retry(
             lambda db: self._save_report_db(db, summary, host_results),
-            max_retries=3, retry_delay=2.0,
+            max_retries=3,
+            retry_delay=2.0,
         )
 
     async def _save_report_db(self, db, summary, host_results):
-        from app.models.health_check import HealthCheckDetail, HealthCheckReport
-
         now = datetime.now(ZoneInfo("Asia/Shanghai"))
 
         report = HealthCheckReport(
@@ -467,12 +470,19 @@ class HealthCheckService:
 
         logger.info(
             "巡检报告已保存",
-            extra={"action": "health_check.run", "report_id": report.id, "total": report.total_hosts, "ok": report.ok_count, "warning": report.warning_count, "critical": report.critical_count},
+            extra={
+                "action": "health_check.run",
+                "report_id": report.id,
+                "total": report.total_hosts,
+                "ok": report.ok_count,
+                "warning": report.warning_count,
+                "critical": report.critical_count,
+            },
         )
 
         return report
 
-    async def _send_feishu_notification(self, report: "HealthCheckReport") -> None:
+    async def _send_feishu_notification(self, report: HealthCheckReport) -> None:
         """Send feishu card notification for health check report"""
         chat_id = await db_operation_with_retry(
             self._get_notification_chat_id, max_retries=2, retry_delay=1.0
@@ -519,10 +529,8 @@ class HealthCheckService:
 
         # List abnormal hosts with their failed checks
         if report.details:
-            abnormal_hosts = [
-                d for d in report.details if d.host_status in ("warning", "critical")
-            ]
-            abnormal_hosts.sort(key=lambda d: (0 if d.host_status == "critical" else 1))
+            abnormal_hosts = [d for d in report.details if d.host_status in ("warning", "critical")]
+            abnormal_hosts.sort(key=lambda d: 0 if d.host_status == "critical" else 1)
             abnormal_hosts = abnormal_hosts[:3]
             if abnormal_hosts:
                 elements.append({"tag": "hr"})
@@ -541,13 +549,20 @@ class HealthCheckService:
                     display_name = detail.instance
                     if detail.asset_type == "terminal" and detail.os_info:
                         display_name = f"{detail.instance} ({detail.os_info})"
-                    host_line = f"{status_icon} **{display_name}** ({detail.env or detail.asset_type})"
+                    host_line = (
+                        f"{status_icon} **{display_name}** ({detail.env or detail.asset_type})"
+                    )
                     if check_lines:
                         host_line += "\n" + "\n".join(check_lines)
                     elements.append({"tag": "markdown", "content": host_line})
                 total_abnormal = report.warning_count + report.critical_count
                 if total_abnormal > 3:
-                    elements.append({"tag": "markdown", "content": f"... 共 {total_abnormal} 台异常主机，查看详情了解全部"})
+                    elements.append(
+                        {
+                            "tag": "markdown",
+                            "content": f"... 共 {total_abnormal} 台异常主机，查看详情了解全部",
+                        }
+                    )
 
         # Inspection time
         report_time_str = ""
@@ -563,18 +578,20 @@ class HealthCheckService:
         from app.config import settings
 
         detail_url = f"{settings.itreporter_download_base_url}/ops/health-check"
-        elements.append({
-            "tag": "button",
-            "type": "primary",
-            "text": {"tag": "plain_text", "content": "查看详情"},
-            "behaviors": [
-                {
-                    "type": "open_url",
-                    "default_url": detail_url,
-                    "pc_url": detail_url,
-                }
-            ],
-        })
+        elements.append(
+            {
+                "tag": "button",
+                "type": "primary",
+                "text": {"tag": "plain_text", "content": "查看详情"},
+                "behaviors": [
+                    {
+                        "type": "open_url",
+                        "default_url": detail_url,
+                        "pc_url": detail_url,
+                    }
+                ],
+            }
+        )
 
         feishu_card_message = {
             "schema": "2.0",
@@ -596,10 +613,14 @@ class HealthCheckService:
         # Update notification_sent flag
         await db_operation_with_retry(
             lambda db: self._mark_notification_sent(db, report.id),
-            max_retries=3, retry_delay=2.0,
+            max_retries=3,
+            retry_delay=2.0,
         )
 
-        logger.info(f"飞书通知已发送: report_id={report.id}", extra={"action": "health_check.notify", "report_id": report.id, "chat_id": chat_id})
+        logger.info(
+            f"飞书通知已发送: report_id={report.id}",
+            extra={"action": "health_check.notify", "report_id": report.id, "chat_id": chat_id},
+        )
 
     async def _get_notification_chat_id(self, db):
         from app.config import settings
@@ -613,8 +634,6 @@ class HealthCheckService:
         return chat_id
 
     async def _mark_notification_sent(self, db, report_id):
-        from app.models.health_check import HealthCheckReport
-
         result = await db.execute(
             select(HealthCheckReport).where(HealthCheckReport.id == report_id)
         )
@@ -623,15 +642,13 @@ class HealthCheckService:
             db_report.notification_sent = True
             await db.commit()
 
-    async def get_latest_report(self) -> "HealthCheckReport | None":
+    async def get_latest_report(self) -> HealthCheckReport | None:
         """Get the latest report from database"""
         return await db_operation_with_retry(
             self._get_latest_report_db, max_retries=2, retry_delay=1.0
         )
 
     async def _get_latest_report_db(self, db):
-        from app.models.health_check import HealthCheckReport
-
         result = await db.execute(
             select(HealthCheckReport)
             .options(selectinload(HealthCheckReport.details))
@@ -642,31 +659,24 @@ class HealthCheckService:
 
     async def get_report_history(
         self, days: int = 30, page: int = 1, page_size: int = 20
-    ) -> tuple[list["HealthCheckReport"], int]:
+    ) -> tuple[list[HealthCheckReport], int]:
         """Get report history with pagination"""
         return await db_operation_with_retry(
             lambda db: self._get_report_history_db(db, days, page, page_size),
-            max_retries=2, retry_delay=1.0,
+            max_retries=2,
+            retry_delay=1.0,
         )
 
     async def _get_report_history_db(self, db, days, page, page_size):
-        from app.models.health_check import HealthCheckReport
-
         since = datetime.now(ZoneInfo("Asia/Shanghai")) - timedelta(days=days)
 
-        query = select(HealthCheckReport).where(
-            HealthCheckReport.report_time >= since
-        )
+        query = select(HealthCheckReport).where(HealthCheckReport.report_time >= since)
 
         total_query = select(func.count()).select_from(query.subquery())
         total = (await db.execute(total_query)).scalar() or 0
 
         offset = (page - 1) * page_size
-        query = (
-            query.order_by(HealthCheckReport.report_time.desc())
-            .offset(offset)
-            .limit(page_size)
-        )
+        query = query.order_by(HealthCheckReport.report_time.desc()).offset(offset).limit(page_size)
         result = await db.execute(query)
         items = list(result.scalars().all())
 
@@ -677,16 +687,15 @@ class HealthCheckService:
             "page_size": page_size,
         }
 
-    async def get_report_by_id(self, report_id: int) -> "HealthCheckReport | None":
+    async def get_report_by_id(self, report_id: int) -> HealthCheckReport | None:
         """Get a specific report with its details"""
         return await db_operation_with_retry(
             lambda db: self._get_report_by_id_db(db, report_id),
-            max_retries=2, retry_delay=1.0,
+            max_retries=2,
+            retry_delay=1.0,
         )
 
     async def _get_report_by_id_db(self, db, report_id):
-        from app.models.health_check import HealthCheckReport
-
         result = await db.execute(
             select(HealthCheckReport)
             .options(selectinload(HealthCheckReport.details))
@@ -741,8 +750,8 @@ class HealthCheckService:
                         check_status = check.get("status", "ok")
                         check_items_html += f"""
                         <div class="check-item">
-                            <div class="check-name">{check.get('name', '')}</div>
-                            <div class="check-details">{check.get('value', '')} (阈值{check.get('threshold', '')})</div>
+                            <div class="check-name">{check.get("name", "")}</div>
+                            <div class="check-details">{check.get("value", "")} (阈值{check.get("threshold", "")})</div>
                             <div class="check-status {check_status}">{check_status.upper()}</div>
                         </div>"""
 
@@ -752,8 +761,8 @@ class HealthCheckService:
                 <div class="host-status {status_class}">{status_text}</div>
                 <div class="host-info">
                     <span>环境: {detail.env or detail.asset_type}</span>
-                    <span>OS: {detail.os_info or '-'}</span>
-                    <span>内核: {detail.kernel_version or '-'}</span>
+                    <span>OS: {detail.os_info or "-"}</span>
+                    <span>内核: {detail.kernel_version or "-"}</span>
                 </div>
                 <div class="check-list">{check_items_html}</div>
             </div>"""
@@ -951,7 +960,8 @@ class HealthCheckService:
 
         await db_operation_with_retry(
             lambda db: self._update_thresholds_db(db, merged),
-            max_retries=3, retry_delay=2.0,
+            max_retries=3,
+            retry_delay=2.0,
         )
 
         return merged

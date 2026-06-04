@@ -56,7 +56,9 @@ class OptimizedAssetSyncService:
             节点列表
         """
         if not force_refresh and self._node_cache and self._node_cache.is_valid():
-            logger.debug(f"使用缓存节点 ({len(self._node_cache.nodes)} 个)", extra={"action": "asset.sync"})
+            logger.debug(
+                f"使用缓存节点 ({len(self._node_cache.nodes)} 个)", extra={"action": "asset.sync"}
+            )
             return self._node_cache.nodes
 
         logger.debug("从Prometheus获取节点...", extra={"action": "asset.sync"})
@@ -105,7 +107,10 @@ class OptimizedAssetSyncService:
         }
 
         try:
-            logger.debug(f"开始优化同步实例: {instance}", extra={"action": "asset.sync", "instance": instance})
+            logger.debug(
+                f"开始优化同步实例: {instance}",
+                extra={"action": "asset.sync", "instance": instance},
+            )
 
             # 从缓存获取节点列表
             nodes = await self._get_cached_nodes(force_refresh=force_refresh)
@@ -174,7 +179,10 @@ class OptimizedAssetSyncService:
             "errors": [],
         }
 
-        logger.debug(f"开始批量同步 {len(instances)} 个实例", extra={"action": "asset.sync", "total": len(instances)})
+        logger.debug(
+            f"开始批量同步 {len(instances)} 个实例",
+            extra={"action": "asset.sync", "total": len(instances)},
+        )
 
         # 先刷新缓存，确保数据最新
         await self._get_cached_nodes(force_refresh=True)
@@ -220,7 +228,9 @@ class OptimizedAssetSyncService:
             nodes = await self._get_cached_nodes(force_refresh=True)
             stats["total"] = len(nodes)
 
-            logger.debug(f"开始同步 {len(nodes)} 个节点", extra={"action": "asset.sync", "total": len(nodes)})
+            logger.debug(
+                f"开始同步 {len(nodes)} 个节点", extra={"action": "asset.sync", "total": len(nodes)}
+            )
 
             for node in nodes:
                 instance = node.get("instance", "")
@@ -243,8 +253,14 @@ class OptimizedAssetSyncService:
 
             stats["end_time"] = now_shanghai().isoformat()
             logger.info(
-                f"同步完成",
-                extra={"action": "asset.sync", "total": stats['total'], "created_count": stats['created'], "updated_count": stats['updated'], "failed_count": stats['failed']},
+                "同步完成",
+                extra={
+                    "action": "asset.sync",
+                    "total": stats["total"],
+                    "created_count": stats["created"],
+                    "updated_count": stats["updated"],
+                    "failed_count": stats["failed"],
+                },
             )
 
         except Exception as e:
@@ -405,7 +421,10 @@ class OptimizedAssetSyncService:
 
         await self.db.commit()
         await self.db.refresh(existing_asset)
-        logger.debug(f"更新资产: {existing_asset.asset_id}", extra={"action": "asset.update", "asset_id": existing_asset.asset_id})
+        logger.debug(
+            f"更新资产: {existing_asset.asset_id}",
+            extra={"action": "asset.update", "asset_id": existing_asset.asset_id},
+        )
 
     async def _create_asset(
         self, asset_data: dict[str, Any], node: dict[str, Any], instance: str
@@ -433,5 +452,8 @@ class OptimizedAssetSyncService:
         self.db.add(new_asset)
         await self.db.commit()
         await self.db.refresh(new_asset)
-        logger.debug(f"创建资产: {new_asset.asset_id}", extra={"action": "asset.create", "asset_id": new_asset.asset_id})
+        logger.debug(
+            f"创建资产: {new_asset.asset_id}",
+            extra={"action": "asset.create", "asset_id": new_asset.asset_id},
+        )
         return new_asset

@@ -2,17 +2,14 @@
 Authentication API routes.
 """
 
-from app.core.logging import get_logger
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
 from app.config import settings
-from app.core.tz import now_shanghai
 from app.core.audit import audit_log
+from app.core.logging import get_logger
 from app.core.rate_limit import limiter
 from app.core.security import (
     create_access_token,
@@ -21,6 +18,7 @@ from app.core.security import (
     verify_password,
     verify_token,
 )
+from app.core.tz import now_shanghai
 from app.crud.crud_user import crud_user
 from app.models.user import User
 from app.schemas.user import ChangePassword, TokenResponse, UserLogin, UserResponse
@@ -110,12 +108,18 @@ async def login(
     db: AsyncSession = Depends(get_db),
 ):
     """用户登录"""
-    logger.info(f"用户 '{credentials.username}' 尝试登录", extra={"action": "user.login", "username": credentials.username})
+    logger.info(
+        f"用户 '{credentials.username}' 尝试登录",
+        extra={"action": "user.login", "username": credentials.username},
+    )
 
     user = await crud_user.get_by_username(db, username=credentials.username)
 
     if not user:
-        logger.warning(f"用户 '{credentials.username}' 不存在", extra={"action": "user.login", "username": credentials.username})
+        logger.warning(
+            f"用户 '{credentials.username}' 不存在",
+            extra={"action": "user.login", "username": credentials.username},
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误",
@@ -123,7 +127,10 @@ async def login(
         )
 
     if not user.is_active:
-        logger.warning(f"用户 '{credentials.username}' 已被禁用", extra={"action": "user.login", "username": credentials.username})
+        logger.warning(
+            f"用户 '{credentials.username}' 已被禁用",
+            extra={"action": "user.login", "username": credentials.username},
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户已被禁用",
@@ -131,7 +138,10 @@ async def login(
         )
 
     if not verify_password(credentials.password, user.hashed_password):
-        logger.warning(f"用户 '{credentials.username}' 密码错误", extra={"action": "user.login", "username": credentials.username})
+        logger.warning(
+            f"用户 '{credentials.username}' 密码错误",
+            extra={"action": "user.login", "username": credentials.username},
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误",
@@ -147,7 +157,14 @@ async def login(
 
     permissions = extract_user_permissions(user)
 
-    logger.info(f"用户 '{credentials.username}' 登录成功，权限数量: {len(permissions)}", extra={"action": "user.login", "username": credentials.username, "permissions_count": len(permissions)})
+    logger.info(
+        f"用户 '{credentials.username}' 登录成功，权限数量: {len(permissions)}",
+        extra={
+            "action": "user.login",
+            "username": credentials.username,
+            "permissions_count": len(permissions),
+        },
+    )
 
     user_roles = [{"id": role.id, "name": role.name} for role in user.roles if role.is_active]
 
@@ -249,10 +266,16 @@ async def change_password(
     db: AsyncSession = Depends(get_db),
 ):
     """修改密码"""
-    logger.info(f"用户 '{current_user.username}' 尝试修改密码", extra={"action": "user.change_password", "username": current_user.username})
+    logger.info(
+        f"用户 '{current_user.username}' 尝试修改密码",
+        extra={"action": "user.change_password", "username": current_user.username},
+    )
 
     if not verify_password(data.old_password, current_user.hashed_password):
-        logger.warning(f"用户 '{current_user.username}' 当前密码错误", extra={"action": "user.change_password", "username": current_user.username})
+        logger.warning(
+            f"用户 '{current_user.username}' 当前密码错误",
+            extra={"action": "user.change_password", "username": current_user.username},
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="当前密码错误",
@@ -261,6 +284,9 @@ async def change_password(
     current_user.hashed_password = get_password_hash(data.new_password)
     await db.commit()
 
-    logger.info(f"用户 '{current_user.username}' 密码修改成功", extra={"action": "user.change_password", "username": current_user.username})
+    logger.info(
+        f"用户 '{current_user.username}' 密码修改成功",
+        extra={"action": "user.change_password", "username": current_user.username},
+    )
 
     return {"message": "密码修改成功"}

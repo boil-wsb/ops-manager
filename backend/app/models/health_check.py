@@ -1,5 +1,4 @@
-"""Health check models.
-"""
+"""Health check models."""
 
 from datetime import datetime
 
@@ -38,7 +37,9 @@ class HealthCheckDetail(BaseModel):
     report_id: Mapped[int] = mapped_column(
         ForeignKey("health_check_reports.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    report: Mapped["HealthCheckReport"] = relationship("HealthCheckReport", back_populates="details")
+    report: Mapped["HealthCheckReport"] = relationship(
+        "HealthCheckReport", back_populates="details"
+    )
 
     instance: Mapped[str] = mapped_column(String(255))
     asset_type: Mapped[str] = mapped_column(String(50))  # "server" / "terminal"

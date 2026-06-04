@@ -62,7 +62,7 @@ const Dashboard = () => {
       {navigationGroups && navigationGroups.groups.length > 0 && (
         <Card
           size="small"
-          style={{ marginBottom: 16 }}
+          style={{ marginBottom: 16, background: 'var(--bg-elevated)' }}
           styles={{ body: { padding: '0 16px 12px' } }}
         >
           <Tabs

@@ -5,10 +5,10 @@ Audit log model for tracking user operations.
 from datetime import datetime
 from typing import Any
 
-from app.core.tz import now_shanghai
 from sqlalchemy import JSON, DateTime, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.tz import now_shanghai
 from app.db.base_class import Base
 
 

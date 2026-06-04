@@ -7,12 +7,12 @@ from app.models.asset import Asset, Label, asset_labels
 from app.models.audit_log import AuditLog
 from app.models.base import BaseModel
 from app.models.feishu_interaction import FeishuInteraction
+from app.models.health_check import HealthCheckDetail, HealthCheckReport
 from app.models.it_feedback import ITFeedback
 from app.models.navigation import NavigationLink, navigation_link_roles
-from app.models.notification_group import NotificationGroup, notification_group_members
 from app.models.notification_callback_log import NotificationCallbackLog
+from app.models.notification_group import NotificationGroup, notification_group_members
 from app.models.notification_record import NotificationRecord
-from app.models.health_check import HealthCheckDetail, HealthCheckReport
 from app.models.ops import Certificate, Deployment, DNSRecord, InspectionReport, InspectionTask
 from app.models.pc_client_version import PCClientVersion
 from app.models.permission import Permission, Role, role_permissions

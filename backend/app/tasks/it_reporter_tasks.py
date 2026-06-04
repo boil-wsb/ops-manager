@@ -51,10 +51,20 @@ async def process_it_report_task() -> dict:
 
         resolved_path = find_latest_object_by_prefix(minio_bucket, report_path)
         if not resolved_path:
-            logger.error(f"未找到匹配的报告: {minio_bucket}/{report_path}", extra={"action": "it_reporter.run"})
+            logger.error(
+                f"未找到匹配的报告: {minio_bucket}/{report_path}",
+                extra={"action": "it_reporter.run"},
+            )
             return {"status": "failed", "error": f"No report found matching prefix: {report_path}"}
 
-        logger.info("报告路径解析完成", extra={"action": "it_reporter.run", "report_path": report_path, "resolved_path": resolved_path})
+        logger.info(
+            "报告路径解析完成",
+            extra={
+                "action": "it_reporter.run",
+                "report_path": report_path,
+                "resolved_path": resolved_path,
+            },
+        )
 
         result = await it_reporter_service.process_report(
             report_path=resolved_path,

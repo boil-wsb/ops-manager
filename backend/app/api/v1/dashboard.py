@@ -3,7 +3,6 @@ Dashboard API routes for terminal metrics and overview statistics.
 """
 
 import asyncio
-from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
@@ -71,8 +70,12 @@ async def get_my_terminal_metrics(
 
 async def _get_alert_stats(db: AsyncSession) -> dict:
     """Query alert statistics using SQL aggregation."""
-    firing_count_stmt = select(func.count()).select_from(AlertHistory).where(AlertHistory.status == "firing")
-    resolved_count_stmt = select(func.count()).select_from(AlertHistory).where(AlertHistory.status == "resolved")
+    firing_count_stmt = (
+        select(func.count()).select_from(AlertHistory).where(AlertHistory.status == "firing")
+    )
+    resolved_count_stmt = (
+        select(func.count()).select_from(AlertHistory).where(AlertHistory.status == "resolved")
+    )
     recent_alerts_stmt = (
         select(
             AlertHistory.alertname,
@@ -111,9 +114,15 @@ async def _get_alert_stats(db: AsyncSession) -> dict:
 
 async def _get_it_feedback_stats(db: AsyncSession) -> dict:
     """Query IT feedback statistics using SQL aggregation."""
-    pending_stmt = select(func.count()).select_from(ITFeedback).where(ITFeedback.status == "pending")
-    handling_stmt = select(func.count()).select_from(ITFeedback).where(ITFeedback.status == "handling")
-    resolved_stmt = select(func.count()).select_from(ITFeedback).where(ITFeedback.status == "resolved")
+    pending_stmt = (
+        select(func.count()).select_from(ITFeedback).where(ITFeedback.status == "pending")
+    )
+    handling_stmt = (
+        select(func.count()).select_from(ITFeedback).where(ITFeedback.status == "handling")
+    )
+    resolved_stmt = (
+        select(func.count()).select_from(ITFeedback).where(ITFeedback.status == "resolved")
+    )
 
     pending_count, handling_count, resolved_count = await asyncio.gather(
         db.scalar(pending_stmt),
@@ -131,14 +140,14 @@ async def _get_it_feedback_stats(db: AsyncSession) -> dict:
 async def _get_asset_stats(db: AsyncSession) -> dict:
     """Query asset statistics using SQL aggregation."""
     total_stmt = select(func.count()).select_from(Asset)
-    server_stmt = select(func.count()).select_from(Asset).where(
-        Asset.asset_type == AssetType.SERVER
+    server_stmt = (
+        select(func.count()).select_from(Asset).where(Asset.asset_type == AssetType.SERVER)
     )
-    domain_stmt = select(func.count()).select_from(Asset).where(
-        Asset.asset_type == AssetType.NETWORK
+    domain_stmt = (
+        select(func.count()).select_from(Asset).where(Asset.asset_type == AssetType.NETWORK)
     )
-    terminal_stmt = select(func.count()).select_from(Asset).where(
-        Asset.asset_type == AssetType.TERMINAL
+    terminal_stmt = (
+        select(func.count()).select_from(Asset).where(Asset.asset_type == AssetType.TERMINAL)
     )
 
     total_count, server_count, domain_count, terminal_count = await asyncio.gather(
@@ -159,14 +168,20 @@ async def _get_asset_stats(db: AsyncSession) -> dict:
 async def _get_cert_stats(db: AsyncSession) -> dict:
     """Query certificate statistics using SQL aggregation."""
     total_stmt = select(func.count()).select_from(Certificate)
-    valid_stmt = select(func.count()).select_from(Certificate).where(
-        Certificate.status == CertificateStatus.ACTIVE
+    valid_stmt = (
+        select(func.count())
+        .select_from(Certificate)
+        .where(Certificate.status == CertificateStatus.ACTIVE)
     )
-    expiring_stmt = select(func.count()).select_from(Certificate).where(
-        Certificate.status == CertificateStatus.EXPIRING
+    expiring_stmt = (
+        select(func.count())
+        .select_from(Certificate)
+        .where(Certificate.status == CertificateStatus.EXPIRING)
     )
-    expired_stmt = select(func.count()).select_from(Certificate).where(
-        Certificate.status == CertificateStatus.EXPIRED
+    expired_stmt = (
+        select(func.count())
+        .select_from(Certificate)
+        .where(Certificate.status == CertificateStatus.EXPIRED)
     )
 
     total_count, valid_count, expiring_count, expired_count = await asyncio.gather(
@@ -219,14 +234,18 @@ async def get_dashboard_overview(
     Returns aggregated statistics for alerts, IT feedback, assets,
     certificates, and recent deployments.
     """
-    alert_stats, it_feedback_stats, asset_stats, cert_stats, recent_deployments = (
-        await asyncio.gather(
-            _get_alert_stats(db),
-            _get_it_feedback_stats(db),
-            _get_asset_stats(db),
-            _get_cert_stats(db),
-            _get_recent_deployments(db),
-        )
+    (
+        alert_stats,
+        it_feedback_stats,
+        asset_stats,
+        cert_stats,
+        recent_deployments,
+    ) = await asyncio.gather(
+        _get_alert_stats(db),
+        _get_it_feedback_stats(db),
+        _get_asset_stats(db),
+        _get_cert_stats(db),
+        _get_recent_deployments(db),
     )
 
     return {

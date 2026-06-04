@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, JSON, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
@@ -51,9 +51,7 @@ class TaskExecutionLog(BaseModel):
     trigger_type: Mapped[str] = mapped_column(String(20), nullable=False)
     triggered_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
-    task: Mapped["ScheduledTask"] = relationship(
-        "ScheduledTask", back_populates="execution_logs"
-    )
+    task: Mapped["ScheduledTask"] = relationship("ScheduledTask", back_populates="execution_logs")
 
     __table_args__ = (
         Index("ix_task_execution_logs_status", "status"),

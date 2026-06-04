@@ -92,7 +92,9 @@ def _try_forward_callback(
             if assignee_open_id and card_content:
                 import json
 
-                card_dict = card_content if isinstance(card_content, dict) else json.loads(card_content)
+                card_dict = (
+                    card_content if isinstance(card_content, dict) else json.loads(card_content)
+                )
                 logger.info(
                     f"转发卡片给指定用户: assignee_open_id={assignee_open_id}",
                     extra={
@@ -102,7 +104,9 @@ def _try_forward_callback(
                     },
                 )
                 try:
-                    from app.services.alerts.feishu_notification import get_feishu_notification_service
+                    from app.services.alerts.feishu_notification import (
+                        get_feishu_notification_service,
+                    )
 
                     feishu_svc = get_feishu_notification_service()
                     result = feishu_svc.send_p2p_card_message(
@@ -112,22 +116,35 @@ def _try_forward_callback(
                     if result.get("success"):
                         logger.info(
                             f"卡片转发成功: assignee_open_id={assignee_open_id}, message_id={result.get('message_id')}",
-                            extra={"action": "feishu.callback.forward", "assignee_open_id": assignee_open_id},
+                            extra={
+                                "action": "feishu.callback.forward",
+                                "assignee_open_id": assignee_open_id,
+                            },
                         )
                     else:
                         logger.warning(
                             f"卡片转发失败: assignee_open_id={assignee_open_id}",
-                            extra={"action": "feishu.callback.forward", "assignee_open_id": assignee_open_id},
+                            extra={
+                                "action": "feishu.callback.forward",
+                                "assignee_open_id": assignee_open_id,
+                            },
                         )
                 except Exception as send_err:
                     logger.error(
                         f"发送转发卡片异常: {send_err}",
-                        extra={"action": "feishu.callback.forward", "assignee_open_id": assignee_open_id, "error": str(send_err)},
+                        extra={
+                            "action": "feishu.callback.forward",
+                            "assignee_open_id": assignee_open_id,
+                            "error": str(send_err),
+                        },
                     )
             else:
                 logger.warning(
                     f"转发缺少必要参数: assignee_open_id={assignee_open_id}, has_card_content={card_content is not None}",
-                    extra={"action": "feishu.callback.forward", "assignee_open_id": assignee_open_id},
+                    extra={
+                        "action": "feishu.callback.forward",
+                        "assignee_open_id": assignee_open_id,
+                    },
                 )
             engine.dispose()
             return
@@ -141,8 +158,10 @@ def _try_forward_callback(
         if hasattr(data.event, "operator") and data.event.operator:
             op = data.event.operator
             operator_info = {
-                "open_id": getattr(op, "open_id", None) or (getattr(getattr(op, "operator_id", None), "open_id", None)),
-                "user_id": getattr(op, "user_id", None) or (getattr(getattr(op, "operator_id", None), "user_id", None)),
+                "open_id": getattr(op, "open_id", None)
+                or (getattr(getattr(op, "operator_id", None), "open_id", None)),
+                "user_id": getattr(op, "user_id", None)
+                or (getattr(getattr(op, "operator_id", None), "user_id", None)),
                 "union_id": getattr(op, "union_id", None),
             }
 
@@ -159,9 +178,9 @@ def _try_forward_callback(
                 "value": value if isinstance(value, dict) else {"action": str(value)},
             },
             "callback_id": value.get("callback_id") if isinstance(value, dict) else None,
-            "timestamp": __import__("datetime").datetime.now(
-                tz=__import__("datetime").timezone.utc
-            ).isoformat(),
+            "timestamp": __import__("datetime")
+            .datetime.now(tz=__import__("datetime").timezone.utc)
+            .isoformat(),
         }
 
         import httpx
@@ -188,7 +207,11 @@ def _try_forward_callback(
 
         logger.info(
             f"回调转发成功: {callback_url}",
-            extra={"action": "feishu.callback.forward", "callback_url": callback_url, "status_code": response.status_code},
+            extra={
+                "action": "feishu.callback.forward",
+                "callback_url": callback_url,
+                "status_code": response.status_code,
+            },
         )
 
         engine.dispose()
@@ -196,10 +219,15 @@ def _try_forward_callback(
     except Exception as e:
         logger.warning(
             f"回调转发失败: {e}",
-            extra={"action": "feishu.callback.forward", "error": str(e), "open_message_id": open_message_id},
+            extra={
+                "action": "feishu.callback.forward",
+                "error": str(e),
+                "open_message_id": open_message_id,
+            },
         )
         try:
-            from sqlalchemy import create_engine as _create_engine, text as _text
+            from sqlalchemy import create_engine as _create_engine
+            from sqlalchemy import text as _text
 
             from app.config import settings as _settings
 
@@ -216,7 +244,9 @@ def _try_forward_callback(
                     {
                         "record_id": record_id if "record_id" in dir() else None,
                         "callback_url": callback_url if "callback_url" in dir() else "",
-                        "request_body": __import__("json").dumps(callback_data, ensure_ascii=False) if "callback_data" in dir() else None,
+                        "request_body": __import__("json").dumps(callback_data, ensure_ascii=False)
+                        if "callback_data" in dir()
+                        else None,
                         "error_message": str(e),
                     },
                 )
@@ -229,6 +259,7 @@ def _try_forward_callback(
 def _record_interaction(**kwargs) -> None:
     try:
         from app.crud.crud_feishu_interaction import record_interaction_sync
+
         record_interaction_sync(**kwargs)
     except Exception as e:
         logger.error(f"记录飞书交互失败: {e}", extra={"action": "feishu.callback", "error": str(e)})
@@ -247,8 +278,15 @@ def _do_card_action_trigger(data: Any) -> Any:
     """Handle card action trigger callback."""
     lark = _get_lark_module()
     data_str = lark.JSON.marshal(data)
-    action_tag = getattr(data.event.action, "tag", None) if hasattr(data, "event") and hasattr(data.event, "action") else None
-    logger.info(f"收到卡片回调: action={action_tag}", extra={"action": "feishu.callback", "callback_data": data_str})
+    action_tag = (
+        getattr(data.event.action, "tag", None)
+        if hasattr(data, "event") and hasattr(data.event, "action")
+        else None
+    )
+    logger.info(
+        f"收到卡片回调: action={action_tag}",
+        extra={"action": "feishu.callback", "callback_data": data_str},
+    )
 
     try:
         action = data.event.action
@@ -317,7 +355,10 @@ def _do_card_action_trigger(data: Any) -> Any:
             interaction_type="card_action",
             feishu_open_id=operator_open_id,
             message_id=open_message_id,
-            content={"action": button_action, "value": value if isinstance(value, dict) else str(value)},
+            content={
+                "action": button_action,
+                "value": value if isinstance(value, dict) else str(value),
+            },
             action_type=button_action,
             related_type=related_type,
             related_id=related_id,
@@ -358,7 +399,10 @@ def _do_card_action_trigger(data: Any) -> Any:
 
                 return P2CardActionTriggerResponse(resp)
 
-            logger.info(f"完成反馈处理: {feedback_id}", extra={"action": "feishu.callback", "feedback_id": feedback_id, "notes": notes})
+            logger.info(
+                f"完成反馈处理: {feedback_id}",
+                extra={"action": "feishu.callback", "feedback_id": feedback_id, "notes": notes},
+            )
 
             if not notes or not notes.strip():
                 resp = {"toast": {"type": "error", "content": "请填写处理方式"}}
@@ -459,10 +503,16 @@ def _handle_feedback_sync(feedback_id: str) -> None:
                 {"id": int(feedback_id)},
             )
             conn.commit()
-            logger.info(f"反馈 {feedback_id} 标记为处理中", extra={"action": "feishu.callback", "feedback_id": feedback_id})
+            logger.info(
+                f"反馈 {feedback_id} 标记为处理中",
+                extra={"action": "feishu.callback", "feedback_id": feedback_id},
+            )
         engine.dispose()
     except Exception as e:
-        logger.error(f"处理反馈失败: {feedback_id}", extra={"action": "feishu.callback", "feedback_id": feedback_id, "error": str(e)})
+        logger.error(
+            f"处理反馈失败: {feedback_id}",
+            extra={"action": "feishu.callback", "feedback_id": feedback_id, "error": str(e)},
+        )
 
 
 def _get_feedback_id_by_open_message_id(open_message_id: str) -> str | None:
@@ -486,7 +536,14 @@ def _get_feedback_id_by_open_message_id(open_message_id: str) -> str | None:
             return str(row[0])
         return None
     except Exception as e:
-        logger.error(f"通过open_message_id查询feedback_id失败: {open_message_id}", extra={"action": "feishu.callback", "open_message_id": open_message_id, "error": str(e)})
+        logger.error(
+            f"通过open_message_id查询feedback_id失败: {open_message_id}",
+            extra={
+                "action": "feishu.callback",
+                "open_message_id": open_message_id,
+                "error": str(e),
+            },
+        )
         return None
 
 
@@ -523,7 +580,10 @@ def _finish_feedback_sync(feedback_id: str, notes: str) -> None:
                 {"id": int(feedback_id), "notes": notes},
             )
             conn.commit()
-            logger.info(f"反馈 {feedback_id} 已解决", extra={"action": "feishu.callback", "feedback_id": feedback_id, "notes": notes})
+            logger.info(
+                f"反馈 {feedback_id} 已解决",
+                extra={"action": "feishu.callback", "feedback_id": feedback_id, "notes": notes},
+            )
         engine.dispose()
 
         if feishu_open_id:
@@ -540,17 +600,27 @@ def _finish_feedback_sync(feedback_id: str, notes: str) -> None:
                 )
                 logger.info(
                     f"已发送通知: feishu_open_id={feishu_open_id}, feedback_id={feedback_id}",
-                    extra={"action": "feishu.callback", "feishu_open_id": feishu_open_id, "feedback_id": feedback_id},
+                    extra={
+                        "action": "feishu.callback",
+                        "feishu_open_id": feishu_open_id,
+                        "feedback_id": feedback_id,
+                    },
                 )
             except Exception as e:
-                logger.error(f"发送通知失败: {e}", extra={"action": "feishu.callback", "error": str(e)})
+                logger.error(
+                    f"发送通知失败: {e}", extra={"action": "feishu.callback", "error": str(e)}
+                )
         else:
             logger.warning(
-                f"未找到飞书open_id: customer={customer}, 跳过通知", extra={"action": "feishu.callback", "customer": customer}
+                f"未找到飞书open_id: customer={customer}, 跳过通知",
+                extra={"action": "feishu.callback", "customer": customer},
             )
 
     except Exception as e:
-        logger.error(f"完成反馈失败: {feedback_id}", extra={"action": "feishu.callback", "feedback_id": feedback_id, "error": str(e)})
+        logger.error(
+            f"完成反馈失败: {feedback_id}",
+            extra={"action": "feishu.callback", "feedback_id": feedback_id, "error": str(e)},
+        )
 
 
 def _resolve_feedback_sync(feedback_id: str) -> None:
@@ -569,10 +639,16 @@ def _resolve_feedback_sync(feedback_id: str) -> None:
                 {"id": int(feedback_id)},
             )
             conn.commit()
-            logger.info(f"反馈 {feedback_id} 标记为已解决", extra={"action": "feishu.callback", "feedback_id": feedback_id})
+            logger.info(
+                f"反馈 {feedback_id} 标记为已解决",
+                extra={"action": "feishu.callback", "feedback_id": feedback_id},
+            )
         engine.dispose()
     except Exception as e:
-        logger.error(f"解决反馈失败: {feedback_id}", extra={"action": "feishu.callback", "feedback_id": feedback_id, "error": str(e)})
+        logger.error(
+            f"解决反馈失败: {feedback_id}",
+            extra={"action": "feishu.callback", "feedback_id": feedback_id, "error": str(e)},
+        )
 
 
 def _update_card_to_handling(open_message_id: str, feedback_id: str) -> None:
@@ -603,7 +679,9 @@ def _update_card_to_handling(open_message_id: str, feedback_id: str) -> None:
         feishu = get_feishu_service()
         feishu.update_card_to_handling(open_message_id, feedback_id, responsible_name)
     except Exception as e:
-        logger.error(f"更新卡片为处理中状态失败: {e}", extra={"action": "feishu.callback", "error": str(e)})
+        logger.error(
+            f"更新卡片为处理中状态失败: {e}", extra={"action": "feishu.callback", "error": str(e)}
+        )
 
 
 def _update_card_to_resolved(open_message_id: str, feedback_id: str, notes: str) -> None:
@@ -653,7 +731,9 @@ def _update_card_to_resolved(open_message_id: str, feedback_id: str, notes: str)
             contact=contact,
         )
     except Exception as e:
-        logger.error(f"更新卡片为已解决状态失败: {e}", extra={"action": "feishu.callback", "error": str(e)})
+        logger.error(
+            f"更新卡片为已解决状态失败: {e}", extra={"action": "feishu.callback", "error": str(e)}
+        )
 
 
 def _get_alert_id_by_open_message_id(open_message_id: str) -> str | None:
@@ -681,7 +761,14 @@ def _get_alert_id_by_open_message_id(open_message_id: str) -> str | None:
             return f"{alertname}_{instance}"
         return None
     except Exception as e:
-        logger.error(f"通过open_message_id查询alert_id失败: {open_message_id}", extra={"action": "feishu.callback", "open_message_id": open_message_id, "error": str(e)})
+        logger.error(
+            f"通过open_message_id查询alert_id失败: {open_message_id}",
+            extra={
+                "action": "feishu.callback",
+                "open_message_id": open_message_id,
+                "error": str(e),
+            },
+        )
         return None
 
 
@@ -738,12 +825,20 @@ def _acknowledge_alert(alert_id: str, open_message_id: str | None) -> None:
                 severity=severity,
                 instance=instance,
             )
-            logger.info(f"告警卡片 {alert_id} 已更新为接单状态", extra={"action": "feishu.callback", "alert_id": alert_id})
+            logger.info(
+                f"告警卡片 {alert_id} 已更新为接单状态",
+                extra={"action": "feishu.callback", "alert_id": alert_id},
+            )
     except Exception as e:
-        logger.error(f"接单失败: {alert_id}", extra={"action": "feishu.callback", "alert_id": alert_id, "error": str(e)})
+        logger.error(
+            f"接单失败: {alert_id}",
+            extra={"action": "feishu.callback", "alert_id": alert_id, "error": str(e)},
+        )
 
 
-def _send_transfer_notification(alert_id: str, alertname: str, severity: str, instance: str) -> None:
+def _send_transfer_notification(
+    alert_id: str, alertname: str, severity: str, instance: str
+) -> None:
     """Send notification to IT team members when alert is transferred."""
     from sqlalchemy import create_engine, text
 
@@ -762,7 +857,7 @@ def _send_transfer_notification(alert_id: str, alertname: str, severity: str, in
                     "WHERE ng.notification_type = :notif_type AND ng.is_active = true "
                     "AND u.feishu_open_id IS NOT NULL"
                 ),
-                {"notif_type": NOTIFICATION_TYPE_ALERT_TRANSFERRED_TO_IT}
+                {"notif_type": NOTIFICATION_TYPE_ALERT_TRANSFERRED_TO_IT},
             )
             rows = result.fetchall()
 
@@ -796,11 +891,20 @@ def _send_transfer_card_to_user(
             header_template="orange",
         )
         if isinstance(result, dict) and result.get("message_id"):
-            logger.info(f"转交通知已发送: user_id={user_id}, message_id={result.get('message_id')}", extra={"action": "feishu.callback", "user_id": user_id})
+            logger.info(
+                f"转交通知已发送: user_id={user_id}, message_id={result.get('message_id')}",
+                extra={"action": "feishu.callback", "user_id": user_id},
+            )
         else:
-            logger.warning(f"转交通知发送失败: {user_id}", extra={"action": "feishu.callback", "user_id": user_id})
+            logger.warning(
+                f"转交通知发送失败: {user_id}",
+                extra={"action": "feishu.callback", "user_id": user_id},
+            )
     except Exception as e:
-        logger.error(f"发送转交卡片失败: {user_id}", extra={"action": "feishu.callback", "user_id": user_id, "error": str(e)})
+        logger.error(
+            f"发送转交卡片失败: {user_id}",
+            extra={"action": "feishu.callback", "user_id": user_id, "error": str(e)},
+        )
 
 
 def _transfer_alert_to_it(alert_id: str, open_message_id: str | None) -> None:
@@ -856,11 +960,17 @@ def _transfer_alert_to_it(alert_id: str, open_message_id: str | None) -> None:
                 severity=severity,
                 instance=instance,
             )
-            logger.info(f"告警卡片 {alert_id} 已更新为转交状态", extra={"action": "feishu.callback", "alert_id": alert_id})
+            logger.info(
+                f"告警卡片 {alert_id} 已更新为转交状态",
+                extra={"action": "feishu.callback", "alert_id": alert_id},
+            )
 
         _send_transfer_notification(alert_id, alertname, severity, instance)
     except Exception as e:
-        logger.error(f"转交告警失败: {alert_id}", extra={"action": "feishu.callback", "alert_id": alert_id, "error": str(e)})
+        logger.error(
+            f"转交告警失败: {alert_id}",
+            extra={"action": "feishu.callback", "alert_id": alert_id, "error": str(e)},
+        )
 
 
 def _resolve_alert_sync(alert_id: str, notes: str, open_message_id: str | None = None) -> None:
@@ -913,7 +1023,10 @@ def _resolve_alert_sync(alert_id: str, notes: str, open_message_id: str | None =
                         history_id = None
                         feishu_open_message_id = None
                 else:
-                    logger.warning(f"无效的alert_id格式: {alert_id}", extra={"action": "feishu.callback", "alert_id": alert_id})
+                    logger.warning(
+                        f"无效的alert_id格式: {alert_id}",
+                        extra={"action": "feishu.callback", "alert_id": alert_id},
+                    )
                     history_id = None
                     feishu_open_message_id = None
                     alertname, instance, severity = "", "", "warning"
@@ -924,7 +1037,10 @@ def _resolve_alert_sync(alert_id: str, notes: str, open_message_id: str | None =
                     {"id": history_id},
                 )
                 conn.commit()
-                logger.info(f"告警 {alert_id} 已解决", extra={"action": "feishu.callback", "alert_id": alert_id, "notes": notes})
+                logger.info(
+                    f"告警 {alert_id} 已解决",
+                    extra={"action": "feishu.callback", "alert_id": alert_id, "notes": notes},
+                )
 
                 if feishu_open_message_id:
                     feishu_svc = get_feishu_notification_service()
@@ -938,10 +1054,16 @@ def _resolve_alert_sync(alert_id: str, notes: str, open_message_id: str | None =
                         card_content=resolved_card,
                     )
             else:
-                logger.warning(f"未找到firing状态的告警: {alert_id}", extra={"action": "feishu.callback", "alert_id": alert_id})
+                logger.warning(
+                    f"未找到firing状态的告警: {alert_id}",
+                    extra={"action": "feishu.callback", "alert_id": alert_id},
+                )
         engine.dispose()
     except Exception as e:
-        logger.error(f"解决告警失败: {alert_id}", extra={"action": "feishu.callback", "alert_id": alert_id, "error": str(e)})
+        logger.error(
+            f"解决告警失败: {alert_id}",
+            extra={"action": "feishu.callback", "alert_id": alert_id, "error": str(e)},
+        )
 
 
 def _start_callback_client() -> None:
@@ -1029,7 +1151,9 @@ def _do_bot_p2p_chat_entered(data: Any) -> None:
             feishu_open_id=open_id,
         )
     except Exception as e:
-        logger.error(f"记录chat_entered交互失败: {e}", extra={"action": "feishu.callback", "error": str(e)})
+        logger.error(
+            f"记录chat_entered交互失败: {e}", extra={"action": "feishu.callback", "error": str(e)}
+        )
 
     return None
 
@@ -1037,6 +1161,16 @@ def _do_bot_p2p_chat_entered(data: Any) -> None:
 def _do_im_message_reaction_created_v1(data: Any) -> None:
     """Handle im.message.reaction.created_v1 event."""
     lark = _get_lark_module()
+
+    # 过滤应用自身触发的表情回应事件
+    operator_type = getattr(data.event, "operator_type", None)
+    if operator_type == "app":
+        logger.debug(
+            "跳过应用自身触发的表情回应事件",
+            extra={"action": "feishu.callback", "operator_type": operator_type},
+        )
+        return None
+
     logger.info(f"表情回应创建: {lark.JSON.marshal(data)}", extra={"action": "feishu.callback"})
 
     try:
@@ -1061,7 +1195,9 @@ def _do_im_message_reaction_created_v1(data: Any) -> None:
             content={"emoji_type": emoji_type},
         )
     except Exception as e:
-        logger.error(f"记录reaction交互失败: {e}", extra={"action": "feishu.callback", "error": str(e)})
+        logger.error(
+            f"记录reaction交互失败: {e}", extra={"action": "feishu.callback", "error": str(e)}
+        )
 
     return None
 
@@ -1087,7 +1223,9 @@ def _do_im_message_message_read_v1(data: Any) -> None:
             content={"message_id_list": message_id_list},
         )
     except Exception as e:
-        logger.error(f"记录message_read交互失败: {e}", extra={"action": "feishu.callback", "error": str(e)})
+        logger.error(
+            f"记录message_read交互失败: {e}", extra={"action": "feishu.callback", "error": str(e)}
+        )
 
     return None
 
@@ -1097,7 +1235,9 @@ def _do_im_message_receive_v1(data: Any) -> Any:
     try:
         lark = _get_lark_module()
         message_content = lark.JSON.marshal(data)
-        logger.info("收到消息", extra={"action": "feishu.callback", "message_data": message_content})
+        logger.info(
+            "收到消息", extra={"action": "feishu.callback", "message_data": message_content}
+        )
 
         event = data.event
         sender = getattr(event, "sender", None)
@@ -1111,6 +1251,20 @@ def _do_im_message_receive_v1(data: Any) -> Any:
 
         message = getattr(event, "message", None)
         message_id = getattr(message, "message_id", None) if message else None
+        chat_type = getattr(message, "chat_type", None) if message else None
+
+        # 仅当消息指向该应用时才回复表情：单聊直接回复，群聊需被 @
+        should_salute = chat_type == "p2p"
+        if not should_salute and chat_type == "group":
+            mentions = getattr(message, "mentions", None) if message else None
+            if mentions:
+                for mention in mentions:
+                    mention_id = getattr(mention, "id", None)
+                    if mention_id:
+                        mention_app_id = getattr(mention_id, "app_id", None)
+                        if mention_app_id == settings.feishu_app_id:
+                            should_salute = True
+                            break
 
         content = getattr(message, "content", None) if message else None
         msg_type = ""
@@ -1123,7 +1277,12 @@ def _do_im_message_receive_v1(data: Any) -> Any:
 
                 logger.info(
                     f"消息来自 {sender_id}: type={msg_type}",
-                    extra={"action": "feishu.callback", "sender_id": sender_id, "msg_type": msg_type, "text_content": text_content},
+                    extra={
+                        "action": "feishu.callback",
+                        "sender_id": sender_id,
+                        "msg_type": msg_type,
+                        "text_content": text_content,
+                    },
                 )
 
                 _record_interaction(
@@ -1138,9 +1297,11 @@ def _do_im_message_receive_v1(data: Any) -> Any:
                 if msg_type == "text" and text_content:
                     _handle_text_message(sender_id, text_content)
             except Exception as e:
-                logger.error(f"解析消息内容失败: {e}", extra={"action": "feishu.callback", "error": str(e)})
+                logger.error(
+                    f"解析消息内容失败: {e}", extra={"action": "feishu.callback", "error": str(e)}
+                )
 
-        if message_id:
+        if message_id and should_salute:
             _send_salute_reaction(message_id)
         return None
 
@@ -1158,7 +1319,10 @@ def _send_salute_reaction(message_id: str | None) -> None:
 
         feishu = get_feishu_service()
         feishu.add_message_reaction(message_id, emoji_type="Typing")
-        logger.info(f"已添加表情回应: message_id={message_id}", extra={"action": "feishu.callback", "message_id": message_id})
+        logger.info(
+            f"已添加表情回应: message_id={message_id}",
+            extra={"action": "feishu.callback", "message_id": message_id},
+        )
     except Exception as e:
         logger.error(f"添加表情回应失败: {e}", extra={"action": "feishu.callback", "error": str(e)})
 
@@ -1175,7 +1339,10 @@ def _handle_text_message(sender_id: str | None, text: str) -> None:
     elif text in ["状态", "status"]:
         _send_status_info(sender_id)
     else:
-        logger.info(f"收到文本消息: sender_id={sender_id}, text={text}", extra={"action": "feishu.callback", "sender_id": sender_id})
+        logger.info(
+            f"收到文本消息: sender_id={sender_id}, text={text}",
+            extra={"action": "feishu.callback", "sender_id": sender_id},
+        )
 
 
 def _send_help_menu(user_id: str) -> None:
@@ -1213,7 +1380,12 @@ def _send_help_menu(user_id: str) -> None:
                                         "text": {"tag": "plain_text", "content": "提交反馈"},
                                         "type": "primary",
                                         "width": "fill",
-                                        "behaviors": [{"type": "callback", "value": {"action": "submit_feedback"}}],
+                                        "behaviors": [
+                                            {
+                                                "type": "callback",
+                                                "value": {"action": "submit_feedback"},
+                                            }
+                                        ],
                                     }
                                 ],
                             },
@@ -1227,7 +1399,12 @@ def _send_help_menu(user_id: str) -> None:
                                         "text": {"tag": "plain_text", "content": "查看状态"},
                                         "type": "default",
                                         "width": "fill",
-                                        "behaviors": [{"type": "callback", "value": {"action": "check_status"}}],
+                                        "behaviors": [
+                                            {
+                                                "type": "callback",
+                                                "value": {"action": "check_status"},
+                                            }
+                                        ],
                                     }
                                 ],
                             },

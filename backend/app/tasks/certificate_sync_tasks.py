@@ -4,13 +4,13 @@
 从 Prometheus 自动同步 SSL 证书数据
 """
 
-from app.core.logging import get_logger
 from datetime import datetime
 from typing import Any
 
 from app.config import settings
-from app.db.session import db_operation_with_retry
+from app.core.logging import get_logger
 from app.core.tz import now_shanghai
+from app.db.session import db_operation_with_retry
 from app.services.prometheus import PrometheusClient
 
 logger = get_logger(__name__)
@@ -113,9 +113,7 @@ async def sync_certificates_from_prometheus_task() -> dict[str, Any]:
     logger.info("开始定时证书同步", extra={"action": "cert.sync"})
 
     try:
-        return await db_operation_with_retry(
-            _sync_certificates_db, max_retries=3, retry_delay=2.0
-        )
+        return await db_operation_with_retry(_sync_certificates_db, max_retries=3, retry_delay=2.0)
     except Exception as exc:
         logger.error(f"证书同步失败: {exc}", extra={"action": "cert.sync"})
         raise

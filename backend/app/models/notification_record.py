@@ -4,10 +4,10 @@ Notification Record model for tracking Feishu notification history.
 
 from datetime import datetime
 
-from app.core.tz import now_shanghai
 from sqlalchemy import JSON, Boolean, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.tz import now_shanghai
 from app.models.base import BaseModel
 
 

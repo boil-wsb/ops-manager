@@ -31,9 +31,7 @@ async def sync_feishu_users_task() -> dict[str, Any]:
     logger.info("开始飞书用户同步", extra={"action": "feishu.sync"})
 
     try:
-        return await db_operation_with_retry(
-            _sync_feishu_users_db, max_retries=3, retry_delay=2.0
-        )
+        return await db_operation_with_retry(_sync_feishu_users_db, max_retries=3, retry_delay=2.0)
     except Exception as exc:
         logger.error(f"飞书同步失败: {exc}", extra={"action": "feishu.sync"})
         raise

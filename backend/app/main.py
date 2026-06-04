@@ -44,14 +44,23 @@ async def _run_task(name: str, coro: Any) -> TaskResult:
         result = await coro
         return TaskResult(name, True, result, None)
     except Exception as e:
-        logger.error(f"{name} 失败: {e}", extra={"action": "app.startup", "task": name, "error": str(e)})
+        logger.error(
+            f"{name} 失败: {e}", extra={"action": "app.startup", "task": name, "error": str(e)}
+        )
         return TaskResult(name, False, None, e)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
-    logger.info(f"应用启动: {settings.app_name} v{settings.app_version}", extra={"action": "app.startup", "app_name": settings.app_name, "version": settings.app_version})
+    logger.info(
+        f"应用启动: {settings.app_name} v{settings.app_version}",
+        extra={
+            "action": "app.startup",
+            "app_name": settings.app_name,
+            "version": settings.app_version,
+        },
+    )
 
     async def _init_db_task():
         await init_db()
@@ -67,7 +76,10 @@ async def lifespan(app: FastAPI):
         async with await get_async_session_local() as db:
             synced = await sync_pc_versions_on_startup(db)
             if synced:
-                logger.info(f"PC客户端版本已同步: {synced}", extra={"action": "app.startup", "synced": synced})
+                logger.info(
+                    f"PC客户端版本已同步: {synced}",
+                    extra={"action": "app.startup", "synced": synced},
+                )
             else:
                 logger.info("无新PC客户端版本需同步", extra={"action": "app.startup"})
             return synced
@@ -80,7 +92,10 @@ async def lifespan(app: FastAPI):
 
     for result in results:
         if not result.success:
-            logger.warning(f"启动任务 '{result.name}' 失败，继续启动流程", extra={"action": "app.startup", "task": result.name})
+            logger.warning(
+                f"启动任务 '{result.name}' 失败，继续启动流程",
+                extra={"action": "app.startup", "task": result.name},
+            )
 
     start_feishu_callback_client()
     start_scheduler()

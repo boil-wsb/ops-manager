@@ -2,13 +2,12 @@
 Notification group management API routes.
 """
 
-from app.core.logging import get_logger
-
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
 from app.core.audit import audit_log
+from app.core.logging import get_logger
 from app.core.permissions import require_permissions
 from app.crud.crud_notification_group import notification_group
 from app.crud.crud_user import crud_user
@@ -67,10 +66,16 @@ async def create_notification_group(
 ):
     """Create a new notification group."""
     require_permissions(["notification_group:create"])(current_user)
-    logger.info(f"创建通知组 '{group_in.name}'", extra={"action": "notify.group_create", "group_name": group_in.name})
+    logger.info(
+        f"创建通知组 '{group_in.name}'",
+        extra={"action": "notify.group_create", "group_name": group_in.name},
+    )
 
     group = await notification_group.create(db, obj_in=group_in)
-    logger.info(f"通知组 '{group.name}' 创建成功，ID: {group.id}", extra={"action": "notify.group_create", "group_name": group.name, "group_id": group.id})
+    logger.info(
+        f"通知组 '{group.name}' 创建成功，ID: {group.id}",
+        extra={"action": "notify.group_create", "group_name": group.name, "group_id": group.id},
+    )
 
     return NotificationGroupResponse.model_validate(group)
 
@@ -116,7 +121,14 @@ async def update_notification_group(
         )
 
     updated_group = await notification_group.update(db, db_obj=db_group, obj_in=group_in)
-    logger.info(f"通知组 '{updated_group.name}' 更新成功", extra={"action": "notify.group_update", "group_name": updated_group.name, "group_id": group_id})
+    logger.info(
+        f"通知组 '{updated_group.name}' 更新成功",
+        extra={
+            "action": "notify.group_update",
+            "group_name": updated_group.name,
+            "group_id": group_id,
+        },
+    )
 
     return NotificationGroupResponse.model_validate(updated_group)
 
@@ -141,7 +153,10 @@ async def delete_notification_group(
         )
 
     await notification_group.delete(db, id=group_id)
-    logger.info(f"通知组 ID={group_id} 删除成功", extra={"action": "notify.group_delete", "group_id": group_id})
+    logger.info(
+        f"通知组 ID={group_id} 删除成功",
+        extra={"action": "notify.group_delete", "group_id": group_id},
+    )
 
     return None
 
@@ -173,7 +188,15 @@ async def add_notification_group_member(
         )
 
     updated_group = await notification_group.add_member(db, group_id=group_id, user_id=user_id)
-    logger.info(f"向通知组 '{db_group.name}' 添加成员 user_id={user_id}", extra={"action": "notify.group_update", "group_name": db_group.name, "group_id": group_id, "user_id": user_id})
+    logger.info(
+        f"向通知组 '{db_group.name}' 添加成员 user_id={user_id}",
+        extra={
+            "action": "notify.group_update",
+            "group_name": db_group.name,
+            "group_id": group_id,
+            "user_id": user_id,
+        },
+    )
 
     return NotificationGroupResponse.model_validate(updated_group)
 
@@ -198,6 +221,14 @@ async def remove_notification_group_member(
         )
 
     updated_group = await notification_group.remove_member(db, group_id=group_id, user_id=user_id)
-    logger.info(f"从通知组 '{db_group.name}' 移除成员 user_id={user_id}", extra={"action": "notify.group_update", "group_name": db_group.name, "group_id": group_id, "user_id": user_id})
+    logger.info(
+        f"从通知组 '{db_group.name}' 移除成员 user_id={user_id}",
+        extra={
+            "action": "notify.group_update",
+            "group_name": db_group.name,
+            "group_id": group_id,
+            "user_id": user_id,
+        },
+    )
 
     return NotificationGroupResponse.model_validate(updated_group)

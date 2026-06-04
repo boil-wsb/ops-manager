@@ -72,7 +72,9 @@ async def run_health_check():
             },
         }
     except Exception as e:
-        logger.error(f"Health check run error: {e}", extra={"action": "health_check.run", "error": str(e)})
+        logger.error(
+            f"Health check run error: {e}", extra={"action": "health_check.run", "error": str(e)}
+        )
         return {"status": "error", "message": str(e)}
 
 
@@ -97,7 +99,9 @@ async def get_report_history(
             "page_size": result["page_size"],
         }
     except Exception as e:
-        logger.error(f"获取巡检历史失败: {e}", extra={"action": "health_check.history", "error": str(e)})
+        logger.error(
+            f"获取巡检历史失败: {e}", extra={"action": "health_check.history", "error": str(e)}
+        )
         raise HTTPException(status_code=500, detail="获取巡检历史记录失败，请稍后重试") from None
 
 

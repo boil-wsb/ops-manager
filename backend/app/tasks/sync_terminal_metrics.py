@@ -4,14 +4,15 @@
 从 Prometheus 同步终端指标数据
 """
 
-from app.core.logging import get_logger
 from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import select
+
+from app.core.logging import get_logger
+from app.core.tz import now_shanghai
 from app.db.session import db_operation_with_retry
 from app.models.asset import Asset, AssetType
-from app.core.tz import now_shanghai
 from app.services.prometheus.client import PrometheusClient
 
 logger = get_logger(__name__)
@@ -69,12 +70,8 @@ async def _sync_terminal_metrics_db(db) -> dict[str, Any]:
         cpu_usage = terminal.get("cpu_usage", 0)
         disk_total_bytes = terminal.get("disk_total", 0)
         memory_total_bytes = terminal.get("memory_total", 0)
-        disk_total_gb = (
-            round(disk_total_bytes / (1024**3), 1) if disk_total_bytes else None
-        )
-        memory_total_gb = (
-            round(memory_total_bytes / (1024**3), 1) if memory_total_bytes else None
-        )
+        disk_total_gb = round(disk_total_bytes / (1024**3), 1) if disk_total_bytes else None
+        memory_total_gb = round(memory_total_bytes / (1024**3), 1) if memory_total_bytes else None
 
         asset_id = await get_or_create_asset(db, hostname, instance, customer)
 
@@ -114,7 +111,15 @@ async def _sync_terminal_metrics_db(db) -> dict[str, Any]:
         "synced": synced_count,
     }
 
-    logger.info("终端指标同步完成", extra={"action": "terminal.metrics", "total": task_result['total_terminals'], "synced": task_result['synced'], "duration_seconds": duration})
+    logger.info(
+        "终端指标同步完成",
+        extra={
+            "action": "terminal.metrics",
+            "total": task_result["total_terminals"],
+            "synced": task_result["synced"],
+            "duration_seconds": duration,
+        },
+    )
 
     return task_result
 
@@ -130,7 +135,7 @@ async def sync_terminal_metrics_task() -> dict[str, Any]:
         return await db_operation_with_retry(
             _sync_terminal_metrics_db, max_retries=3, retry_delay=2.0
         )
-    except Exception as e:
+    except Exception:
         raise
 
 

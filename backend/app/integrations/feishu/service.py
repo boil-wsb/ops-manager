@@ -124,6 +124,7 @@ class FeishuService:
     ) -> None:
         try:
             from app.crud.crud_feishu_interaction import record_interaction_sync
+
             record_interaction_sync(
                 direction="outbound",
                 interaction_type="message",
@@ -136,7 +137,9 @@ class FeishuService:
                 error=error,
             )
         except Exception as e:
-            logger.error(f"记录出站交互失败: {e}", extra={"action": "feishu.interaction", "error": str(e)})
+            logger.error(
+                f"记录出站交互失败: {e}", extra={"action": "feishu.interaction", "error": str(e)}
+            )
 
     def send_text_message(self, user_id: str, text: str) -> dict[str, Any]:
         return self.send_message_to_user(
@@ -146,8 +149,11 @@ class FeishuService:
         )
 
     def add_message_reaction(self, message_id: str, emoji_type: str = "SMILE") -> dict[str, Any]:
-        import lark_oapi as lark
-        from lark_oapi.api.im.v1 import CreateMessageReactionRequest, CreateMessageReactionRequestBody, Emoji
+        from lark_oapi.api.im.v1 import (
+            CreateMessageReactionRequest,
+            CreateMessageReactionRequestBody,
+            Emoji,
+        )
 
         self._check_enabled()
         client = self._get_client()
@@ -157,11 +163,7 @@ class FeishuService:
             .message_id(message_id)
             .request_body(
                 CreateMessageReactionRequestBody.builder()
-                .reaction_type(
-                    Emoji.builder()
-                    .emoji_type(emoji_type)
-                    .build()
-                )
+                .reaction_type(Emoji.builder().emoji_type(emoji_type).build())
                 .build()
             )
             .build()
@@ -446,12 +448,19 @@ class FeishuService:
             response = client.im.v1.message.patch(request)
 
             if response.success():
-                logger.info(f"卡片更新成功: message_id={open_message_id}", extra={"action": "feishu.api", "message_id": open_message_id})
+                logger.info(
+                    f"卡片更新成功: message_id={open_message_id}",
+                    extra={"action": "feishu.api", "message_id": open_message_id},
+                )
                 return {"success": True}
             else:
                 logger.error(
                     f"卡片更新失败: message_id={open_message_id}, code={response.code}, msg={response.msg}",
-                    extra={"action": "feishu.api", "message_id": open_message_id, "code": response.code},
+                    extra={
+                        "action": "feishu.api",
+                        "message_id": open_message_id,
+                        "code": response.code,
+                    },
                 )
                 return {"success": False, "error": f"{response.code} - {response.msg}"}
         except Exception as e:

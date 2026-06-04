@@ -21,11 +21,12 @@ async def send_email_notification(
             return
 
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(
-            None, _send_email_sync, to_addresses, subject, body, html_body
-        )
+        await loop.run_in_executor(None, _send_email_sync, to_addresses, subject, body, html_body)
 
-        logger.info("邮件通知已发送", extra={"action": "alert.notify", "to": to_addresses, "subject": subject})
+        logger.info(
+            "邮件通知已发送",
+            extra={"action": "alert.notify", "to": to_addresses, "subject": subject},
+        )
 
     except Exception as exc:
         logger.error(f"邮件通知发送失败: {str(exc)}", extra={"action": "alert.notify"})
@@ -62,8 +63,13 @@ async def send_webhook_notification(url: str, payload: dict, headers: dict = Non
             response = await client.post(url, json=payload, headers=headers)
             response.raise_for_status()
 
-        logger.info("Webhook通知已发送", extra={"action": "alert.notify", "url": url, "status": response.status_code})
+        logger.info(
+            "Webhook通知已发送",
+            extra={"action": "alert.notify", "url": url, "status": response.status_code},
+        )
 
     except Exception as exc:
-        logger.error(f"Webhook通知发送失败: {str(exc)}", extra={"action": "alert.notify", "url": url})
+        logger.error(
+            f"Webhook通知发送失败: {str(exc)}", extra={"action": "alert.notify", "url": url}
+        )
         raise

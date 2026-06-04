@@ -66,7 +66,10 @@ def fetch_all_users() -> list[FeishuUser]:
     scope_resp = client.contact.v3.scope.list(scope_req)
 
     if not scope_resp.success() or not scope_resp.data:
-        logger.error(f"获取通讯录范围失败: {scope_resp.msg}", extra={"action": "feishu.sync", "error": scope_resp.msg})
+        logger.error(
+            f"获取通讯录范围失败: {scope_resp.msg}",
+            extra={"action": "feishu.sync", "error": scope_resp.msg},
+        )
         return []
 
     user_ids = scope_resp.data.user_ids or []
@@ -75,7 +78,10 @@ def fetch_all_users() -> list[FeishuUser]:
     all_user_ids.extend(user_ids)
     all_department_ids.extend(dept_ids)
 
-    logger.info(f"通讯录范围内找到 {len(user_ids)} 个用户和 {len(dept_ids)} 个部门", extra={"action": "feishu.sync", "users": len(user_ids), "departments": len(dept_ids)})
+    logger.info(
+        f"通讯录范围内找到 {len(user_ids)} 个用户和 {len(dept_ids)} 个部门",
+        extra={"action": "feishu.sync", "users": len(user_ids), "departments": len(dept_ids)},
+    )
 
     def get_department_children(dept_id: str) -> list[str]:
         children = []
@@ -94,7 +100,10 @@ def fetch_all_users() -> list[FeishuUser]:
                     if child_id:
                         children.append(child_id)
         except Exception as e:
-            logger.error(f"获取子部门失败: {dept_id}", extra={"action": "feishu.sync", "dept_id": dept_id, "error": str(e)})
+            logger.error(
+                f"获取子部门失败: {dept_id}",
+                extra={"action": "feishu.sync", "dept_id": dept_id, "error": str(e)},
+            )
         return children
 
     queue = list(all_department_ids)
@@ -106,7 +115,10 @@ def fetch_all_users() -> list[FeishuUser]:
                 queue.append(child_id)
                 all_department_ids.append(child_id)
 
-    logger.info(f"共找到 {len(all_department_ids)} 个部门", extra={"action": "feishu.sync", "total_departments": len(all_department_ids)})
+    logger.info(
+        f"共找到 {len(all_department_ids)} 个部门",
+        extra={"action": "feishu.sync", "total_departments": len(all_department_ids)},
+    )
 
     for dept_id in all_department_ids:
         try:
@@ -124,9 +136,15 @@ def fetch_all_users() -> list[FeishuUser]:
                     if uid and uid not in all_user_ids:
                         all_user_ids.append(uid)
         except Exception as e:
-            logger.error(f"获取部门用户失败: {dept_id}", extra={"action": "feishu.sync", "dept_id": dept_id, "error": str(e)})
+            logger.error(
+                f"获取部门用户失败: {dept_id}",
+                extra={"action": "feishu.sync", "dept_id": dept_id, "error": str(e)},
+            )
 
-    logger.info(f"共找到 {len(all_user_ids)} 个用户", extra={"action": "feishu.sync", "total_users": len(all_user_ids)})
+    logger.info(
+        f"共找到 {len(all_user_ids)} 个用户",
+        extra={"action": "feishu.sync", "total_users": len(all_user_ids)},
+    )
 
     users = []
     for uid in all_user_ids:
@@ -146,9 +164,14 @@ def fetch_all_users() -> list[FeishuUser]:
                 )
                 users.append(feishu_user)
         except Exception as e:
-            logger.error(f"获取用户详情失败: {uid}", extra={"action": "feishu.sync", "uid": uid, "error": str(e)})
+            logger.error(
+                f"获取用户详情失败: {uid}",
+                extra={"action": "feishu.sync", "uid": uid, "error": str(e)},
+            )
 
-    logger.info(f"获取到 {len(users)} 个用户详情", extra={"action": "feishu.sync", "users": len(users)})
+    logger.info(
+        f"获取到 {len(users)} 个用户详情", extra={"action": "feishu.sync", "users": len(users)}
+    )
     return users
 
 
@@ -230,7 +253,10 @@ async def sync_users(db, crud_user) -> dict:
                 )
                 created += 1
         except Exception as e:
-            logger.error(f"同步用户失败: {feishu_user.open_id}", extra={"action": "feishu.sync", "open_id": feishu_user.open_id, "error": str(e)})
+            logger.error(
+                f"同步用户失败: {feishu_user.open_id}",
+                extra={"action": "feishu.sync", "open_id": feishu_user.open_id, "error": str(e)},
+            )
             errors.append(f"User {feishu_user.open_id}: {str(e)}")
 
     local_feishu_open_ids = set(existing_map.keys())
@@ -242,7 +268,10 @@ async def sync_users(db, crud_user) -> dict:
             await crud_user.delete_feishu_user(db, user=user)
             deleted += 1
         except Exception as e:
-            logger.error(f"删除用户失败: {open_id}", extra={"action": "feishu.sync", "open_id": open_id, "error": str(e)})
+            logger.error(
+                f"删除用户失败: {open_id}",
+                extra={"action": "feishu.sync", "open_id": open_id, "error": str(e)},
+            )
             errors.append(f"Delete {open_id}: {str(e)}")
 
     result = {
@@ -253,5 +282,14 @@ async def sync_users(db, crud_user) -> dict:
         "errors": errors if errors else None,
     }
 
-    logger.info(f"飞书同步完成", extra={"action": "feishu.sync", "created_count": created, "updated_count": updated, "deleted_count": deleted, "total_feishu": len(feishu_users)})
+    logger.info(
+        "飞书同步完成",
+        extra={
+            "action": "feishu.sync",
+            "created_count": created,
+            "updated_count": updated,
+            "deleted_count": deleted,
+            "total_feishu": len(feishu_users),
+        },
+    )
     return result

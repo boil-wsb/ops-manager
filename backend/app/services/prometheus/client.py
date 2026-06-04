@@ -3,6 +3,7 @@ Prometheus HTTP API 客户端实现
 """
 
 import asyncio
+import contextlib
 from datetime import datetime
 from typing import Any
 
@@ -90,7 +91,9 @@ class PrometheusClient:
             data = response.json()
 
             if data.get("status") != "success":
-                logger.error(f"范围查询失败: {data.get('error')}", extra={"action": "prometheus.query"})
+                logger.error(
+                    f"范围查询失败: {data.get('error')}", extra={"action": "prometheus.query"}
+                )
                 return {"status": "error", "error": data.get("error")}
 
             return data
@@ -281,7 +284,10 @@ class PrometheusClient:
 
         for (key, _), data in zip(queries.items(), results, strict=True):
             if isinstance(data, Exception):
-                logger.error(f"负载查询失败: {instance} {key}: {data}", extra={"action": "prometheus.query", "instance": instance})
+                logger.error(
+                    f"负载查询失败: {instance} {key}: {data}",
+                    extra={"action": "prometheus.query", "instance": instance},
+                )
                 continue
             if data.get("status") == "success":
                 result_list = data.get("data", {}).get("result", [])
@@ -373,10 +379,8 @@ class PrometheusClient:
                 inst = metric.get("instance", "")
                 value = r.get("value", [])
                 if inst and len(value) >= 2:
-                    try:
+                    with contextlib.suppress(ValueError, TypeError):
                         value_map[inst] = float(value[1])
-                    except (ValueError, TypeError):
-                        pass
             return value_map
 
         up_map: dict[str, bool] = {}
@@ -435,7 +439,10 @@ class PrometheusClient:
 
             return node
         except Exception as e:
-            logger.error(f"节点数据丰富失败: {instance}: {e}", extra={"action": "prometheus.query", "instance": instance})
+            logger.error(
+                f"节点数据丰富失败: {instance}: {e}",
+                extra={"action": "prometheus.query", "instance": instance},
+            )
             node["status"] = "unknown"
             return node
 
@@ -637,7 +644,10 @@ class PrometheusClient:
 
         for (key, _), data in zip(queries.items(), results, strict=True):
             if isinstance(data, Exception):
-                logger.error(f"终端指标查询失败: {hostname} {key}: {data}", extra={"action": "prometheus.query", "hostname": hostname})
+                logger.error(
+                    f"终端指标查询失败: {hostname} {key}: {data}",
+                    extra={"action": "prometheus.query", "hostname": hostname},
+                )
                 continue
             if data.get("status") == "success":
                 result_list = data.get("data", {}).get("result", [])
@@ -676,7 +686,10 @@ class PrometheusClient:
                     metrics = await self.get_terminal_metrics(hostname)
                     terminal.update(metrics)
                 except Exception as e:
-                    logger.error(f"终端指标获取失败: {hostname}: {e}", extra={"action": "prometheus.query", "hostname": hostname})
+                    logger.error(
+                        f"终端指标获取失败: {hostname}: {e}",
+                        extra={"action": "prometheus.query", "hostname": hostname},
+                    )
             enriched_terminals.append(terminal)
 
         return enriched_terminals

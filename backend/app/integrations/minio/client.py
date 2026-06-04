@@ -44,7 +44,11 @@ def generate_presigned_url(
         if actual_hours < expires_hours:
             logger.info(
                 f"预签名URL时长已限制: {expires_hours}h -> {actual_hours}h",
-                extra={"action": "minio.download", "expires_hours": expires_hours, "actual_hours": actual_hours},
+                extra={
+                    "action": "minio.download",
+                    "expires_hours": expires_hours,
+                    "actual_hours": actual_hours,
+                },
             )
         return client.presigned_get_object(
             bucket_name, object_path, expires=timedelta(hours=actual_hours)
@@ -63,7 +67,10 @@ def find_latest_object_by_prefix(bucket_name: str, prefix: str) -> str | None:
         latest = max(objects, key=lambda o: o.last_modified)
         return latest.object_name
     except Exception as e:
-        logger.error(f"按前缀查找最新对象失败: '{prefix}'", extra={"action": "minio.download", "prefix": prefix, "error": str(e)})
+        logger.error(
+            f"按前缀查找最新对象失败: '{prefix}'",
+            extra={"action": "minio.download", "prefix": prefix, "error": str(e)},
+        )
         return None
 
 

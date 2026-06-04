@@ -51,7 +51,9 @@ def _parse_excluded_paths() -> list[str]:
 TRUSTED_NETWORKS = _parse_trusted_networks()
 AUTH_EXCLUDED_PATHS = _parse_excluded_paths()
 
-logger.info(f"信任网络配置: {[str(n) for n in TRUSTED_NETWORKS]}", extra={"action": "auth.middleware"})
+logger.info(
+    f"信任网络配置: {[str(n) for n in TRUSTED_NETWORKS]}", extra={"action": "auth.middleware"}
+)
 logger.info(f"认证排除路径: {AUTH_EXCLUDED_PATHS}", extra={"action": "auth.middleware"})
 
 
@@ -110,10 +112,12 @@ class AuthenticationMiddleware:
 
         is_trusted = _is_trusted_client(request)
         for excluded_path in AUTH_EXCLUDED_PATHS:
-            if path.startswith(excluded_path):
-                if is_trusted:
-                    logger.debug(f"信任网络跳过认证: {path}", extra={"action": "auth.bypass", "client_ip": _get_client_ip(request)})
-                    return await call_next(request)
+            if path.startswith(excluded_path) and is_trusted:
+                logger.debug(
+                    f"信任网络跳过认证: {path}",
+                    extra={"action": "auth.bypass", "client_ip": _get_client_ip(request)},
+                )
+                return await call_next(request)
 
         auth_header = request.headers.get("Authorization")
 

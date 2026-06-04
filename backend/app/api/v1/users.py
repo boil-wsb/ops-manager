@@ -2,8 +2,6 @@
 User management API routes.
 """
 
-from app.core.logging import get_logger
-
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +10,7 @@ from sqlalchemy.orm import selectinload
 from app.api.deps import get_db, require_permissions
 from app.core.audit import audit_log
 from app.core.cache import cache_delete_pattern, cache_get_or_set
+from app.core.logging import get_logger
 from app.crud.crud_user import crud_user
 from app.models.permission import Role
 from app.models.user import User
@@ -91,11 +90,17 @@ async def create_user(
     current_user: User = Depends(require_permissions(["user:create"])),
 ):
     """创建新用户"""
-    logger.info(f"创建用户 '{user_in.username}'", extra={"action": "user.create", "username": user_in.username})
+    logger.info(
+        f"创建用户 '{user_in.username}'",
+        extra={"action": "user.create", "username": user_in.username},
+    )
 
     existing_user = await crud_user.get_by_username(db, username=user_in.username)
     if existing_user:
-        logger.warning(f"用户名 '{user_in.username}' 已存在", extra={"action": "user.create", "username": user_in.username})
+        logger.warning(
+            f"用户名 '{user_in.username}' 已存在",
+            extra={"action": "user.create", "username": user_in.username},
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="用户名已存在",
@@ -104,14 +109,20 @@ async def create_user(
     if user_in.email:
         existing_email = await crud_user.get_by_email(db, email=user_in.email)
         if existing_email:
-            logger.warning(f"邮箱 '{user_in.email}' 已存在", extra={"action": "user.create", "email": user_in.email})
+            logger.warning(
+                f"邮箱 '{user_in.email}' 已存在",
+                extra={"action": "user.create", "email": user_in.email},
+            )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="邮箱已存在",
             )
 
     user = await crud_user.create(db, obj_in=user_in)
-    logger.info(f"用户 '{user_in.username}' 创建成功，ID: {user.id}", extra={"action": "user.create", "username": user_in.username, "user_id": user.id})
+    logger.info(
+        f"用户 '{user_in.username}' 创建成功，ID: {user.id}",
+        extra={"action": "user.create", "username": user_in.username, "user_id": user.id},
+    )
 
     await cache_delete_pattern("users:list:*")
 
@@ -148,7 +159,9 @@ async def update_user(
 
     user = await crud_user.get(db, id=user_id)
     if not user:
-        logger.warning(f"用户 ID={user_id} 不存在", extra={"action": "user.update", "user_id": user_id})
+        logger.warning(
+            f"用户 ID={user_id} 不存在", extra={"action": "user.update", "user_id": user_id}
+        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="用户不存在",
@@ -157,7 +170,10 @@ async def update_user(
     if user_in.email and user_in.email != user.email:
         existing_email = await crud_user.get_by_email(db, email=user_in.email)
         if existing_email:
-            logger.warning(f"邮箱 '{user_in.email}' 已被其他用户使用", extra={"action": "user.update", "email": user_in.email})
+            logger.warning(
+                f"邮箱 '{user_in.email}' 已被其他用户使用",
+                extra={"action": "user.update", "email": user_in.email},
+            )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="邮箱已存在",
@@ -171,7 +187,10 @@ async def update_user(
         )
 
     user = await crud_user.update(db, db_obj=user, obj_in=user_in)
-    logger.info(f"用户 '{user.username}' 更新成功", extra={"action": "user.update", "username": user.username, "user_id": user.id})
+    logger.info(
+        f"用户 '{user.username}' 更新成功",
+        extra={"action": "user.update", "username": user.username, "user_id": user.id},
+    )
 
     await cache_delete_pattern("users:list:*")
 
@@ -191,7 +210,9 @@ async def delete_user(
 
     user = await crud_user.get(db, id=user_id)
     if not user:
-        logger.warning(f"用户 ID={user_id} 不存在", extra={"action": "user.delete", "user_id": user_id})
+        logger.warning(
+            f"用户 ID={user_id} 不存在", extra={"action": "user.delete", "user_id": user_id}
+        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="用户不存在",
@@ -199,7 +220,10 @@ async def delete_user(
 
     username = user.username
     await crud_user.delete(db, id=user_id)
-    logger.info(f"用户 '{username}' 删除成功", extra={"action": "user.delete", "username": username, "user_id": user_id})
+    logger.info(
+        f"用户 '{username}' 删除成功",
+        extra={"action": "user.delete", "username": username, "user_id": user_id},
+    )
 
     await cache_delete_pattern("users:list:*")
 

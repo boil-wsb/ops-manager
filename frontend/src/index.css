@@ -49,30 +49,30 @@
 /* Light Theme (default) */
 :root,
 [data-theme='light'] {
-  --bg-color: #121220;
-  --bg-primary: #1a1a2e;
-  --bg-secondary: #16162a;
-  --bg-tertiary: #1e1e36;
-  --bg-elevated: #22223a;
-  --bg-card: #1a1a2e;
+  --bg-color: #e8ecf4;
+  --bg-primary: #f0f3fa;
+  --bg-secondary: #eef1f9;
+  --bg-tertiary: #e4e8f2;
+  --bg-elevated: #f5f7fc;
+  --bg-card: #f0f3fa;
   --bg-mask: rgba(0, 0, 0, 0.45);
 
-  --text-primary: rgba(255, 255, 255, 0.88);
-  --text-secondary: rgba(255, 255, 255, 0.65);
-  --text-tertiary: rgba(255, 255, 255, 0.45);
-  --text-muted: rgba(255, 255, 255, 0.25);
-  --text-disabled: rgba(255, 255, 255, 0.25);
+  --text-primary: rgba(20, 25, 50, 0.88);
+  --text-secondary: rgba(20, 25, 50, 0.65);
+  --text-tertiary: rgba(20, 25, 50, 0.45);
+  --text-muted: rgba(20, 25, 50, 0.25);
+  --text-disabled: rgba(20, 25, 50, 0.25);
 
-  --border-color: #2a2a4a;
-  --border-secondary: #222240;
+  --border-color: #c8cee0;
+  --border-secondary: #d8dde8;
   --border-glow: rgba(24, 144, 255, 0.3);
 
-  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow-glow: 0 0 20px rgba(24, 144, 255, 0.15);
-  --shadow-dropdown: 0 6px 16px 8px rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 2px 8px rgba(30, 40, 80, 0.08);
+  --shadow-glow: 0 0 20px rgba(24, 144, 255, 0.1);
+  --shadow-dropdown: 0 6px 16px 8px rgba(30, 40, 80, 0.1);
 
-  --sider-bg: #1e1e2d;
-  --header-bg: #1a1a2e;
+  --sider-bg: #2a3050;
+  --header-bg: #f0f3fa;
 }
 
 /* Dark Theme */

@@ -56,7 +56,10 @@ async def download_personalized_pc_client(
     import zipfile
     from pathlib import Path
 
-    logger.info(f"Download endpoint called by user: {current_user.username}", extra={"action": "terminal.version", "username": current_user.username})
+    logger.info(
+        f"Download endpoint called by user: {current_user.username}",
+        extra={"action": "terminal.version", "username": current_user.username},
+    )
 
     pcinfo_dir = (
         Path(__file__).parent.parent.parent.parent.parent / "frontend" / "public" / "pcinfo"

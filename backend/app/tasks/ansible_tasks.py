@@ -2,8 +2,8 @@
 Ansible playbook execution tasks via SSH.
 """
 
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 
 import paramiko
 from tenacity import retry, stop_after_attempt, wait_fixed
@@ -19,7 +19,14 @@ SCRIPTS_DIRECTORY = Path(__file__).parent.parent.parent / "scripts" / "shells"
 class SSHCommandExecutor:
     """Execute commands over SSH using paramiko."""
 
-    def __init__(self, host: str, port: int, username: str, password: str | None = None, key_path: str | None = None):
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        username: str,
+        password: str | None = None,
+        key_path: str | None = None,
+    ):
         self.host = host
         self.port = port
         self.username = username
@@ -87,7 +94,10 @@ class SSHCommandExecutor:
                 remote_file.write(script_content)
             sftp.close()
             self.client.exec_command(f"chmod +x {remote_path}")
-            logger.info("脚本已上传", extra={"action": "ansible.run", "host": self.host, "remote_path": remote_path})
+            logger.info(
+                "脚本已上传",
+                extra={"action": "ansible.run", "host": self.host, "remote_path": remote_path},
+            )
             return True
         except Exception as e:
             logger.error(f"脚本上传失败: {str(e)}", extra={"action": "ansible.run"})
@@ -123,7 +133,14 @@ def execute_ansible_command() -> tuple[bool, str]:
         )
 
         executor.connect()
-        logger.info("SSH连接成功", extra={"action": "ansible.run", "host": settings.ansible_ssh_host, "port": settings.ansible_ssh_port})
+        logger.info(
+            "SSH连接成功",
+            extra={
+                "action": "ansible.run",
+                "host": settings.ansible_ssh_host,
+                "port": settings.ansible_ssh_port,
+            },
+        )
 
         if settings.ansible_local_script_path:
             script_path = Path(settings.ansible_local_script_path)
@@ -135,7 +152,9 @@ def execute_ansible_command() -> tuple[bool, str]:
                 return False, f"Local script file not found: {script_path}"
 
             script_content = script_path.read_text(encoding="utf-8")
-            logger.debug("读取本地脚本文件", extra={"action": "ansible.run", "script_path": str(script_path)})
+            logger.debug(
+                "读取本地脚本文件", extra={"action": "ansible.run", "script_path": str(script_path)}
+            )
             upload_success = executor.upload_script(script_content, "/tmp/execute_script.sh")
             if not upload_success:
                 executor.close()
@@ -145,8 +164,7 @@ def execute_ansible_command() -> tuple[bool, str]:
         elif settings.ansible_script:
             logger.info("检测到脚本模式，上传并执行脚本", extra={"action": "ansible.run"})
             upload_success = executor.upload_script(
-                settings.ansible_script,
-                "/tmp/execute_script.sh"
+                settings.ansible_script, "/tmp/execute_script.sh"
             )
             if not upload_success:
                 executor.close()
@@ -209,7 +227,14 @@ def execute_remote_script(script_content: str) -> tuple[bool, str]:
         )
 
         executor.connect()
-        logger.info("SSH连接成功", extra={"action": "ansible.run", "host": settings.ansible_ssh_host, "port": settings.ansible_ssh_port})
+        logger.info(
+            "SSH连接成功",
+            extra={
+                "action": "ansible.run",
+                "host": settings.ansible_ssh_host,
+                "port": settings.ansible_ssh_port,
+            },
+        )
 
         upload_success = executor.upload_script(script_content, "/tmp/execute_script.sh")
         if not upload_success:

@@ -40,7 +40,12 @@ class ITReporterService:
             if report_data:
                 logger.info(
                     f"报告解析完成: ok={report_data['ok_count']}, warning={report_data['warning_count']}, critical={report_data['critical_count']}",
-                    extra={"action": "it_reporter.run", "ok": report_data['ok_count'], "warning": report_data['warning_count'], "critical": report_data['critical_count']},
+                    extra={
+                        "action": "it_reporter.run",
+                        "ok": report_data["ok_count"],
+                        "warning": report_data["warning_count"],
+                        "critical": report_data["critical_count"],
+                    },
                 )
             else:
                 logger.warning("报告解析结果为空", extra={"action": "it_reporter.run"})
@@ -48,7 +53,10 @@ class ITReporterService:
             logger.error(f"报告解析失败: {e}", extra={"action": "it_reporter.run"})
 
         card_elements, card_template = build_inspection_card_elements(
-            report_data, download_url, file_size_mb, report_path,
+            report_data,
+            download_url,
+            file_size_mb,
+            report_path,
             expires_hours=settings.itreporter_presigned_url_expires_hours,
         )
 
@@ -74,7 +82,10 @@ class ITReporterService:
                     receive_id_type="chat_id",
                 )
                 feishu_sent = True
-                logger.info(f"飞书通知已发送: chat_id={chat_id}", extra={"action": "it_reporter.notify", "chat_id": chat_id})
+                logger.info(
+                    f"飞书通知已发送: chat_id={chat_id}",
+                    extra={"action": "it_reporter.notify", "chat_id": chat_id},
+                )
             except Exception as e:
                 logger.error(f"飞书通知发送失败: {e}", extra={"action": "it_reporter.notify"})
 
@@ -103,7 +114,9 @@ class ITReporterService:
 
         try:
             return await db_operation_with_retry(
-                _get_chat_id_db, max_retries=3, retry_delay=2.0,
+                _get_chat_id_db,
+                max_retries=3,
+                retry_delay=2.0,
             )
         except Exception as e:
             logger.error(f"查询飞书通知群聊 ID 失败: {e}", extra={"action": "it_reporter.config"})

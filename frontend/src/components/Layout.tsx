@@ -1,4 +1,4 @@
-import { Layout as AntLayout, Menu, Button, Avatar, Dropdown, Space, Tooltip } from 'antd';
+import { Layout as AntLayout, Menu, Button, Avatar, Dropdown, Space, Tooltip, ConfigProvider, theme } from 'antd';
 import type { MenuProps } from 'antd';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -145,52 +145,67 @@ const Layout = () => {
 
   return (
     <AntLayout style={{ minHeight: '100vh' }}>
-      <Sider
-        trigger={null}
-        collapsible
-        collapsed={collapsed}
-        style={{
-          overflow: 'auto',
-          height: '100vh',
-          position: 'fixed',
-          left: 0,
-          top: 0,
-          bottom: 0,
-          background: 'var(--sider-bg)',
+      <ConfigProvider
+        theme={{
+          algorithm: theme.darkAlgorithm,
+          token: {
+            colorBgContainer: 'var(--sider-bg)',
+          },
+          components: {
+            Menu: {
+              darkItemBg: 'var(--sider-bg)',
+              darkItemSelectedBg: '#1890ff',
+            },
+          },
         }}
       >
-        <div
+        <Sider
+          trigger={null}
+          collapsible
+          collapsed={collapsed}
           style={{
-            height: 64,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderBottom: '1px solid rgba(255,255,255,0.1)',
+            overflow: 'auto',
+            height: '100vh',
+            position: 'fixed',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            background: 'var(--sider-bg)',
           }}
         >
-          <SafetyOutlined style={{ fontSize: 24, color: '#1890ff' }} />
-          {!collapsed && (
-            <span
-              style={{
-                marginLeft: 12,
-                fontSize: 18,
-                fontWeight: 'bold',
-                color: '#fff',
-              }}
-            >
-              OpsManager
-            </span>
-          )}
-        </div>
-        <Menu
-          theme="dark"
-          mode="inline"
-          selectedKeys={getSelectedKeys()}
-          defaultOpenKeys={getOpenKeys()}
-          items={filteredMenuItems as MenuProps['items']}
-          onClick={handleMenuClick}
-        />
-      </Sider>
+          <div
+            style={{
+              height: 64,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderBottom: '1px solid rgba(255,255,255,0.1)',
+            }}
+          >
+            <SafetyOutlined style={{ fontSize: 24, color: '#1890ff' }} />
+            {!collapsed && (
+              <span
+                style={{
+                  marginLeft: 12,
+                  fontSize: 18,
+                  fontWeight: 'bold',
+                  color: '#fff',
+                }}
+              >
+                OpsManager
+              </span>
+            )}
+          </div>
+          <Menu
+            theme="dark"
+            mode="inline"
+            selectedKeys={getSelectedKeys()}
+            defaultOpenKeys={getOpenKeys()}
+            items={filteredMenuItems as MenuProps['items']}
+            onClick={handleMenuClick}
+          />
+        </Sider>
+      </ConfigProvider>
       <AntLayout style={{ marginLeft: collapsed ? 80 : 200, transition: 'margin-left 0.2s' }}>
         <Header
           style={{

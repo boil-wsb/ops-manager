@@ -1,5 +1,4 @@
 import json
-from datetime import datetime
 from typing import Any
 
 from sqlalchemy import create_engine, func, select, text
@@ -97,7 +96,10 @@ def _resolve_user_id_by_open_id(open_id: str | None) -> int | None:
         engine.dispose()
         return row[0] if row else None
     except Exception as e:
-        logger.error(f"解析用户ID失败: {e}", extra={"action": "feishu.interaction", "open_id": open_id, "error": str(e)})
+        logger.error(
+            f"解析用户ID失败: {e}",
+            extra={"action": "feishu.interaction", "open_id": open_id, "error": str(e)},
+        )
         return None
 
 
@@ -152,7 +154,9 @@ def record_interaction_sync(
             conn.commit()
         engine.dispose()
     except Exception as e:
-        logger.error(f"记录飞书交互失败: {e}", extra={"action": "feishu.interaction", "error": str(e)})
+        logger.error(
+            f"记录飞书交互失败: {e}", extra={"action": "feishu.interaction", "error": str(e)}
+        )
 
 
 feishu_interaction = CRUDFeishuInteraction()

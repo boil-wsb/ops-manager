@@ -9,13 +9,36 @@ from app.config import settings
 from app.core.log_context import request_id_ctx, user_id_ctx
 from app.core.tz import from_timestamp, now_shanghai
 
-_LOGRECORD_BUILTIN = frozenset({
-    "name", "msg", "args", "created", "relativeCreated", "exc_info",
-    "exc_text", "stack_info", "levelname", "levelno", "lineno",
-    "funcName", "pathname", "filename", "module", "msecs",
-    "thread", "threadName", "process", "processName", "taskName",
-    "message", "asctime", "request_id", "user_id", "action",
-})
+_LOGRECORD_BUILTIN = frozenset(
+    {
+        "name",
+        "msg",
+        "args",
+        "created",
+        "relativeCreated",
+        "exc_info",
+        "exc_text",
+        "stack_info",
+        "levelname",
+        "levelno",
+        "lineno",
+        "funcName",
+        "pathname",
+        "filename",
+        "module",
+        "msecs",
+        "thread",
+        "threadName",
+        "process",
+        "processName",
+        "taskName",
+        "message",
+        "asctime",
+        "request_id",
+        "user_id",
+        "action",
+    }
+)
 
 
 class ContextFilter(logging.Filter):

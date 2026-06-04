@@ -1,10 +1,8 @@
-from app.core.logging import get_logger
-from typing import Any
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_db, get_current_user
+from app.api.deps import get_current_user, get_db
+from app.core.logging import get_logger
 from app.crud.crud_feishu_interaction import feishu_interaction
 from app.models.user import User
 from app.schemas.feishu_interaction import (

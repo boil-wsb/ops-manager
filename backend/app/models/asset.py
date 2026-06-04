@@ -6,7 +6,6 @@ import enum
 from datetime import datetime
 from typing import Any, Optional
 
-from app.core.tz import now_shanghai
 from sqlalchemy import (
     JSON,
     Column,
@@ -21,6 +20,7 @@ from sqlalchemy import (
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.tz import now_shanghai
 from app.models.base import BaseModel
 
 

@@ -2,12 +2,11 @@
 Notification Record API endpoints.
 """
 
-from app.core.logging import get_logger
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
+from app.core.logging import get_logger
 from app.crud.crud_notification_record import notification_record
 from app.schemas.notification_record import (
     NotificationRecordListResponse,

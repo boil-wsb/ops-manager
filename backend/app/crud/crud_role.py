@@ -82,9 +82,7 @@ class CRUDRole(CRUDBase[Role, RoleCreate, RoleUpdate]):
     async def get_permission_ids(self, db: AsyncSession, *, role_id: int) -> list[int]:
         """Get permission IDs for a role."""
         result = await db.execute(
-            select(role_permissions.c.permission_id).where(
-                role_permissions.c.role_id == role_id
-            )
+            select(role_permissions.c.permission_id).where(role_permissions.c.role_id == role_id)
         )
         return list(result.scalars().all())
 

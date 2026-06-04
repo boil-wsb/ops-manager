@@ -1,8 +1,8 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
-UTC_TZ = timezone.utc
+UTC_TZ = UTC
 
 
 def now_shanghai() -> datetime:

@@ -127,9 +127,19 @@ async def _register_all_tasks(db):
                 for log in task.execution_logs:
                     await db.delete(log)
                 await db.delete(task)
-                logger.info(f"清理已移除的内置任务: {task.task_id}", extra={"action": "scheduler.register", "task_id": task.task_id})
+                logger.info(
+                    f"清理已移除的内置任务: {task.task_id}",
+                    extra={"action": "scheduler.register", "task_id": task.task_id},
+                )
             except Exception as e:
-                logger.error(f"清理任务失败: {task.task_id}", extra={"action": "scheduler.register", "task_id": task.task_id, "error": str(e)})
+                logger.error(
+                    f"清理任务失败: {task.task_id}",
+                    extra={
+                        "action": "scheduler.register",
+                        "task_id": task.task_id,
+                        "error": str(e),
+                    },
+                )
     await db.commit()
 
     for task_def in BUILTIN_TASKS:
@@ -152,7 +162,14 @@ async def _register_all_tasks(db):
                 description=f"定时任务「{task_def['name']}」对应的代码函数路径",
             )
         except Exception as e:
-            logger.error(f"注册内置任务失败: {task_def['task_id']}", extra={"action": "scheduler.register", "task_id": task_def['task_id'], "error": str(e)})
+            logger.error(
+                f"注册内置任务失败: {task_def['task_id']}",
+                extra={
+                    "action": "scheduler.register",
+                    "task_id": task_def["task_id"],
+                    "error": str(e),
+                },
+            )
 
     await _init_default_configs(db)
 
@@ -196,7 +213,14 @@ async def _init_default_configs(db):
                 continue
             await crud_system_config.upsert_by_key(db, **config)
         except Exception as e:
-            logger.error(f"初始化默认配置失败: {config['key']}", extra={"action": "scheduler.register", "config_key": config['key'], "error": str(e)})
+            logger.error(
+                f"初始化默认配置失败: {config['key']}",
+                extra={
+                    "action": "scheduler.register",
+                    "config_key": config["key"],
+                    "error": str(e),
+                },
+            )
 
 
 async def register_builtin_tasks():
@@ -212,6 +236,7 @@ async def register_builtin_tasks():
 
 async def _load_enabled_tasks(db):
     from app.crud.crud_scheduled_task import crud_scheduled_task
+
     tasks, _ = await crud_scheduled_task.get_multi(db, limit=1000, is_enabled=True)
 
     sched = get_scheduler()
@@ -219,7 +244,10 @@ async def _load_enabled_tasks(db):
         try:
             trigger = _build_trigger(task.trigger_type, task.trigger_config)
             if trigger is None:
-                logger.error(f"构建触发器失败: {task.task_id}", extra={"action": "scheduler.load", "task_id": task.task_id})
+                logger.error(
+                    f"构建触发器失败: {task.task_id}",
+                    extra={"action": "scheduler.load", "task_id": task.task_id},
+                )
                 continue
             sched.add_job(
                 _execute_task_wrapper,
@@ -229,9 +257,19 @@ async def _load_enabled_tasks(db):
                 args=[task.task_id],
                 replace_existing=True,
             )
-            logger.info(f"加载定时任务: {task.task_id} ({task.trigger_type})", extra={"action": "scheduler.load", "task_id": task.task_id, "trigger_type": task.trigger_type})
+            logger.info(
+                f"加载定时任务: {task.task_id} ({task.trigger_type})",
+                extra={
+                    "action": "scheduler.load",
+                    "task_id": task.task_id,
+                    "trigger_type": task.trigger_type,
+                },
+            )
         except Exception as e:
-            logger.error(f"加载任务失败: {task.task_id}", extra={"action": "scheduler.load", "task_id": task.task_id, "error": str(e)})
+            logger.error(
+                f"加载任务失败: {task.task_id}",
+                extra={"action": "scheduler.load", "task_id": task.task_id, "error": str(e)},
+            )
 
     await db.commit()
 
@@ -272,19 +310,33 @@ def _build_trigger(trigger_type: str, trigger_config: dict):
             return CronTrigger(timezone="Asia/Shanghai", **cleaned)
         elif trigger_type == "interval":
             if not cleaned:
-                logger.error("间隔触发器配置为空", extra={"action": "scheduler.load", "trigger_type": trigger_type, "trigger_config": trigger_config})
+                logger.error(
+                    "间隔触发器配置为空",
+                    extra={
+                        "action": "scheduler.load",
+                        "trigger_type": trigger_type,
+                        "trigger_config": trigger_config,
+                    },
+                )
                 return None
             return IntervalTrigger(timezone="Asia/Shanghai", **cleaned)
         else:
-            logger.error(f"未知触发器类型: {trigger_type}", extra={"action": "scheduler.load", "trigger_type": trigger_type})
+            logger.error(
+                f"未知触发器类型: {trigger_type}",
+                extra={"action": "scheduler.load", "trigger_type": trigger_type},
+            )
             return None
     except Exception as e:
-        logger.error(f"构建触发器失败: ({trigger_type}, {trigger_config})", extra={"action": "scheduler.load", "trigger_type": trigger_type, "error": str(e)})
+        logger.error(
+            f"构建触发器失败: ({trigger_type}, {trigger_config})",
+            extra={"action": "scheduler.load", "trigger_type": trigger_type, "error": str(e)},
+        )
         return None
 
 
 async def _get_task_function_path(db, task_id: str) -> str | None:
     from app.crud.crud_scheduled_task import crud_scheduled_task
+
     task = await crud_scheduled_task.get_by_task_id(db, task_id)
     if not task:
         return None
@@ -292,10 +344,19 @@ async def _get_task_function_path(db, task_id: str) -> str | None:
 
 
 async def _update_task_execution_log(
-    db, task_id, status, started_at, finished_at, duration,
-    error_message, result_summary, trigger_type="scheduled", triggered_by=None,
+    db,
+    task_id,
+    status,
+    started_at,
+    finished_at,
+    duration,
+    error_message,
+    result_summary,
+    trigger_type="scheduled",
+    triggered_by=None,
 ):
     from app.crud.crud_scheduled_task import crud_scheduled_task
+
     await crud_scheduled_task.create_execution_log(
         db,
         task_id=task_id,
@@ -337,11 +398,16 @@ async def _execute_task_wrapper(task_id: str):
             retry_delay=1.0,
         )
     except Exception as e:
-        logger.error(f"查询任务配置失败: {task_id}", extra={"action": "scheduler.run", "task_id": task_id, "error": str(e)})
+        logger.error(
+            f"查询任务配置失败: {task_id}",
+            extra={"action": "scheduler.run", "task_id": task_id, "error": str(e)},
+        )
         return
 
     if not task_function_path:
-        logger.debug(f"任务 {task_id} 未找到", extra={"action": "scheduler.run", "task_id": task_id})
+        logger.debug(
+            f"任务 {task_id} 未找到", extra={"action": "scheduler.run", "task_id": task_id}
+        )
         return
 
     started_at = datetime.now(ZoneInfo("Asia/Shanghai"))
@@ -386,33 +452,52 @@ async def _execute_task_wrapper(task_id: str):
             result_summary = result
 
         if status == "success":
-            logger.debug(f"任务 {task_id} 完成，耗时 {duration:.2f}s", extra={"action": "scheduler.run", "task_id": task_id, "duration": duration})
+            logger.debug(
+                f"任务 {task_id} 完成，耗时 {duration:.2f}s",
+                extra={"action": "scheduler.run", "task_id": task_id, "duration": duration},
+            )
         else:
-            logger.debug(f"任务 {task_id} 失败: {error_message}", extra={"action": "scheduler.run", "task_id": task_id, "error": error_message})
+            logger.debug(
+                f"任务 {task_id} 失败: {error_message}",
+                extra={"action": "scheduler.run", "task_id": task_id, "error": error_message},
+            )
 
     except Exception as e:
         duration = time.time() - start_time
         status = "failed"
         error_message = str(e)
-        logger.debug(f"任务 {task_id} 执行异常: {e}", extra={"action": "scheduler.run", "task_id": task_id, "error": str(e)})
+        logger.debug(
+            f"任务 {task_id} 执行异常: {e}",
+            extra={"action": "scheduler.run", "task_id": task_id, "error": str(e)},
+        )
 
     finished_at = datetime.now(ZoneInfo("Asia/Shanghai"))
 
     try:
         await db_operation_with_retry(
             lambda db: _update_task_execution_log(
-                db, task_id, status, started_at, finished_at, duration,
-                error_message, result_summary,
+                db,
+                task_id,
+                status,
+                started_at,
+                finished_at,
+                duration,
+                error_message,
+                result_summary,
             ),
             max_retries=2,
             retry_delay=1.0,
         )
     except Exception as e:
-        logger.debug(f"更新任务状态失败: {task_id}", extra={"action": "scheduler.run", "task_id": task_id, "error": str(e)})
+        logger.debug(
+            f"更新任务状态失败: {task_id}",
+            extra={"action": "scheduler.run", "task_id": task_id, "error": str(e)},
+        )
 
 
 async def _update_scheduler_job_db(db, task_id: str, sched):
     from app.crud.crud_scheduled_task import crud_scheduled_task
+
     task = await crud_scheduled_task.get_by_task_id(db, task_id)
     if not task:
         return None
@@ -458,7 +543,10 @@ def update_scheduler_job(task_id: str):
             if result == "remove":
                 remove_scheduler_job(task_id)
         except Exception as e:
-            logger.error(f"更新调度任务失败: {task_id}", extra={"action": "scheduler.update", "task_id": task_id, "error": str(e)})
+            logger.error(
+                f"更新调度任务失败: {task_id}",
+                extra={"action": "scheduler.update", "task_id": task_id, "error": str(e)},
+            )
 
     try:
         loop = asyncio.get_event_loop()
@@ -474,7 +562,9 @@ def remove_scheduler_job(task_id: str):
     sched = get_scheduler()
     try:
         sched.remove_job(task_id)
-        logger.info(f"移除定时任务: {task_id}", extra={"action": "scheduler.register", "task_id": task_id})
+        logger.info(
+            f"移除定时任务: {task_id}", extra={"action": "scheduler.register", "task_id": task_id}
+        )
     except Exception:
         pass
 
@@ -548,15 +638,25 @@ async def run_task_manually(task_id: str, triggered_by: str | None = None):
     try:
         await db_operation_with_retry(
             lambda db: _update_task_execution_log(
-                db, task_id, status, started_at, finished_at, duration,
-                error_message, result_summary,
-                trigger_type="manual", triggered_by=triggered_by,
+                db,
+                task_id,
+                status,
+                started_at,
+                finished_at,
+                duration,
+                error_message,
+                result_summary,
+                trigger_type="manual",
+                triggered_by=triggered_by,
             ),
             max_retries=2,
             retry_delay=1.0,
         )
     except Exception as e:
-        logger.error(f"手动任务状态更新失败: {task_id}", extra={"action": "scheduler.run", "task_id": task_id, "error": str(e)})
+        logger.error(
+            f"手动任务状态更新失败: {task_id}",
+            extra={"action": "scheduler.run", "task_id": task_id, "error": str(e)},
+        )
 
     return {
         "status": status,
@@ -605,6 +705,7 @@ def start_scheduler():
 
 async def _sync_all_next_run_times(db):
     from app.crud.crud_scheduled_task import crud_scheduled_task
+
     sched = get_scheduler()
     tasks, _ = await crud_scheduled_task.get_multi(db, limit=1000, is_enabled=True)
     updated = 0
@@ -619,7 +720,10 @@ async def _sync_all_next_run_times(db):
             pass
     if updated > 0:
         await db.commit()
-    logger.info(f"同步下次执行时间完成: {updated} 个任务", extra={"action": "scheduler.sync", "updated": updated})
+    logger.info(
+        f"同步下次执行时间完成: {updated} 个任务",
+        extra={"action": "scheduler.sync", "updated": updated},
+    )
 
 
 def stop_scheduler():

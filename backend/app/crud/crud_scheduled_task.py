@@ -71,11 +71,7 @@ class CRUDScheduledTask:
         total_result = await db.execute(count_query)
         total = total_result.scalar()
 
-        query = (
-            query.offset(skip)
-            .limit(limit)
-            .order_by(TaskExecutionLog.started_at.desc())
-        )
+        query = query.offset(skip).limit(limit).order_by(TaskExecutionLog.started_at.desc())
         result = await db.execute(query)
         items = result.scalars().all()
 

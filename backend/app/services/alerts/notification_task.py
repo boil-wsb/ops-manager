@@ -77,7 +77,11 @@ async def send_alert_notification(
 
         logger.info(
             f"告警通知已处理: alertname={alert_data.get('alertname')}, instance={instance}",
-            extra={"action": "alert.notify", "alertname": alert_data.get('alertname'), "instance": instance},
+            extra={
+                "action": "alert.notify",
+                "alertname": alert_data.get("alertname"),
+                "instance": instance,
+            },
         )
 
     except Exception as exc:
@@ -154,7 +158,10 @@ async def _send_notification_by_instance(
         )
 
         if subject and body:
-            logger.info(f"邮件通知已准备: instance={instance}, subject={subject}", extra={"action": "alert.notify", "instance": instance})
+            logger.info(
+                f"邮件通知已准备: instance={instance}, subject={subject}",
+                extra={"action": "alert.notify", "instance": instance},
+            )
 
     if feishu_template:
         logger.info(
@@ -190,10 +197,10 @@ async def _send_notification_by_instance(
             )
 
             asset_owner_open_id = await _get_asset_owner_open_id(db, instance)
-            
+
             # Get notification group members as fallback/additional recipients
             notification_group_open_ids = await _get_alert_notification_group_open_ids(db)
-            
+
             # Collect all recipient open_ids (asset owner + notification group, deduplicated)
             recipient_open_ids = []
             if asset_owner_open_id:
@@ -201,7 +208,7 @@ async def _send_notification_by_instance(
             for oid in notification_group_open_ids:
                 if oid and oid not in recipient_open_ids:
                     recipient_open_ids.append(oid)
-            
+
             if recipient_open_ids:
                 feishu_svc = get_feishu_notification_service()
 
@@ -245,7 +252,9 @@ async def _send_notification_by_instance(
                         template_str=card_config_json,
                         context=context,
                     )
-                    logger.info(f"渲染卡片配置: {rendered_card_str[:500]}", extra={"action": "alert.notify"})
+                    logger.info(
+                        f"渲染卡片配置: {rendered_card_str[:500]}", extra={"action": "alert.notify"}
+                    )
                     card = json.loads(rendered_card_str)
                     logger.info("使用模板card_config", extra={"action": "alert.notify"})
 
@@ -284,14 +293,22 @@ async def _send_notification_by_instance(
                                 first_message_id = message_id
                             logger.info(
                                 f"P2P飞书卡片已发送: instance={instance}, open_id={recipient_open_id}",
-                                extra={"action": "alert.notify", "instance": instance, "open_id": recipient_open_id},
+                                extra={
+                                    "action": "alert.notify",
+                                    "instance": instance,
+                                    "open_id": recipient_open_id,
+                                },
                             )
                         else:
                             logger.warning(
                                 f"P2P飞书卡片发送失败: instance={instance}, open_id={recipient_open_id}",
-                                extra={"action": "alert.notify", "instance": instance, "open_id": recipient_open_id},
+                                extra={
+                                    "action": "alert.notify",
+                                    "instance": instance,
+                                    "open_id": recipient_open_id,
+                                },
                             )
-                    
+
                     if first_message_id:
                         await _save_firing_alert_message_id(
                             db=db,
@@ -348,7 +365,12 @@ async def _save_firing_alert_message_id(
             await db.commit()
             logger.info(
                 f"保存feishu_open_message_id: alertname={alertname}, instance={instance}, history_id={history_id}",
-                extra={"action": "alert.notify", "alertname": alertname, "instance": instance, "history_id": history_id},
+                extra={
+                    "action": "alert.notify",
+                    "alertname": alertname,
+                    "instance": instance,
+                    "history_id": history_id,
+                },
             )
         else:
             logger.warning(
@@ -357,7 +379,9 @@ async def _save_firing_alert_message_id(
             )
 
     except Exception as exc:
-        logger.error(f"保存feishu_open_message_id异常: {str(exc)}", extra={"action": "alert.notify"})
+        logger.error(
+            f"保存feishu_open_message_id异常: {str(exc)}", extra={"action": "alert.notify"}
+        )
 
 
 async def _update_resolved_alert_card(
@@ -416,9 +440,14 @@ async def _update_resolved_alert_card(
                 {"id": history_id},
             )
             await db.commit()
-            logger.info(f"卡片已更新为resolved: alertname={alertname}, instance={instance}", extra={"action": "alert.resolve", "alertname": alertname, "instance": instance})
+            logger.info(
+                f"卡片已更新为resolved: alertname={alertname}, instance={instance}",
+                extra={"action": "alert.resolve", "alertname": alertname, "instance": instance},
+            )
         else:
-            logger.error(f"更新卡片失败: {update_result.get('message')}", extra={"action": "alert.resolve"})
+            logger.error(
+                f"更新卡片失败: {update_result.get('message')}", extra={"action": "alert.resolve"}
+            )
 
     except Exception as exc:
         logger.error(f"更新resolved告警卡片异常: {str(exc)}", extra={"action": "alert.resolve"})
@@ -498,15 +527,26 @@ async def _get_asset_owner_open_id(db: AsyncSession, instance: str) -> str | Non
             if user.feishu_open_id:
                 logger.info(
                     f"找到资产负责人: asset={asset.name}, user={user.username}, open_id={user.feishu_open_id}",
-                    extra={"action": "alert.notify", "instance": instance, "asset_name": asset.name, "username": user.username},
+                    extra={
+                        "action": "alert.notify",
+                        "instance": instance,
+                        "asset_name": asset.name,
+                        "username": user.username,
+                    },
                 )
                 return user.feishu_open_id
 
-        logger.debug(f"未找到资产负责人: IP={instance}", extra={"action": "alert.notify", "instance": instance})
+        logger.debug(
+            f"未找到资产负责人: IP={instance}",
+            extra={"action": "alert.notify", "instance": instance},
+        )
         return None
 
     except Exception as exc:
-        logger.error(f"查询资产负责人异常: {instance}: {str(exc)}", extra={"action": "alert.notify", "instance": instance})
+        logger.error(
+            f"查询资产负责人异常: {instance}: {str(exc)}",
+            extra={"action": "alert.notify", "instance": instance},
+        )
         return None
 
 
@@ -524,7 +564,10 @@ async def _get_alert_notification_group_open_ids(db: AsyncSession) -> list[str]:
     """
     try:
         from app.crud.crud_notification_group import notification_group
-        groups = await notification_group.get_by_notification_type(db, NOTIFICATION_TYPE_ALERT_FIRING)
+
+        groups = await notification_group.get_by_notification_type(
+            db, NOTIFICATION_TYPE_ALERT_FIRING
+        )
         open_ids = []
         for group in groups:
             if group.is_active:
@@ -534,7 +577,11 @@ async def _get_alert_notification_group_open_ids(db: AsyncSession) -> list[str]:
         if open_ids:
             logger.info(
                 f"告警通知组成员: {len(open_ids)} 人",
-                extra={"action": "alert.notify", "notification_type": NOTIFICATION_TYPE_ALERT_FIRING, "member_count": len(open_ids)},
+                extra={
+                    "action": "alert.notify",
+                    "notification_type": NOTIFICATION_TYPE_ALERT_FIRING,
+                    "member_count": len(open_ids),
+                },
             )
         return open_ids
     except Exception as exc:
