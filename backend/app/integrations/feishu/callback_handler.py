@@ -1261,8 +1261,10 @@ def _do_im_message_receive_v1(data: Any) -> Any:
                 for mention in mentions:
                     mention_id = getattr(mention, "id", None)
                     if mention_id:
+                        # 飞书 SDK Mention.id 不含 app_id，机器人被 @时 user_id 为空
                         mention_app_id = getattr(mention_id, "app_id", None)
-                        if mention_app_id == settings.feishu_app_id:
+                        mention_user_id = getattr(mention_id, "user_id", None)
+                        if mention_app_id == settings.feishu_app_id or not mention_user_id:
                             should_salute = True
                             break
 
