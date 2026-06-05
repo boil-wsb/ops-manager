@@ -1,10 +1,11 @@
 import asyncio
 import importlib
+import threading
 import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
@@ -14,7 +15,13 @@ from app.db.session import db_operation_with_retry, get_session_maker
 
 logger = get_logger(__name__)
 
-scheduler: AsyncIOScheduler | None = None
+scheduler: BackgroundScheduler | None = None
+
+# Thread-local storage for persistent event loop per scheduler thread.
+# This avoids the asyncpg "connection was closed" error caused by
+# asyncio.run() creating a new event loop each time (asyncpg connections
+# are bound to the event loop that created them).
+_thread_local = threading.local()
 
 BUILTIN_TASKS = [
     {
@@ -104,10 +111,10 @@ BUILTIN_TASKS = [
 ]
 
 
-def get_scheduler() -> AsyncIOScheduler:
+def get_scheduler() -> BackgroundScheduler:
     global scheduler
     if scheduler is None:
-        scheduler = AsyncIOScheduler(timezone="Asia/Shanghai")
+        scheduler = BackgroundScheduler(timezone="Asia/Shanghai")
     return scheduler
 
 
@@ -389,10 +396,15 @@ async def _update_task_execution_log(
         pass
 
 
-async def _execute_task_wrapper(task_id: str):
+async def _execute_task_async(task_id: str):
+    """Async task execution logic - runs in a persistent event loop within a thread.
+
+    Uses the scheduler thread's own database engine (created in _init_thread_db)
+    to avoid cross-event-loop asyncpg connection issues.
+    """
     task_function_path = None
     try:
-        task_function_path = await db_operation_with_retry(
+        task_function_path = await _scheduler_db_operation(
             lambda db: _get_task_function_path(db, task_id),
             max_retries=2,
             retry_delay=1.0,
@@ -474,7 +486,7 @@ async def _execute_task_wrapper(task_id: str):
     finished_at = datetime.now(ZoneInfo("Asia/Shanghai"))
 
     try:
-        await db_operation_with_retry(
+        await _scheduler_db_operation(
             lambda db: _update_task_execution_log(
                 db,
                 task_id,
@@ -491,6 +503,93 @@ async def _execute_task_wrapper(task_id: str):
     except Exception as e:
         logger.debug(
             f"更新任务状态失败: {task_id}",
+            extra={"action": "scheduler.run", "task_id": task_id, "error": str(e)},
+        )
+
+
+async def _init_thread_db():
+    """Initialize a separate database engine for the scheduler thread.
+
+    Creates a dedicated engine + session maker stored in thread-local storage
+    (via app.db.session._scheduler_thread_local). This way, all DB operations
+    in the scheduler thread — including those in task functions that call
+    db_operation_with_retry — automatically use the thread-local engine.
+
+    This avoids sharing the main API engine, which would cause asyncpg
+    "connection was closed" errors because asyncpg connections are bound
+    to the event loop that created them.
+    """
+    from app.db.session import (
+        _scheduler_thread_local,
+        create_scheduler_engine,
+        async_sessionmaker,
+        AsyncSession,
+    )
+
+    engine = create_scheduler_engine()
+    _scheduler_thread_local.engine = engine
+    session_maker = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autocommit=False,
+        autoflush=False,
+    )
+    _scheduler_thread_local.session_maker = session_maker
+    logger.debug(
+        "已创建调度线程独立数据库引擎",
+        extra={"action": "scheduler.run"},
+    )
+
+
+def _get_scheduler_session_maker():
+    """Get the thread-local session maker for the scheduler thread."""
+    from app.db.session import _scheduler_thread_local
+
+    return getattr(_scheduler_thread_local, "session_maker", None)
+
+
+async def _scheduler_db_operation(operation, max_retries=2, retry_delay=1.0):
+    """Execute a DB operation using the scheduler thread's own session maker.
+
+    Since db_operation_with_retry now auto-detects the thread-local session
+    maker, this is a simple wrapper that falls back to the shared session
+    maker if the thread-local one is not available (e.g., during startup).
+    """
+    from app.db.session import db_operation_with_retry
+
+    return await db_operation_with_retry(operation, max_retries, retry_delay)
+
+
+def _execute_task_wrapper(task_id: str):
+    """Sync wrapper for BackgroundScheduler.
+
+    BackgroundScheduler runs jobs in a thread pool. This wrapper uses
+    a persistent event loop per thread (stored in threading.local) to
+    avoid the asyncpg "connection was closed" error.
+
+    Problem: asyncio.run() creates a new event loop each time, and asyncpg
+    connections are bound to the event loop that created them. When a new
+    loop is created, old connections become invalid.
+
+    Solution: Reuse the same event loop within each thread. On first run,
+    dispose the shared engine pool so connections are created in this
+    thread's event loop. Subsequent runs reuse the loop and its connections.
+    """
+    loop = getattr(_thread_local, "event_loop", None)
+    if loop is None or loop.is_closed():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        _thread_local.event_loop = loop
+        # First run in this thread: dispose shared engine pool so that
+        # new connections are created in this thread's event loop.
+        loop.run_until_complete(_init_thread_db())
+
+    try:
+        loop.run_until_complete(_execute_task_async(task_id))
+    except Exception as e:
+        logger.error(
+            f"任务执行异常: {task_id}",
             extra={"action": "scheduler.run", "task_id": task_id, "error": str(e)},
         )
 
@@ -683,7 +782,10 @@ def start_scheduler():
         asyncio.run(_init())
 
     sched.start()
-    logger.info("APScheduler已启动", extra={"action": "scheduler.register"})
+    logger.info(
+        "APScheduler已启动 (BackgroundScheduler - 线程调度)",
+        extra={"action": "scheduler.register"},
+    )
 
     async def _sync_after_start():
         await asyncio.sleep(10)

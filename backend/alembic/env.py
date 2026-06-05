@@ -17,14 +17,23 @@ from app.models.base import BaseModel
 # Import all models to ensure they are registered with SQLAlchemy
 from app.models import (
     User, user_roles,
+    Department,
     Permission, Role, role_permissions,
     Asset, Label, asset_labels,
-    Monitor, Alert, AlertRule, NotificationChannel,
     AuditLog,
     NavigationLink, navigation_link_roles,
     ITFeedback,
+    FeishuInteraction,
     Deployment, InspectionTask, InspectionReport, Certificate, DNSRecord,
     NotificationGroup, notification_group_members,
+    NotificationRecord,
+    NotificationCallbackLog,
+    AlertHistory, AlertSilence, AlertTemplate,
+    TerminalMetric,
+    ScheduledTask, TaskExecutionLog,
+    HealthCheckReport, HealthCheckDetail,
+    SystemConfig,
+    PCClientVersion,
 )
 
 # this is the Alembic Config object

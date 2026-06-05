@@ -61,7 +61,7 @@ def _extract_extra(record) -> dict:
 class ConsoleFormatter(logging.Formatter):
     def __init__(self):
         super().__init__(
-            fmt="%(asctime)s.%(msecs)03d | %(levelname)-5s | [%(action)s] | req=%(request_id)s user=%(user_id)s | %(message)s",
+            fmt="%(asctime)s.%(msecs)03d | %(levelname)-5s | [%(name)s:%(funcName)s:%(lineno)d] | req=%(request_id)s user=%(user_id)s | %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         )
 

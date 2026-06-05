@@ -40,4 +40,9 @@ export const userApi = {
   assignRoles: async (id: number, roleIds: number[]): Promise<void> => {
     await api.post(`/users/${id}/roles`, roleIds);
   },
+
+  sendMessage: async (id: number, message: string): Promise<{ success: boolean; message_id?: string }> => {
+    const response = await api.post<ApiResponse<{ success: boolean; message_id?: string }>>(`/users/${id}/send-message`, { message });
+    return response.data.data;
+  },
 };

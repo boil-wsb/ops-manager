@@ -1,5 +1,9 @@
 """
 Authentication middleware for global API authentication.
+
+Uses pure ASGI middleware instead of BaseHTTPMiddleware to avoid
+the known concurrency issues with BaseHTTPMiddleware that can
+block other requests during async operations.
 """
 
 import ipaddress
@@ -13,7 +17,6 @@ from app.config import settings
 from app.core.logging import get_logger
 from app.core.security import verify_token
 from app.crud.crud_user import crud_user
-from app.db.session import get_async_session_local
 
 logger = get_logger(__name__)
 
@@ -54,25 +57,50 @@ AUTH_EXCLUDED_PATHS = _parse_excluded_paths()
 logger.info(
     f"信任网络配置: {[str(n) for n in TRUSTED_NETWORKS]}", extra={"action": "auth.middleware"}
 )
-logger.info(f"认证排除路径: {AUTH_EXCLUDED_PATHS}", extra={"action": "auth.middleware"})
+logger.info(
+    f"认证排除路径: {AUTH_EXCLUDED_PATHS}",
+    extra={"action": "auth.middleware"},
+)
 
 
-def _get_client_ip(request: Request) -> str | None:
-    forwarded = request.headers.get("X-Forwarded-For")
+EXCLUDE_PATHS = [
+    "/health",
+    "/",
+    "/docs",
+    "/redoc",
+    "/openapi.json",
+    "/api/v1/auth",
+    "/api/v1/navigation/public",
+    "/api/v1/audit-logs",
+    "/api/v1/it-feedback",
+    "/api/v1/notification-records",
+    "/api/v1/assets/users-for-owner",
+    "/api/v1/labels",
+    "/api/v1/feishu/notify",
+    "/api/v1/it-reporter",
+    "/api/v1/open-id",
+]
+
+
+def _get_client_ip(scope: dict) -> str | None:
+    """Extract client IP from ASGI scope headers."""
+    headers = dict(scope.get("headers", []))
+    forwarded = headers.get(b"x-forwarded-for")
     if forwarded:
-        return forwarded.split(",")[0].strip()
-    real_ip = request.headers.get("X-Real-IP")
+        return forwarded.decode().split(",")[0].strip()
+    real_ip = headers.get(b"x-real-ip")
     if real_ip:
-        return real_ip.strip()
-    if request.client:
-        return request.client.host
+        return real_ip.decode().strip()
+    client = scope.get("client")
+    if client:
+        return client[0]
     return None
 
 
-def _is_trusted_client(request: Request) -> bool:
+def _is_trusted_client(scope: dict) -> bool:
     if not TRUSTED_NETWORKS:
         return False
-    client_ip = _get_client_ip(request)
+    client_ip = _get_client_ip(scope)
     if not client_ip:
         return False
     try:
@@ -82,116 +110,130 @@ def _is_trusted_client(request: Request) -> bool:
         return False
 
 
-class AuthenticationMiddleware:
-    """Middleware to handle global authentication for all API requests."""
+class PureASGIAuthMiddleware:
+    """Pure ASGI authentication middleware.
 
-    EXCLUDE_PATHS = [
-        "/health",
-        "/",
-        "/docs",
-        "/redoc",
-        "/openapi.json",
-        "/api/v1/auth",
-        "/api/v1/navigation/public",
-        "/api/v1/audit-logs",
-        "/api/v1/it-feedback",
-        "/api/v1/notification-records",
-        "/api/v1/assets/users-for-owner",
-        "/api/v1/labels",
-        "/api/v1/feishu/notify",
-        "/api/v1/it-reporter",
-        "/api/v1/open-id",
-    ]
+    Unlike BaseHTTPMiddleware, this does not block concurrent requests
+    during async operations like database queries.
+    """
 
-    async def dispatch(self, request: Request, call_next: Callable) -> JSONResponse:
-        path = request.url.path
+    def __init__(self, app: Callable):
+        self.app = app
 
-        for exclude_path in self.EXCLUDE_PATHS:
+    async def __call__(self, scope: dict, receive: Callable, send: Callable):
+        if scope["type"] not in ("http", "websocket"):
+            await self.app(scope, receive, send)
+            return
+
+        path = scope.get("path", "")
+
+        # Check excluded paths
+        for exclude_path in EXCLUDE_PATHS:
             if path == exclude_path or path.startswith(exclude_path + "/"):
-                return await call_next(request)
+                await self.app(scope, receive, send)
+                return
 
-        is_trusted = _is_trusted_client(request)
-        for excluded_path in AUTH_EXCLUDED_PATHS:
-            if path.startswith(excluded_path) and is_trusted:
-                logger.debug(
-                    f"信任网络跳过认证: {path}",
-                    extra={"action": "auth.bypass", "client_ip": _get_client_ip(request)},
-                )
-                return await call_next(request)
+        # Check trusted networks
+        is_trusted = _is_trusted_client(scope)
+        if is_trusted:
+            for excluded_path in AUTH_EXCLUDED_PATHS:
+                if path.startswith(excluded_path):
+                    logger.debug(
+                        f"信任网络跳过认证: {path}",
+                        extra={"action": "auth.bypass", "client_ip": _get_client_ip(scope)},
+                    )
+                    await self.app(scope, receive, send)
+                    return
 
-        auth_header = request.headers.get("Authorization")
+        # Extract Authorization header from ASGI scope
+        headers = dict(scope.get("headers", []))
+        auth_header = headers.get(b"authorization")
+        if not auth_header:
+            await self._send_unauthorized(send, "Not authenticated")
+            return
 
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return JSONResponse(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                content={"detail": "Not authenticated"},
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        auth_str = auth_header.decode()
+        if not auth_str.startswith("Bearer "):
+            await self._send_unauthorized(send, "Not authenticated")
+            return
 
-        token = auth_header.split(" ")[1]
+        token = auth_str.split(" ", 1)[1]
 
         try:
             payload = verify_token(token)
 
             if payload is None:
-                return JSONResponse(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    content={"detail": "Invalid or expired token"},
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
+                await self._send_unauthorized(send, "Invalid or expired token")
+                return
 
             if payload.get("type") != "access":
-                return JSONResponse(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    content={"detail": "Invalid token type"},
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
+                await self._send_unauthorized(send, "Invalid token type")
+                return
 
             user_id = payload.get("sub")
             if user_id is None:
-                return JSONResponse(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    content={"detail": "Invalid token payload"},
-                    headers={"WWW-Authenticate": "Bearer"},
+                await self._send_unauthorized(send, "Invalid token payload")
+                return
+
+            # Query user with retry for transient connection errors
+            user = None
+
+            async def _query_user(db):
+                return await crud_user.get_for_auth(db, id=int(user_id))
+
+            try:
+                from app.db.session import db_operation_with_retry
+
+                user = await db_operation_with_retry(_query_user, max_retries=3, retry_delay=0.5)
+            except Exception as db_err:
+                logger.error(
+                    f"认证数据库查询失败: {db_err}",
+                    extra={"action": "auth.middleware", "error": str(db_err)},
                 )
+                await self._send_unauthorized(send, "Authentication failed")
+                return
 
-            async with await get_async_session_local() as db:
-                user = await crud_user.get(db, id=int(user_id))
+            if not user:
+                await self._send_unauthorized(send, "User not found")
+                return
 
-                if not user:
-                    return JSONResponse(
-                        status_code=status.HTTP_401_UNAUTHORIZED,
-                        content={"detail": "User not found"},
-                        headers={"WWW-Authenticate": "Bearer"},
-                    )
+            if not user.is_active:
+                await self._send_unauthorized(send, "User is inactive")
+                return
 
-                if not user.is_active:
-                    return JSONResponse(
-                        status_code=status.HTTP_401_UNAUTHORIZED,
-                        content={"detail": "User is inactive"},
-                        headers={"WWW-Authenticate": "Bearer"},
-                    )
+            # Store user in scope state for downstream access
+            scope.setdefault("state", {})
+            if isinstance(scope["state"], dict):
+                scope["state"]["user"] = user
+            else:
+                # FastAPI uses a State object
+                from starlette.datastructures import State
 
-                request.state.user = user
+                if not isinstance(scope.get("state"), State):
+                    scope["state"] = State(scope.get("state", {}))
+                scope["state"].user = user
 
-                response = await call_next(request)
-                return response
+            await self.app(scope, receive, send)
 
         except Exception as e:
             logger.error(f"认证错误: {e}", extra={"action": "auth.middleware", "error": str(e)})
-            return JSONResponse(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                content={"detail": "Authentication failed"},
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+            await self._send_unauthorized(send, "Authentication failed")
 
+    async def _send_unauthorized(self, send: Callable, detail: str):
+        """Send a 401 Unauthorized JSON response."""
+        import json
 
-def get_authentication_middleware():
-    from starlette.middleware.base import BaseHTTPMiddleware
-
-    class AuthenticationMiddlewareWrapper(BaseHTTPMiddleware):
-        async def dispatch(self, request: Request, call_next: Callable):
-            middleware = AuthenticationMiddleware()
-            return await middleware.dispatch(request, call_next)
-
-    return AuthenticationMiddlewareWrapper
+        body = json.dumps({"detail": detail}).encode("utf-8")
+        await send({
+            "type": "http.response.start",
+            "status": status.HTTP_401_UNAUTHORIZED,
+            "headers": [
+                [b"content-type", b"application/json"],
+                [b"www-authenticate", b"Bearer"],
+                [b"content-length", str(len(body)).encode()],
+            ],
+        })
+        await send({
+            "type": "http.response.body",
+            "body": body,
+        })

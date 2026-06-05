@@ -10,6 +10,7 @@ from app.core.exceptions import AuthenticationError, PermissionDeniedError
 from app.core.security import verify_token
 from app.crud.crud_user import crud_user
 from app.db.session import get_db
+from app.models.user import User
 
 security = HTTPBearer(auto_error=False)
 
@@ -18,8 +19,16 @@ async def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: AsyncSession = Depends(get_db),
-) -> dict:
-    """Get current user from JWT token."""
+) -> User:
+    """Get current user from JWT token.
+
+    If the auth middleware has already authenticated the user and stored
+    it in request.state, reuse that object to avoid a duplicate DB query.
+    """
+    # Reuse user already authenticated by PureASGIAuthMiddleware
+    if hasattr(request.state, "user") and request.state.user is not None:
+        return request.state.user
+
     if not credentials:
         raise AuthenticationError(detail="Not authenticated")
 
@@ -53,8 +62,15 @@ async def get_current_user_optional(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: AsyncSession = Depends(get_db),
-) -> dict | None:
-    """Get current user from JWT token, returns None if not authenticated."""
+) -> User | None:
+    """Get current user from JWT token, returns None if not authenticated.
+
+    Reuses user from auth middleware if available.
+    """
+    # Reuse user already authenticated by PureASGIAuthMiddleware
+    if hasattr(request.state, "user") and request.state.user is not None:
+        return request.state.user
+
     if not credentials:
         return None
 
@@ -83,7 +99,7 @@ async def get_current_user_optional(
 
 async def get_current_active_user(
     current_user=Depends(get_current_user),
-) -> dict:
+) -> User:
     """Get current active user."""
     return current_user
 
@@ -97,7 +113,7 @@ class PermissionChecker:
     async def __call__(
         self,
         current_user=Depends(get_current_user),
-    ) -> dict:
+    ) -> User:
         """Check if user has required permissions."""
         user_permissions: list[str] = []
         for role in current_user.roles:

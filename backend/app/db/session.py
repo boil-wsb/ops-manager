@@ -4,6 +4,7 @@ Database session management.
 
 import asyncio
 import contextlib
+import threading
 from functools import lru_cache
 
 import asyncpg
@@ -47,22 +48,57 @@ _pool_dispose_lock = asyncio.Lock()
 _last_pool_dispose_time = 0.0
 _POOL_DISPOSE_COOLDOWN = 30.0
 
+# Thread-local storage for scheduler threads. When a scheduler thread
+# initializes its own engine (via create_scheduler_engine), it stores
+# the session_maker here. db_operation_with_retry checks this first.
+_scheduler_thread_local = threading.local()
+
 
 @lru_cache
 def get_engine():
     """Get or create the async engine (lazy initialization)."""
     return create_async_engine(
         settings.async_database_url,
-        pool_size=10,
-        max_overflow=5,
+        pool_size=settings.db_pool_size,
+        max_overflow=settings.db_max_overflow,
         pool_pre_ping=True,
-        pool_recycle=300,
-        pool_timeout=30,
+        pool_recycle=180,
+        pool_timeout=10,
         connect_args={
             "timeout": 10,
-            "command_timeout": 60,
+            "command_timeout": 30,
             "server_settings": {
-                "tcp_keepalives_idle": "30",
+                "tcp_keepalives_idle": "15",
+                "tcp_keepalives_interval": "5",
+                "tcp_keepalives_count": "3",
+            },
+        },
+        echo=False,
+    )
+
+
+def create_scheduler_engine():
+    """Create a separate async engine for scheduler threads.
+
+    Scheduler threads run in their own event loops (BackgroundScheduler).
+    asyncpg connections are bound to the event loop that created them,
+    so sharing the main API engine causes "Connection was closed" errors.
+
+    This engine has a smaller pool since scheduler tasks are less concurrent
+    than API requests, and is fully independent from the main API engine.
+    """
+    return create_async_engine(
+        settings.async_database_url,
+        pool_size=5,
+        max_overflow=3,
+        pool_pre_ping=True,
+        pool_recycle=180,
+        pool_timeout=10,
+        connect_args={
+            "timeout": 10,
+            "command_timeout": 30,
+            "server_settings": {
+                "tcp_keepalives_idle": "15",
                 "tcp_keepalives_interval": "5",
                 "tcp_keepalives_count": "3",
             },
@@ -118,6 +154,10 @@ async def db_operation_with_retry(operation, max_retries=2, retry_delay=1.0):
     Each retry creates a brand-new session from the pool, so stale connections
     are never reused across attempts. Uses exponential backoff between retries.
 
+    When called from a scheduler thread (detected via threading.local), uses
+    the thread-local session maker instead of the shared one. This avoids
+    cross-event-loop asyncpg connection issues.
+
     Args:
         operation: async callable that receives a db session and returns a result.
         max_retries: maximum number of retries (default 2).
@@ -131,7 +171,9 @@ async def db_operation_with_retry(operation, max_retries=2, retry_delay=1.0):
         The last transient error if all retries are exhausted.
         Any non-transient error immediately without retry.
     """
-    session_maker = get_session_maker()
+    # Check for scheduler thread-local session maker
+    scheduler_sm = getattr(_scheduler_thread_local, "session_maker", None)
+    session_maker = scheduler_sm if scheduler_sm else get_session_maker()
     last_error = None
 
     for attempt in range(max_retries + 1):
@@ -189,8 +231,13 @@ async def db_operation_with_retry(operation, max_retries=2, retry_delay=1.0):
 
 
 async def ensure_pool_health():
-    """Check connection pool health and dispose stale connections if needed."""
-    engine = get_engine()
+    """Check connection pool health and dispose stale connections if needed.
+
+    In scheduler threads, checks the thread-local engine instead of the
+    shared one to avoid cross-event-loop issues.
+    """
+    scheduler_engine = getattr(_scheduler_thread_local, "engine", None)
+    engine = scheduler_engine if scheduler_engine else get_engine()
     pool = engine.pool
     try:
         async with engine.connect() as conn:
@@ -210,8 +257,13 @@ async def ensure_pool_health():
 
 
 def log_pool_status():
-    """Log current connection pool status for diagnostics."""
-    engine = get_engine()
+    """Log current connection pool status for diagnostics.
+
+    In scheduler threads, logs the thread-local engine's pool instead of
+    the shared one.
+    """
+    scheduler_engine = getattr(_scheduler_thread_local, "engine", None)
+    engine = scheduler_engine if scheduler_engine else get_engine()
     pool = engine.pool
     logger.info(
         f"连接池状态: size={pool.size()}, checked_in={pool.checkedin()}, "

@@ -673,26 +673,38 @@ class PrometheusClient:
         """
         获取所有终端及其指标
 
+        使用 asyncio.Semaphore 限制并发数，避免大量并发请求
+        导致事件循环或网络资源压力过大。
+
         Returns:
             包含完整信息的终端列表
         """
+        import asyncio
+
         terminals = await self.get_pc_info_terminals()
 
-        enriched_terminals = []
-        for terminal in terminals:
-            hostname = terminal.get("hostname", "")
-            if hostname:
-                try:
-                    metrics = await self.get_terminal_metrics(hostname)
-                    terminal.update(metrics)
-                except Exception as e:
-                    logger.error(
-                        f"终端指标获取失败: {hostname}: {e}",
-                        extra={"action": "prometheus.query", "hostname": hostname},
-                    )
-            enriched_terminals.append(terminal)
+        # 限制并发数，避免同时发起过多 HTTP 请求
+        semaphore = asyncio.Semaphore(10)
 
-        return enriched_terminals
+        async def _enrich_terminal(terminal: dict) -> dict:
+            async with semaphore:
+                hostname = terminal.get("hostname", "")
+                if hostname:
+                    try:
+                        metrics = await self.get_terminal_metrics(hostname)
+                        terminal.update(metrics)
+                    except Exception as e:
+                        logger.error(
+                            f"终端指标获取失败: {hostname}: {e}",
+                            extra={"action": "prometheus.query", "hostname": hostname},
+                        )
+                return terminal
+
+        enriched_terminals = await asyncio.gather(
+            *[_enrich_terminal(t) for t in terminals]
+        )
+
+        return list(enriched_terminals)
 
 
 prometheus_client: PrometheusClient | None = None

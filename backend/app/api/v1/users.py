@@ -3,6 +3,7 @@ User management API routes.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -35,7 +36,7 @@ async def list_users(
     cache_key = f"users:list:{keyword}:{is_active}:{page}:{page_size}"
 
     async def _fetch_users():
-        query = select(User).options(selectinload(User.roles))
+        query = select(User).options(selectinload(User.roles)).options(selectinload(User.department))
 
         if keyword:
             query = query.where(
@@ -68,6 +69,8 @@ async def list_users(
                     "created_at": u.created_at,
                     "updated_at": u.updated_at,
                     "feishu_open_id": u.feishu_open_id,
+                    "department_id": u.department_id,
+                    "department_name": u.department.name if u.department else None,
                     "permissions": [],
                     "roles": [{"id": r.id, "name": r.name} for r in u.roles],
                 }
@@ -320,3 +323,68 @@ async def batch_delete_users(
         "deleted_ids": list(existing_ids),
         "failed_ids": list(missing_ids),
     }
+
+
+class SendMessageRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=4000, description="消息内容")
+
+
+@router.post("/{user_id}/send-message")
+@audit_log(operation_type="SEND_MESSAGE", module="user", object_type="User")
+async def send_message_to_user(
+    request: Request,
+    user_id: int,
+    msg_in: SendMessageRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permissions(["user:write"])),
+):
+    """通过飞书发送消息给指定用户"""
+    user = await crud_user.get(db, id=user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="用户不存在",
+        )
+
+    if not user.feishu_open_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"用户 {user.username} 未绑定飞书账号，无法发送消息",
+        )
+
+    try:
+        from app.integrations.feishu.service import get_feishu_service
+
+        feishu_service = get_feishu_service()
+        result = feishu_service.send_text_message(
+            user_id=user.feishu_open_id,
+            text=msg_in.message,
+        )
+
+        if result.get("message_id"):
+            logger.info(
+                f"消息发送成功: user={user.username}",
+                extra={"action": "user.send_message", "username": user.username},
+            )
+            return {"success": True, "message_id": result["message_id"]}
+        else:
+            error_msg = result.get("msg", "Unknown error")
+            logger.error(
+                f"消息发送失败: user={user.username}, error={error_msg}",
+                extra={"action": "user.send_message", "username": user.username, "error": error_msg},
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"消息发送失败: {error_msg}",
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"消息发送异常: user={user.username}, error={str(e)}",
+            extra={"action": "user.send_message", "username": user.username, "error": str(e)},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"消息发送失败: {str(e)}",
+        )

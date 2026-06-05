@@ -40,9 +40,16 @@ class User(BaseModel):
     feishu_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_feishu_user: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    department_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("departments.id", ondelete="SET NULL"), nullable=True, comment="所属部门ID"
+    )
+
     # Relationships
     roles: Mapped[list["Role"]] = relationship(
         "Role", secondary=user_roles, back_populates="users", lazy="selectin"
+    )
+    department: Mapped["Department | None"] = relationship(
+        "Department", back_populates="users", lazy="selectin"
     )
 
     def __repr__(self) -> str:

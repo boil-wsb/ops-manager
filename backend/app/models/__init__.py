@@ -6,6 +6,7 @@ from app.models.alert import AlertHistory, AlertSilence, AlertTemplate
 from app.models.asset import Asset, Label, asset_labels
 from app.models.audit_log import AuditLog
 from app.models.base import BaseModel
+from app.models.department import Department
 from app.models.feishu_interaction import FeishuInteraction
 from app.models.health_check import HealthCheckDetail, HealthCheckReport
 from app.models.it_feedback import ITFeedback
@@ -24,6 +25,7 @@ from app.models.user import User, user_roles
 __all__ = [
     "BaseModel",
     "User",
+    "Department",
     "Role",
     "Permission",
     "Asset",

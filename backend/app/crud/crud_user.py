@@ -4,7 +4,7 @@ User CRUD operations.
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import noload, selectinload
 
 from app.core.security import get_password_hash
 from app.core.tz import now_shanghai
@@ -21,6 +21,19 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         """Get a user by ID with roles preloaded."""
         result = await db.execute(
             select(User).options(selectinload(User.roles)).where(User.id == id)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_for_auth(self, db: AsyncSession, id: int) -> User | None:
+        """Get a user by ID for authentication check only.
+
+        Loads roles (needed for permission checks in downstream requests)
+        but skips loading department to reduce query overhead.
+        """
+        result = await db.execute(
+            select(User)
+            .options(selectinload(User.roles), noload(User.department))
+            .where(User.id == id)
         )
         return result.scalar_one_or_none()
 

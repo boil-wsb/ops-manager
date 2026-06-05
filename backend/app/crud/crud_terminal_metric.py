@@ -150,8 +150,7 @@ class CRUDBerminalMetric(CRUDBase[TerminalMetric, Any, Any]):
             )
             db.add(metric)
 
-        await db.commit()
-        await db.refresh(metric)
+        await db.flush()
         return metric
 
     async def bulk_upsert_metrics(
