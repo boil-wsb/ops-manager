@@ -22,12 +22,19 @@ async def get_current_user(
 ) -> User:
     """Get current user from JWT token.
 
-    If the auth middleware has already authenticated the user and stored
-    it in request.state, reuse that object to avoid a duplicate DB query.
+    If the auth middleware has already verified the user and stored
+    user_id in request.state, use that to load the full user object
+    with roles. This avoids redundant token parsing.
     """
-    # Reuse user already authenticated by PureASGIAuthMiddleware
-    if hasattr(request.state, "user") and request.state.user is not None:
-        return request.state.user
+    # Reuse user_id already verified by PureASGIAuthMiddleware
+    if hasattr(request.state, "user_id") and request.state.user_id is not None:
+        user = await crud_user.get(db, id=request.state.user_id)
+        if not user:
+            raise AuthenticationError(detail="User not found")
+        if not user.is_active:
+            raise AuthenticationError(detail="User is inactive")
+        request.state.user = user
+        return user
 
     if not credentials:
         raise AuthenticationError(detail="Not authenticated")
@@ -67,9 +74,13 @@ async def get_current_user_optional(
 
     Reuses user from auth middleware if available.
     """
-    # Reuse user already authenticated by PureASGIAuthMiddleware
-    if hasattr(request.state, "user") and request.state.user is not None:
-        return request.state.user
+    # Reuse user_id already verified by PureASGIAuthMiddleware
+    if hasattr(request.state, "user_id") and request.state.user_id is not None:
+        user = await crud_user.get(db, id=request.state.user_id)
+        if not user or not user.is_active:
+            return None
+        request.state.user = user
+        return user
 
     if not credentials:
         return None

@@ -6,6 +6,7 @@ the known concurrency issues with BaseHTTPMiddleware that can
 block other requests during async operations.
 """
 
+import contextlib
 import ipaddress
 from collections.abc import Callable
 
@@ -175,43 +176,74 @@ class PureASGIAuthMiddleware:
                 await self._send_unauthorized(send, "Invalid token payload")
                 return
 
-            # Query user with retry for transient connection errors
-            user = None
+            # Query user with retry for transient connection errors.
+            # Only verify user exists and is active here — full user object
+            # with roles will be loaded by downstream dependencies.
+            # This avoids ORM relationship loading issues in middleware context.
+            user_id_int = int(user_id)
+            user_active = False
+            import asyncio
 
-            async def _query_user(db):
-                return await crud_user.get_for_auth(db, id=int(user_id))
+            from sqlalchemy import select, text
 
-            try:
-                from app.db.session import db_operation_with_retry
+            from app.db.session import get_session_maker
+            from app.models.user import User
 
-                user = await db_operation_with_retry(_query_user, max_retries=3, retry_delay=0.5)
-            except Exception as db_err:
-                logger.error(
-                    f"认证数据库查询失败: {db_err}",
-                    extra={"action": "auth.middleware", "error": str(db_err)},
-                )
-                await self._send_unauthorized(send, "Authentication failed")
+            session_maker = get_session_maker()
+
+            for attempt in range(3):
+                db = None
+                try:
+                    db = session_maker()
+                    result = await db.execute(
+                        select(User.id, User.is_active).where(User.id == user_id_int)
+                    )
+                    row = result.first()
+                    if row and row.is_active:
+                        user_active = True
+                    await db.commit()
+                except Exception as db_err:
+                    if db:
+                        with contextlib.suppress(Exception):
+                            await db.rollback()
+                    if attempt < 2:
+                        logger.warning(
+                            f"认证数据库查询失败，重试 {attempt + 1}/3: {db_err}",
+                            extra={"action": "auth.middleware", "attempt": attempt + 1},
+                        )
+                        await asyncio.sleep(0.5 * (attempt + 1))
+                        continue
+                    else:
+                        logger.error(
+                            f"认证数据库查询失败: {db_err}",
+                            extra={"action": "auth.middleware", "error": str(db_err)},
+                        )
+                        await self._send_unauthorized(send, "Authentication failed")
+                        return
+                finally:
+                    if db:
+                        with contextlib.suppress(Exception):
+                            await db.close()
+                if user_active:
+                    break
+
+            if not user_active:
+                await self._send_unauthorized(send, "User not found or inactive")
                 return
 
-            if not user:
-                await self._send_unauthorized(send, "User not found")
-                return
-
-            if not user.is_active:
-                await self._send_unauthorized(send, "User is inactive")
-                return
-
-            # Store user in scope state for downstream access
+            # Store authenticated user_id in scope state for downstream access.
+            # The full User object will be loaded by downstream dependencies
+            # (get_current_user) with proper session management and roles.
             scope.setdefault("state", {})
             if isinstance(scope["state"], dict):
-                scope["state"]["user"] = user
+                scope["state"]["user_id"] = user_id_int
             else:
                 # FastAPI uses a State object
                 from starlette.datastructures import State
 
                 if not isinstance(scope.get("state"), State):
                     scope["state"] = State(scope.get("state", {}))
-                scope["state"].user = user
+                scope["state"].user_id = user_id_int
 
             await self.app(scope, receive, send)
 

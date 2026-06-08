@@ -42,32 +42,16 @@ async def get_public_navigation_links(
         user_role_ids = {role.id for role in current_user.roles}
         cache_key = f"nav:public:user:{','.join(str(rid) for rid in sorted(user_role_ids))}"
 
-        async def _get_for_user():
-            return await navigation_link.get_grouped_links_for_user(db, user_role_ids)
-
-        grouped = await cache_get_or_set(
-            cache_key,
-            _get_for_user,
-            ttl=300,
-        )
+        grouped = await navigation_link.get_grouped_links_for_user(db, user_role_ids)
     else:
-        cache_key = "nav:public:all"
-
-        async def _get_all():
-            return await navigation_link.get_grouped_links(db)
-
-        grouped = await cache_get_or_set(
-            cache_key,
-            _get_all,
-            ttl=300,
-        )
+        grouped = await navigation_link.get_grouped_links(db)
 
     result = []
     for category, links in grouped.items():
         result.append(
             {
                 "category": category,
-                "links": [NavigationLinkResponse.model_validate(link) for link in links],
+                "links": [NavigationLinkResponse.model_validate(link).model_dump() for link in links],
             }
         )
     return {"groups": result}

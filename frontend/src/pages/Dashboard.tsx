@@ -50,12 +50,12 @@ const Dashboard = () => {
     refetchInterval: REFRESH_INTERVAL,
   });
 
-  const alertStats = overview?.alert_stats;
-  const itFeedbackStats = overview?.it_feedback_stats;
-  const assetStats = overview?.asset_stats;
-  const certStats = overview?.cert_stats;
-  const recentAlerts = alertStats?.recent_alerts || [];
-  const recentDeployments = overview?.recent_deployments || [];
+  const alertStats = overview?.alertStats;
+  const itFeedbackStats = overview?.itFeedbackStats;
+  const assetStats = overview?.assetStats;
+  const certStats = overview?.certStats;
+  const recentAlerts = alertStats?.recentAlerts || [];
+  const recentDeployments = overview?.recentDeployments || [];
 
   return (
     <div>
@@ -101,13 +101,13 @@ const Dashboard = () => {
               <Card loading={overviewLoading}>
                 <Statistic
                   title="活跃告警"
-                  value={alertStats?.firing_count || 0}
+                  value={alertStats?.firingCount || 0}
                   suffix="个"
-                  style={{ color: (alertStats?.firing_count ?? 0) > 0 ? '#ff4d4f' : '#52c41a' }}
+                  style={{ color: (alertStats?.firingCount ?? 0) > 0 ? '#ff4d4f' : '#52c41a' }}
                 />
                 <div style={{ marginTop: 8 }}>
-                  <Tag color="orange">待处理: {alertStats?.firing_count || 0}</Tag>
-                  <Tag color="green">已解决: {alertStats?.resolved_count || 0}</Tag>
+                  <Tag color="orange">待处理: {alertStats?.firingCount || 0}</Tag>
+                  <Tag color="green">已解决: {alertStats?.resolvedCount || 0}</Tag>
                 </div>
               </Card>
             </Col>
@@ -116,15 +116,15 @@ const Dashboard = () => {
               <Card loading={overviewLoading}>
                 <Statistic
                   title="IT反馈"
-                  value={itFeedbackStats?.pending_count || 0}
+                  value={itFeedbackStats?.pendingCount || 0}
                   suffix="个待处理"
-                  valueStyle={{ color: (itFeedbackStats?.pending_count ?? 0) > 0 ? '#faad14' : '#52c41a' }}
+                  valueStyle={{ color: (itFeedbackStats?.pendingCount ?? 0) > 0 ? '#faad14' : '#52c41a' }}
                   prefix={<CustomerServiceOutlined />}
                 />
                 <div style={{ marginTop: 8 }}>
-                  <Tag color="orange">待处理: {itFeedbackStats?.pending_count || 0}</Tag>
-                  <Tag color="blue">处理中: {itFeedbackStats?.handling_count || 0}</Tag>
-                  <Tag color="green">已解决: {itFeedbackStats?.resolved_count || 0}</Tag>
+                  <Tag color="orange">待处理: {itFeedbackStats?.pendingCount || 0}</Tag>
+                  <Tag color="blue">处理中: {itFeedbackStats?.handlingCount || 0}</Tag>
+                  <Tag color="green">已解决: {itFeedbackStats?.resolvedCount || 0}</Tag>
                 </div>
               </Card>
             </Col>
@@ -133,14 +133,14 @@ const Dashboard = () => {
               <Card loading={overviewLoading}>
                 <Statistic
                   title="证书总数"
-                  value={certStats?.total_count || 0}
+                  value={certStats?.totalCount || 0}
                   suffix="个"
                   style={{ color: '#722ed1' }}
                 />
                 <div style={{ marginTop: 8 }}>
-                  <Tag color="green">有效: {certStats?.valid_count || 0}</Tag>
-                  <Tag color="orange">即将过期: {certStats?.expiring_count || 0}</Tag>
-                  <Tag color="red">已过期: {certStats?.expired_count || 0}</Tag>
+                  <Tag color="green">有效: {certStats?.validCount || 0}</Tag>
+                  <Tag color="orange">即将过期: {certStats?.expiringCount || 0}</Tag>
+                  <Tag color="red">已过期: {certStats?.expiredCount || 0}</Tag>
                 </div>
               </Card>
             </Col>
@@ -149,14 +149,14 @@ const Dashboard = () => {
               <Card loading={overviewLoading}>
                 <Statistic
                   title="资产总数"
-                  value={assetStats?.total_count || 0}
+                  value={assetStats?.totalCount || 0}
                   suffix="个"
                   style={{ color: '#13c2c2' }}
                 />
                 <div style={{ marginTop: 8 }}>
-                  <Tag color="blue">服务器: {assetStats?.server_count || 0}</Tag>
-                  <Tag color="purple">域名: {assetStats?.domain_count || 0}</Tag>
-                  <Tag color="cyan">终端: {assetStats?.terminal_count || 0}</Tag>
+                  <Tag color="blue">服务器: {assetStats?.serverCount || 0}</Tag>
+                  <Tag color="purple">域名: {assetStats?.domainCount || 0}</Tag>
+                  <Tag color="cyan">终端: {assetStats?.terminalCount || 0}</Tag>
                 </div>
               </Card>
             </Col>
@@ -169,14 +169,14 @@ const Dashboard = () => {
           <Col xs={12}>
             <Card loading={overviewLoading}>
               <Statistic
-                title="我的资产"
-                value={assetStats?.total_count || 0}
-                suffix="个"
-                style={{ color: '#13c2c2' }}
-              />
-              <div style={{ marginTop: 8 }}>
-                <Tag color="blue">服务器: {assetStats?.server_count || 0}</Tag>
-                <Tag color="purple">域名: {assetStats?.domain_count || 0}</Tag>
+                  title="我的资产"
+                  value={assetStats?.totalCount || 0}
+                  suffix="个"
+                  style={{ color: '#13c2c2' }}
+                />
+                <div style={{ marginTop: 8 }}>
+                  <Tag color="blue">服务器: {assetStats?.serverCount || 0}</Tag>
+                  <Tag color="purple">域名: {assetStats?.domainCount || 0}</Tag>
               </div>
             </Card>
           </Col>
@@ -321,7 +321,7 @@ const Dashboard = () => {
             <Card title="最近告警" extra={<a href="/alerts/alertmanager">查看全部</a>}>
               <Table
                 dataSource={recentAlerts}
-                rowKey={(r: RecentAlert) => `${r.alertname}-${r.starts_at}`}
+                rowKey={(r: RecentAlert) => `${r.alertname}-${r.startsAt}`}
                 loading={overviewLoading}
                 pagination={false}
                 size="small"
@@ -370,8 +370,8 @@ const Dashboard = () => {
                   },
                   {
                     title: '时间',
-                    dataIndex: 'starts_at',
-                    key: 'starts_at',
+                    dataIndex: 'startsAt',
+                    key: 'startsAt',
                     width: 100,
                     render: (v: string | null) => formatTime(v),
                   },
@@ -384,15 +384,15 @@ const Dashboard = () => {
             <Card title="最近发布" extra={<a href="/ops/deployments">查看全部</a>}>
               <Table
                 dataSource={recentDeployments}
-                rowKey={(r: RecentDeployment) => `${r.project_name}-${r.created_at}`}
+                rowKey={(r: RecentDeployment) => `${r.projectName}-${r.createdAt}`}
                 loading={overviewLoading}
                 pagination={false}
                 size="small"
                 columns={[
                   {
                     title: '项目',
-                    dataIndex: 'project_name',
-                    key: 'project_name',
+                    dataIndex: 'projectName',
+                    key: 'projectName',
                     ellipsis: true,
                   },
                   {
@@ -427,8 +427,8 @@ const Dashboard = () => {
                   },
                   {
                     title: '时间',
-                    dataIndex: 'created_at',
-                    key: 'created_at',
+                    dataIndex: 'createdAt',
+                    key: 'createdAt',
                     width: 100,
                     render: (v: string | null) => formatTime(v),
                   },

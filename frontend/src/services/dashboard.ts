@@ -37,52 +37,52 @@ export interface MyTerminalMetricsResponse {
 }
 
 export interface AlertStats {
-  firing_count: number;
-  resolved_count: number;
-  recent_alerts: RecentAlert[];
+  firingCount: number;
+  resolvedCount: number;
+  recentAlerts: RecentAlert[];
 }
 
 export interface RecentAlert {
   alertname: string;
   severity: string;
   status: string;
-  starts_at: string | null;
+  startsAt: string | null;
   instance: string | null;
 }
 
 export interface ItFeedbackStats {
-  pending_count: number;
-  handling_count: number;
-  resolved_count: number;
+  pendingCount: number;
+  handlingCount: number;
+  resolvedCount: number;
 }
 
 export interface AssetStats {
-  total_count: number;
-  server_count: number;
-  domain_count: number;
-  terminal_count: number;
+  totalCount: number;
+  serverCount: number;
+  domainCount: number;
+  terminalCount: number;
 }
 
 export interface CertStats {
-  total_count: number;
-  valid_count: number;
-  expiring_count: number;
-  expired_count: number;
+  totalCount: number;
+  validCount: number;
+  expiringCount: number;
+  expiredCount: number;
 }
 
 export interface RecentDeployment {
-  project_name: string;
+  projectName: string;
   environment: string;
   status: string;
-  created_at: string | null;
+  createdAt: string | null;
 }
 
 export interface DashboardOverview {
-  alert_stats: AlertStats;
-  it_feedback_stats: ItFeedbackStats;
-  asset_stats: AssetStats;
-  cert_stats: CertStats;
-  recent_deployments: RecentDeployment[];
+  alertStats: AlertStats;
+  itFeedbackStats: ItFeedbackStats;
+  assetStats: AssetStats;
+  certStats: CertStats;
+  recentDeployments: RecentDeployment[];
 }
 
 export const dashboardApi = {

@@ -52,14 +52,18 @@ class PureASGILoggingMiddleware:
         state = scope.get("state", {})
         if isinstance(state, dict):
             user = state.get("user")
+            uid = state.get("user_id")
         else:
             user = getattr(state, "user", None)
+            uid = getattr(state, "user_id", None)
         if user is not None:
             username = getattr(user, "username", None)
             if username:
                 user_id = username
             elif isinstance(user, dict):
                 user_id = user.get("username", "")
+        elif uid is not None:
+            user_id = f"id:{uid}"
 
         set_request_context(request_id=request_id, user_id=user_id)
 
