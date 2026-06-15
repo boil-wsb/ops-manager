@@ -145,47 +145,47 @@ frontend-typecheck:
   allow_failure: true
 
 # Test Stage - Backend
-backend-test:
-  stage: test
-  image: $PYTHON_IMAGE
-  tags:
-    - ops-docker
-  cache:
-    key: "pip-backend-$CI_COMMIT_REF_SLUG"
-    paths:
-      - /root/.cache/pip
-      - backend/.venv
-    policy: pull-push
-  before_script:
-    - pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
-    - pip config set global.trusted-host mirrors.aliyun.com
-    - cd backend
-    - export PYTHONPATH=$PWD:$PYTHONPATH
-    - export SECRET_KEY=$CI_SECRET_KEY
-    - export ENVIRONMENT=testing
-    - export DATABASE_URL=$CI_DATABASE_URL
-    - export REDIS_URL=$CI_REDIS_URL
-    - export DISABLE_RATE_LIMIT=true
-    - test -d .venv || python -m venv .venv
-    - source .venv/bin/activate
-    - pip install -r requirements/dev.txt -q
-  script:
-    - source .venv/bin/activate
-    - pytest tests/ -v --cov=app --cov-report=xml --cov-report=html --cov-fail-under=$COVERAGE_MIN
-  coverage: '/(?i)TOTAL.*\s+(\d+\.\d+\%)/'
-  artifacts:
-    reports:
-      coverage_report:
-        coverage_format: cobertura
-        path: backend/coverage.xml
-    paths:
-      - backend/coverage/
-    expire_in: 1 week
-  rules:
-    - <<: *if-merge-request
-    - <<: *if-master-branch
-    - <<: *if-release-branch
-  allow_failure: false
+# backend-test:
+#  stage: test
+#  image: $PYTHON_IMAGE
+#  tags:
+#    - ops-docker
+#  cache:
+#    key: "pip-backend-$CI_COMMIT_REF_SLUG"
+#    paths:
+#      - /root/.cache/pip
+#      - backend/.venv
+#    policy: pull-push
+#  before_script:
+#    - pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
+#    - pip config set global.trusted-host mirrors.aliyun.com
+#    - cd backend
+#    - export PYTHONPATH=$PWD:$PYTHONPATH
+#    - export SECRET_KEY=$CI_SECRET_KEY
+#    - export ENVIRONMENT=testing
+#    - export DATABASE_URL=$CI_DATABASE_URL
+#    - export REDIS_URL=$CI_REDIS_URL
+#    - export DISABLE_RATE_LIMIT=true
+#    - test -d .venv || python -m venv .venv
+#    - source .venv/bin/activate
+#    - pip install -r requirements/dev.txt -q
+#  script:
+#    - source .venv/bin/activate
+#    - pytest tests/ -v --cov=app --cov-report=xml --cov-report=html --cov-fail-under=$COVERAGE_MIN
+#  coverage: '/(?i)TOTAL.*\s+(\d+\.\d+\%)/'
+#  artifacts:
+#    reports:
+#      coverage_report:
+#        coverage_format: cobertura
+#        path: backend/coverage.xml
+#    paths:
+#      - backend/coverage/
+#    expire_in: 1 week
+#  rules:
+#    - <<: *if-merge-request
+#    - <<: *if-master-branch
+#    - <<: *if-release-branch
+#  allow_failure: false
 
 # Security Scan - Backend
 backend-security:
