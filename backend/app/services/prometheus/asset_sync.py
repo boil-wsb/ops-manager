@@ -491,22 +491,37 @@ class AssetSyncService:
 
         retired_count = 0
         for asset in prometheus_assets:
-            if asset.ip_address not in prometheus_ips:
-                asset.status = AssetStatus.RETIRED
-                asset.sync_status = SyncStatus.ERROR
-                asset.last_sync_time = now_shanghai()
-                retired_count += 1
-                logger.info(
-                    f"资产已从 Prometheus 消失，标记为 RETIRED: {asset.ip_address}",
+            try:
+                if asset.ip_address not in prometheus_ips:
+                    asset.status = AssetStatus.RETIRED
+                    asset.sync_status = SyncStatus.ERROR
+                    asset.last_sync_time = now_shanghai()
+                    retired_count += 1
+                    logger.info(
+                        f"资产已从 Prometheus 消失，标记为 RETIRED: {asset.ip_address}",
+                        extra={
+                            "action": "asset.retire",
+                            "ip_address": asset.ip_address,
+                            "asset_id": asset.asset_id,
+                        },
+                    )
+            except Exception as e:
+                logger.error(
+                    f"标记退役资产异常: {asset.ip_address}: {e}",
                     extra={
                         "action": "asset.retire",
                         "ip_address": asset.ip_address,
-                        "asset_id": asset.asset_id,
                     },
                 )
+                continue
 
         if retired_count > 0:
-            await self.db.commit()
+            try:
+                await self.db.commit()
+            except Exception as e:
+                await self.db.rollback()
+                logger.error(f"提交退役资产事务异常: {e}", extra={"action": "asset.retire"})
+                raise
 
         return retired_count
 
