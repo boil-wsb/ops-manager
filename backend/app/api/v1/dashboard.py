@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, get_db
 from app.crud import crud_terminal_metric
 from app.models.alert import AlertHistory
-from app.models.asset import Asset, AssetType
+from app.models.asset import Asset, AssetStatus, AssetType
 from app.models.it_feedback import ITFeedback
 from app.models.ops import Certificate, CertificateStatus, Deployment
 from app.models.user import User
@@ -138,16 +138,17 @@ async def _get_it_feedback_stats(db: AsyncSession) -> dict:
 
 
 async def _get_asset_stats(db: AsyncSession) -> dict:
-    """Query asset statistics using SQL aggregation."""
-    total_stmt = select(func.count()).select_from(Asset)
+    """Query asset statistics using SQL aggregation (excludes RETIRED assets)."""
+    active_filter = Asset.status != AssetStatus.RETIRED
+    total_stmt = select(func.count()).select_from(Asset).where(active_filter)
     server_stmt = (
-        select(func.count()).select_from(Asset).where(Asset.asset_type == AssetType.SERVER)
+        select(func.count()).select_from(Asset).where(Asset.asset_type == AssetType.SERVER, active_filter)
     )
     domain_stmt = (
-        select(func.count()).select_from(Asset).where(Asset.asset_type == AssetType.NETWORK)
+        select(func.count()).select_from(Asset).where(Asset.asset_type == AssetType.NETWORK, active_filter)
     )
     terminal_stmt = (
-        select(func.count()).select_from(Asset).where(Asset.asset_type == AssetType.TERMINAL)
+        select(func.count()).select_from(Asset).where(Asset.asset_type == AssetType.TERMINAL, active_filter)
     )
 
     total_count, server_count, domain_count, terminal_count = await asyncio.gather(

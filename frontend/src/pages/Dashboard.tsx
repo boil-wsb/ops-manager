@@ -1,5 +1,5 @@
-import { Row, Col, Card, Statistic, Table, Tag, Space, Button, Tooltip, Tabs, Progress } from 'antd';
-import { LinkOutlined, MonitorOutlined, CloudUploadOutlined, DatabaseOutlined, CloudOutlined, SettingOutlined, DashboardOutlined, SafetyOutlined, ApiOutlined, DesktopOutlined, CustomerServiceOutlined } from '@ant-design/icons';
+import { Row, Col, Card, Statistic, Table, Tag, Tooltip, Tabs, Progress, Badge } from 'antd';
+import { LinkOutlined, MonitorOutlined, CloudUploadOutlined, DatabaseOutlined, CloudOutlined, SettingOutlined, DashboardOutlined, SafetyOutlined, ApiOutlined, DesktopOutlined, CustomerServiceOutlined, AppstoreOutlined, GlobalOutlined, ExperimentOutlined, ThunderboltOutlined, RocketOutlined, ToolOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { navigationApi } from '../services/navigation';
 import { dashboardApi } from '../services/dashboard';
@@ -17,6 +17,28 @@ const iconMap: Record<string, React.ReactNode> = {
   DashboardOutlined: <DashboardOutlined />,
   SafetyOutlined: <SafetyOutlined />,
   ApiOutlined: <ApiOutlined />,
+  AppstoreOutlined: <AppstoreOutlined />,
+  GlobalOutlined: <GlobalOutlined />,
+  ExperimentOutlined: <ExperimentOutlined />,
+  ThunderboltOutlined: <ThunderboltOutlined />,
+  RocketOutlined: <RocketOutlined />,
+  ToolOutlined: <ToolOutlined />,
+};
+
+// 分类图标和主题色映射
+const categoryConfig: Record<string, { icon: React.ReactNode; color: string }> = {
+  '监控': { icon: <MonitorOutlined />, color: '#1890ff' },
+  '个人': { icon: <DesktopOutlined />, color: '#52c41a' },
+  '天璇平台': { icon: <RocketOutlined />, color: '#722ed1' },
+  '边缘大脑': { icon: <ThunderboltOutlined />, color: '#fa8c16' },
+  'IOT平台': { icon: <ApiOutlined />, color: '#13c2c2' },
+  'IAM平台': { icon: <SafetyOutlined />, color: '#eb2f96' },
+  '其他': { icon: <AppstoreOutlined />, color: '#8c8c8c' },
+  '测试分类': { icon: <ExperimentOutlined />, color: '#faad14' },
+};
+
+const getCategoryConfig = (category: string) => {
+  return categoryConfig[category] || { icon: <AppstoreOutlined />, color: '#1890ff' };
 };
 
 const REFRESH_INTERVAL = 60 * 1000;
@@ -62,34 +84,88 @@ const Dashboard = () => {
       {navigationGroups && navigationGroups.groups.length > 0 && (
         <Card
           size="small"
-          style={{ marginBottom: 16, background: 'var(--bg-elevated)' }}
-          styles={{ body: { padding: '0 16px 12px' } }}
+          style={{
+            marginBottom: 16,
+            background: 'var(--bg-elevated)',
+            border: '1px solid var(--border-color)',
+          }}
+          styles={{ body: { padding: '0 20px 16px' } }}
         >
           <Tabs
             defaultActiveKey={navigationGroups.groups[0]?.category}
-            items={navigationGroups.groups.map((group) => ({
-              key: group.category,
-              label: group.category,
-              children: (
-                <Space size={8} wrap>
-                  {group.links.map((link) => (
-                    <Tooltip key={link.id} title={link.description || link.url} placement="top">
-                      <Button
-                        type="primary"
-                        size="small"
-                        icon={link.icon ? iconMap[link.icon] : <LinkOutlined />}
-                        onClick={() => window.open(link.url, '_blank')}
-                      >
-                        {link.name}
-                        <LinkOutlined style={{ marginLeft: 4, fontSize: 12 }} />
-                      </Button>
-                    </Tooltip>
-                  ))}
-                </Space>
-              ),
-            }))}
+            items={navigationGroups.groups.map((group) => {
+              const cfg = getCategoryConfig(group.category);
+              return {
+                key: group.category,
+                label: (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 500 }}>
+                    <span style={{ color: cfg.color, fontSize: 15 }}>{cfg.icon}</span>
+                    {group.category}
+                    <Badge
+                      count={group.links.length}
+                      style={{
+                        backgroundColor: cfg.color,
+                        fontSize: 11,
+                        minWidth: 18,
+                        height: 18,
+                        lineHeight: '18px',
+                        borderRadius: 9,
+                      }}
+                    />
+                  </span>
+                ),
+                children: (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, paddingTop: 8 }}>
+                    {group.links.map((link) => {
+                      const linkIcon = link.icon ? iconMap[link.icon] : <LinkOutlined />;
+                      return (
+                        <Tooltip key={link.id} title={link.description || link.url} placement="top">
+                          <div
+                            onClick={() => window.open(link.url, '_blank')}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 10,
+                              padding: '10px 20px',
+                              borderRadius: 10,
+                              cursor: 'pointer',
+                              fontSize: 14,
+                              fontWeight: 500,
+                              color: 'var(--text-primary)',
+                              background: 'var(--bg-tertiary)',
+                              border: `1px solid var(--border-color)`,
+                              transition: 'all 0.2s ease',
+                              lineHeight: 1.5,
+                              minHeight: 40,
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = cfg.color;
+                              e.currentTarget.style.color = cfg.color;
+                              e.currentTarget.style.background = `${cfg.color}10`;
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                              e.currentTarget.style.boxShadow = `0 4px 12px ${cfg.color}30`;
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'var(--border-color)';
+                              e.currentTarget.style.color = 'var(--text-primary)';
+                              e.currentTarget.style.background = 'var(--bg-tertiary)';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.boxShadow = 'none';
+                            }}
+                          >
+                            <span style={{ color: cfg.color, fontSize: 18 }}>{linkIcon}</span>
+                            <span>{link.name}</span>
+                            <LinkOutlined style={{ fontSize: 12, color: 'var(--text-tertiary)' }} />
+                          </div>
+                        </Tooltip>
+                      );
+                    })}
+                  </div>
+                ),
+              };
+            })}
             size="small"
-            tabBarStyle={{ marginBottom: 12 }}
+            tabBarStyle={{ marginBottom: 12, marginTop: 8 }}
           />
         </Card>
       )}

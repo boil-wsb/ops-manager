@@ -7,6 +7,7 @@ Phase 2 实现：
 - 处理资产变更事件
 """
 
+import contextlib
 from typing import Any
 
 from sqlalchemy import select
@@ -14,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
 from app.core.tz import now_shanghai
-from app.models.asset import Asset, AssetStatus, AssetType
+from app.models.asset import Asset, AssetSource, AssetStatus, AssetType, SyncStatus
 from app.services.prometheus.client import PrometheusClient
 
 logger = get_logger(__name__)
@@ -357,6 +358,8 @@ class AssetSyncService:
                 )
 
         except Exception as e:
+            with contextlib.suppress(Exception):
+                await self.db.rollback()
             result["error"] = str(e)
             logger.exception(f"同步异常: {e}", extra={"action": "asset.sync", "instance": instance})
             logger.error(
@@ -371,13 +374,14 @@ class AssetSyncService:
         从 Prometheus 获取所有节点并同步到数据库
 
         Returns:
-            同步统计信息字典，包含 total, created, updated, failed, errors 等字段
+            同步统计信息字典，包含 total, created, updated, failed, retired, errors 等字段
         """
         stats = {
             "total": 0,
             "created": 0,
             "updated": 0,
             "failed": 0,
+            "retired": 0,
             "errors": [],
             "start_time": now_shanghai().isoformat(),
             "end_time": None,
@@ -392,6 +396,13 @@ class AssetSyncService:
                 f"开始同步 {len(nodes)} 个节点", extra={"action": "asset.sync", "total": len(nodes)}
             )
 
+            # 收集 Prometheus 中所有 instance 的 IP 集合，用于反向比对
+            prometheus_ips = set()
+            for node in nodes:
+                instance = node.get("instance", "")
+                if instance:
+                    prometheus_ips.add(self._extract_ip_from_instance(instance))
+
             for node in nodes:
                 instance = node.get("instance", "")
                 if not instance:
@@ -399,18 +410,40 @@ class AssetSyncService:
                     stats["errors"].append("Empty instance in node data")
                     continue
 
-                # 同步单个节点
-                result = await self.sync_single_asset(instance)
+                # 同步单个节点，捕获异常以避免污染整个事务
+                try:
+                    result = await self.sync_single_asset(instance)
 
-                if result["success"]:
-                    if result["action"] == "created":
-                        stats["created"] += 1
-                    elif result["action"] == "updated":
-                        stats["updated"] += 1
-                else:
+                    if result["success"]:
+                        if result["action"] == "created":
+                            stats["created"] += 1
+                        elif result["action"] == "updated":
+                            stats["updated"] += 1
+                    else:
+                        stats["failed"] += 1
+                        if result["error"]:
+                            stats["errors"].append(f"{instance}: {result['error']}")
+                except Exception as e:
+                    # 单个节点同步异常时 rollback 恢复事务状态，继续处理其他节点
+                    await self.db.rollback()
                     stats["failed"] += 1
-                    if result["error"]:
-                        stats["errors"].append(f"{instance}: {result['error']}")
+                    stats["errors"].append(f"{instance}: {str(e)}")
+                    logger.error(
+                        f"同步单节点异常: {instance}: {e}",
+                        extra={"action": "asset.sync", "instance": instance},
+                    )
+
+            # 反向比对：将 Prometheus 中已不存在的资产标记为 RETIRED
+            # 放在独立 try 块中，不受上面单节点同步错误影响
+            try:
+                retired_result = await self._retire_stale_prometheus_assets(prometheus_ips)
+                stats["retired"] = retired_result
+            except Exception as e:
+                logger.error(
+                    f"标记失活资产异常: {e}",
+                    extra={"action": "asset.retire"},
+                )
+                stats["errors"].append(f"Retire error: {str(e)}")
 
             stats["end_time"] = now_shanghai().isoformat()
             logger.info(
@@ -421,6 +454,7 @@ class AssetSyncService:
                     "created_count": stats["created"],
                     "updated_count": stats["updated"],
                     "failed_count": stats["failed"],
+                    "retired_count": stats["retired"],
                 },
             )
 
@@ -431,6 +465,50 @@ class AssetSyncService:
             logger.error(f"全量同步失败: {e}", extra={"action": "asset.sync"})
 
         return stats
+
+    async def _retire_stale_prometheus_assets(self, prometheus_ips: set[str]) -> int:
+        """
+        将 Prometheus 中已不存在的资产标记为 RETIRED
+
+        查询数据库中所有 source=PROMETHEUS 的资产，如果其 IP 不在
+        当前 Prometheus 节点列表中，则将状态标记为 RETIRED，
+        sync_status 标记为 ERROR。
+
+        Args:
+            prometheus_ips: Prometheus 当前所有节点的 IP 集合
+
+        Returns:
+            标记为 RETIRED 的资产数量
+        """
+        result = await self.db.execute(
+            select(Asset).where(
+                Asset.source == AssetSource.PROMETHEUS,
+                Asset.status != AssetStatus.RETIRED,
+                Asset.asset_type != AssetType.TERMINAL,
+            )
+        )
+        prometheus_assets = result.scalars().all()
+
+        retired_count = 0
+        for asset in prometheus_assets:
+            if asset.ip_address not in prometheus_ips:
+                asset.status = AssetStatus.RETIRED
+                asset.sync_status = SyncStatus.ERROR
+                asset.last_sync_time = now_shanghai()
+                retired_count += 1
+                logger.info(
+                    f"资产已从 Prometheus 消失，标记为 RETIRED: {asset.ip_address}",
+                    extra={
+                        "action": "asset.retire",
+                        "ip_address": asset.ip_address,
+                        "asset_id": asset.asset_id,
+                    },
+                )
+
+        if retired_count > 0:
+            await self.db.commit()
+
+        return retired_count
 
 
 async def sync_assets_from_prometheus(

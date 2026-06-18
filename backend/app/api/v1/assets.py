@@ -104,7 +104,13 @@ async def trigger_asset_sync(
 
     from app.services.prometheus.asset_sync import sync_assets_from_prometheus
 
-    asyncio.create_task(sync_assets_from_prometheus(db))
+    async def _run_sync():
+        """使用独立数据库会话运行同步任务，避免请求作用域会话被提前关闭"""
+        from app.db.session import db_operation_with_retry
+
+        await db_operation_with_retry(sync_assets_from_prometheus, max_retries=3, retry_delay=2.0)
+
+    asyncio.create_task(_run_sync())
 
     return {
         "message": "Asset sync task triggered successfully",
@@ -282,7 +288,7 @@ async def discover_prometheus_assets(
     prometheus_client = get_prometheus_client()
     nodes = await prometheus_client.get_all_nodes()
 
-    existing_assets, _ = await crud_asset.get_multi_with_filters(db, skip=0, limit=10000)
+    existing_assets, _ = await crud_asset.get_multi_with_filters(db, skip=0, limit=10000, exclude_retired=False)
     existing_ips = {asset.ip_address for asset in existing_assets if asset.ip_address}
 
     discovered_nodes = []

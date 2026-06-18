@@ -33,6 +33,7 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
         keyword: str | None = None,
         label_ids: list[int] | None = None,
         owner_id: int | None = None,
+        exclude_retired: bool = True,
     ) -> tuple[list[Asset], int]:
         """Get assets with filters and pagination."""
         query = select(Asset).options(
@@ -45,6 +46,9 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
             filters.append(Asset.asset_type == AssetType(asset_type))
         if status:
             filters.append(Asset.status == AssetStatus(status))
+        elif exclude_retired:
+            # 默认排除已退役资产，除非用户主动筛选 RETIRED 状态或显式禁用排除
+            filters.append(Asset.status != AssetStatus.RETIRED)
         if idc:
             filters.append(Asset.idc == idc)
         if keyword:
@@ -67,8 +71,8 @@ class CRUDAsset(CRUDBase[Asset, AssetCreate, AssetUpdate]):
         total_result = await db.execute(count_query)
         total = total_result.scalar()
 
-        # Apply pagination
-        query = query.offset(skip).limit(limit)
+        # Apply default IP address ordering and pagination
+        query = query.order_by(Asset.ip_address).offset(skip).limit(limit)
         result = await db.execute(query)
         items = result.scalars().all()
 
