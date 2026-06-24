@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { Table, Button, Input, Select, Tag, Space, Card, Popconfirm, Tooltip, Tabs, App, Alert } from 'antd';
+import { useState, Suspense, lazy } from 'react';
+import { Table, Button, Input, Select, Tag, Space, Card, Popconfirm, Tooltip, Tabs, App, Alert, Spin } from 'antd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlusOutlined, SearchOutlined, DeleteOutlined, EditOutlined, SyncOutlined, CloudOutlined, CompassOutlined, UserOutlined, DesktopOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined, DeleteOutlined, EditOutlined, SyncOutlined, CloudOutlined, CompassOutlined, UserOutlined, DesktopOutlined, ShareAltOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { fuzzyFilterOption } from '../../utils/selectFilter';
 import { assetApi } from '../../services/assets';
@@ -11,6 +11,9 @@ import AssetFormModal from './AssetFormModal';
 import type { Asset } from '../../types';
 import type { TablePaginationConfig } from 'antd';
 import { useAuthStore } from '../../stores/authStore';
+
+// Lazy-load the topology view to keep the main bundle small
+const AssetTopology = lazy(() => import('./AssetTopology'));
 
 const { Option } = Select;
 
@@ -58,6 +61,8 @@ const AssetList = () => {
         limit: pagination.pageSize,
       });
     },
+    // 拓扑视图有自己的数据流，不需要拉列表
+    enabled: activeTab === 'servers' || activeTab === 'terminals',
   });
 
   const deleteMutation = useMutation({
@@ -546,6 +551,26 @@ const AssetList = () => {
             scroll={{ x: 1200 }}
           />
         </>
+      ),
+    },
+    {
+      key: 'topology',
+      label: (
+        <span>
+          <ShareAltOutlined style={{ marginRight: 8 }} />
+          拓扑视图
+        </span>
+      ),
+      children: (
+        <Suspense
+          fallback={
+            <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
+              <Spin tip="加载拓扑视图..." size="large" />
+            </div>
+          }
+        >
+          <AssetTopology />
+        </Suspense>
       ),
     },
   ];

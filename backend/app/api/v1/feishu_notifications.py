@@ -346,7 +346,7 @@ async def update_feishu_card(
     if not record:
         raise HTTPException(status_code=404, detail="Notification record not found")
 
-    if request.callback_id and record.callback_id != request.callback_id:
+    if request.callback_id and record.callback_id and record.callback_id != request.callback_id:
         raise HTTPException(status_code=403, detail="callback_id does not match")
 
     card_content = request.card_content or record.card_content

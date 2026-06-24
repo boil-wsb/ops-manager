@@ -13,6 +13,7 @@ from app.core.exceptions import ConflictError, NotFoundError
 from app.core.logging import get_logger
 from app.core.tz import now_shanghai
 from app.crud.crud_asset import crud_asset, crud_label
+from app.crud.crud_asset_relation import crud_asset_relation
 from app.models.user import User
 from app.schemas.asset import (
     AssetCreate,
@@ -22,6 +23,12 @@ from app.schemas.asset import (
     AssetUpdate,
     LabelCreate,
     LabelResponse,
+)
+from app.schemas.asset_relation import (
+    AssetRelationCreate,
+    AssetRelationDeleteResponse,
+    AssetRelationOut,
+    TopologyResponse,
 )
 
 router = APIRouter()
@@ -372,6 +379,86 @@ async def import_prometheus_asset(
             f"Exception during asset import: {e}", extra={"action": "asset.import", "error": str(e)}
         )
         raise ConflictError(detail=f"Failed to import asset: {str(e)}") from e
+
+
+@router.get("/assets/topology", response_model=TopologyResponse)
+async def get_asset_topology(
+    asset_type: str | None = Query(None, description="按资产类型筛选"),
+    status: str | None = Query(None, description="按状态筛选"),
+    refresh: bool = Query(False, description="true=实时拉取 Prometheus 指标(同每日巡检), false=读最新巡检报告"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permissions(["asset:read"])),
+):
+    """获取资产拓扑数据（节点+边+分组统计）。
+
+    关联关系全部自动推断（无手动编辑）：
+    - 相同标签 -> CONNECTED（边带标签名+颜色）
+    - 相同 /24 网段 -> CONNECTED
+
+    节点资源指标(CPU/MEM/DISK)来源于每日巡检：默认读最新巡检报告，
+    refresh=true 时实时拉取 Prometheus（与每日巡检同一数据源）。
+
+    viewer 角色仅返回其负责的资产。
+    """
+    if is_viewer_role(current_user):
+        # viewer 只能看自己的资产拓扑
+        items, _ = await crud_asset.get_multi_with_filters(
+            db, skip=0, limit=10000, owner_id=current_user.id
+        )
+        payload = await crud_asset_relation.get_topology(
+            db, asset_type=asset_type, status=status, refresh=refresh
+        )
+        owned_ids = {a.id for a in items}
+        payload["nodes"] = [n for n in payload["nodes"] if int(n["id"]) in owned_ids]
+        payload["edges"] = [
+            e
+            for e in payload["edges"]
+            if int(e["source"]) in owned_ids and int(e["target"]) in owned_ids
+        ]
+        return payload
+
+    return await crud_asset_relation.get_topology(
+        db, asset_type=asset_type, status=status, refresh=refresh
+    )
+
+
+@router.post(
+    "/assets/topology/edges",
+    response_model=AssetRelationOut,
+    status_code=status.HTTP_201_CREATED,
+)
+@audit_log(operation_type="CREATE", module="asset", object_type="AssetRelation")
+async def create_topology_edge(
+    request: Request,
+    obj_in: AssetRelationCreate,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_permissions(["asset:write"])),
+):
+    """创建手动资产关联关系。"""
+    relation = await crud_asset_relation.create_manual(db, obj_in=obj_in)
+    return AssetRelationOut(
+        id=relation.id,
+        source=str(relation.source_asset_id),
+        target=str(relation.target_asset_id),
+        relation_type=relation.relation_type.value,
+        auto_inferred=relation.auto_inferred,
+    )
+
+
+@router.delete(
+    "/assets/topology/edges/{edge_id}",
+    response_model=AssetRelationDeleteResponse,
+)
+@audit_log(operation_type="DELETE", module="asset", object_type="AssetRelation")
+async def delete_topology_edge(
+    request: Request,
+    edge_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_permissions(["asset:write"])),
+):
+    """删除资产关联关系（仅手动添加的关联可删除）。"""
+    success = await crud_asset_relation.delete_manual(db, edge_id=edge_id)
+    return AssetRelationDeleteResponse(success=success)
 
 
 @router.get("/assets/tree", response_model=list[AssetTreeNode])

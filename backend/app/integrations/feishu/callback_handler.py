@@ -121,6 +121,67 @@ def _try_forward_callback(
                                 "assignee_open_id": assignee_open_id,
                             },
                         )
+                        # 更新原卡片：将"转交运维处理"按钮替换为"已转交运维"通知框
+                        if open_message_id:
+                            try:
+                                import copy
+
+                                updated_card = copy.deepcopy(card_dict)
+                                elements = (
+                                    updated_card.get("body", {}).get("elements", [])
+                                    if isinstance(updated_card, dict)
+                                    else []
+                                )
+                                for idx, el in enumerate(elements):
+                                    if (
+                                        isinstance(el, dict)
+                                        and el.get("tag") == "button"
+                                        and isinstance(el.get("value"), dict)
+                                        and el.get("value", {}).get("action")
+                                        == "forward_to_assignee"
+                                    ):
+                                        elements[idx] = {
+                                            "tag": "markdown",
+                                            "content": "***处理状态***：<font color='green'>✅ 已转交运维</font>",
+                                            "text_align": "left",
+                                            "text_size": "normal",
+                                            "icon": {
+                                                "tag": "standard_icon",
+                                                "token": "check_circle_outlined",
+                                                "color": "green",
+                                            },
+                                        }
+                                        break
+                                update_result = feishu_svc.update_card_message(
+                                    open_message_id=open_message_id,
+                                    card_content=updated_card,
+                                )
+                                if update_result.get("success"):
+                                    logger.info(
+                                        f"原卡片已更新为已转交运维状态: open_message_id={open_message_id}",
+                                        extra={
+                                            "action": "feishu.callback.forward",
+                                            "open_message_id": open_message_id,
+                                        },
+                                    )
+                                else:
+                                    logger.warning(
+                                        f"原卡片更新未成功: open_message_id={open_message_id}, error={update_result.get('error')}",
+                                        extra={
+                                            "action": "feishu.callback.forward",
+                                            "open_message_id": open_message_id,
+                                            "error": update_result.get("error"),
+                                        },
+                                    )
+                            except Exception as update_err:
+                                logger.error(
+                                    f"更新原卡片为已转交运维状态失败: {update_err}",
+                                    extra={
+                                        "action": "feishu.callback.forward",
+                                        "open_message_id": open_message_id,
+                                        "error": str(update_err),
+                                    },
+                                )
                     else:
                         logger.warning(
                             f"卡片转发失败: assignee_open_id={assignee_open_id}",

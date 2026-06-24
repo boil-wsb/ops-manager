@@ -151,6 +151,25 @@ class Asset(BaseModel):
     terminal_metrics: Mapped[list["TerminalMetric"]] = relationship(
         "TerminalMetric", back_populates="asset", lazy="selectin"
     )
+    # Asset topology relations (asset_relations table)
+    # Use lazy="select" (default lazy loading) so ordinary Asset list queries
+    # are NOT forced to join asset_relations. Topology endpoint queries the
+    # relation table directly via crud_asset_relation, so these relationships
+    # are only populated on explicit access.
+    outgoing_relations: Mapped[list["AssetRelation"]] = relationship(
+        "AssetRelation",
+        foreign_keys="AssetRelation.source_asset_id",
+        back_populates="source_asset",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
+    incoming_relations: Mapped[list["AssetRelation"]] = relationship(
+        "AssetRelation",
+        foreign_keys="AssetRelation.target_asset_id",
+        back_populates="target_asset",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
 
     # Indexes
     __table_args__ = (

@@ -4,6 +4,7 @@ Models package.
 
 from app.models.alert import AlertHistory, AlertSilence, AlertTemplate
 from app.models.asset import Asset, Label, asset_labels
+from app.models.asset_relation import AssetRelation, RelationType
 from app.models.audit_log import AuditLog
 from app.models.base import BaseModel
 from app.models.department import Department
@@ -29,6 +30,8 @@ __all__ = [
     "Role",
     "Permission",
     "Asset",
+    "AssetRelation",
+    "RelationType",
     "Label",
     "AuditLog",
     "NavigationLink",
