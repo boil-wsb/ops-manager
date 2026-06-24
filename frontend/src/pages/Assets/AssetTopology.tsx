@@ -10,7 +10,13 @@ import {
   useNodesState,
   useReactFlow,
 } from '@xyflow/react';
-import type { Edge, EdgeTypes, Node, NodeTypes, OnNodeClick } from '@xyflow/react';
+import type {
+  Edge,
+  EdgeTypes,
+  Node,
+  NodeMouseHandler,
+  NodeTypes,
+} from '@xyflow/react';
 import dagre from 'dagre';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -182,7 +188,7 @@ function AssetTopologyInner() {
 
   // ====== Handlers ======
 
-  const onNodeClick: OnNodeClick = useCallback(
+  const onNodeClick: NodeMouseHandler<FlowNode> = useCallback(
     (_evt, node) => {
       setNodes((nds) =>
         nds.map((n) => ({

@@ -4,21 +4,27 @@ import {
   EdgeLabelRenderer,
   getBezierPath,
 } from '@xyflow/react';
-import type { EdgeProps } from '@xyflow/react';
+import type { Edge, EdgeProps } from '@xyflow/react';
 import { Tag } from 'antd';
 import { useThemeStore } from '../../stores/themeStore';
 
 // ====== Types ======
 
+// Index signature required by @xyflow/react v12's `Edge<Record<string, unknown>>`
+// constraint. Known fields keep their declared (more specific) types.
 export interface AssetEdgeData {
   relationType: 'CONNECTED' | 'LOCATED_IN' | 'CUSTOM';
   autoInferred: boolean;
   label?: string | null;
   labelColor?: string | null;
   highlightLabelId: number | null;
+  [key: string]: unknown;
 }
 
-type AssetEdgeType = EdgeProps<AssetEdgeData>;
+// Full Flow edge type (data = AssetEdgeData). EdgeProps<T> requires T to be a
+// complete Edge, not just the data shape.
+export type AssetFlowEdge = Edge<AssetEdgeData>;
+type AssetEdgeType = EdgeProps<AssetFlowEdge>;
 
 // ====== Style ======
 

@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
-import type { NodeProps } from '@xyflow/react';
+import type { Node, NodeProps } from '@xyflow/react';
 import { Tooltip } from 'antd';
 import {
   DesktopOutlined,
@@ -14,13 +14,19 @@ import { useThemeStore } from '../../stores/themeStore';
 
 // ====== Types ======
 
+// Index signature required by @xyflow/react v12's `Node<Record<string, unknown>>`
+// constraint. Known fields keep their declared (more specific) types.
 export interface AssetNodeData {
   asset: TopologyNode;
   isSelected: boolean;
   highlightLabelId: number | null;
+  [key: string]: unknown;
 }
 
-type AssetNodeType = NodeProps<AssetNodeData>;
+// Full Flow node type (data = AssetNodeData). NodeProps<T> requires T to be a
+// complete Node, not just the data shape.
+export type AssetFlowNode = Node<AssetNodeData>;
+type AssetNodeType = NodeProps<AssetFlowNode>;
 
 // ====== Style constants ======
 
@@ -92,7 +98,6 @@ function AssetNodeImpl({ data, selected }: AssetNodeType) {
   // Theme-aware colors
   const textColor = isDark ? 'rgba(255,255,255,0.85)' : 'rgba(20,25,50,0.88)';
   const textSecondary = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(20,25,50,0.55)';
-  const ringBase = isDark ? '#3a3a5a' : '#e0e0e0';
   const iconColor = isDark ? 'rgba(255,255,255,0.85)' : 'rgba(20,25,50,0.85)';
   const nodeBg = isDark ? '#1e1e36' : '#ffffff';
   const dimOpacity = highlightLabelId != null && !hasHighlightLabel ? 0.25 : 1;
