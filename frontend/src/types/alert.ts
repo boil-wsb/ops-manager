@@ -67,6 +67,7 @@ export interface AlertTemplate {
   name: string;
   templateType: AlertTemplateType;
   subjectTemplate?: string;
+  bodyTemplate?: string;
   cardConfig?: Record<string, unknown>;
   isDefault: boolean;
   isActive: boolean;
@@ -78,6 +79,7 @@ export interface AlertTemplateCreate {
   name: string;
   templateType: AlertTemplateType;
   subjectTemplate?: string;
+  bodyTemplate?: string;
   cardConfig?: Record<string, unknown>;
   isDefault: boolean;
   isActive: boolean;
@@ -87,6 +89,7 @@ export interface AlertTemplateUpdate {
   name?: string;
   templateType?: AlertTemplateType;
   subjectTemplate?: string;
+  bodyTemplate?: string;
   cardConfig?: Record<string, unknown>;
   isDefault?: boolean;
   isActive?: boolean;

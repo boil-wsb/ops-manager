@@ -80,6 +80,7 @@ EXCLUDE_PATHS = [
     "/api/v1/feishu/notify",
     "/api/v1/it-reporter",
     "/api/v1/open-id",
+    "/api/v1/alert/webhook/alertmanager",
 ]
 
 

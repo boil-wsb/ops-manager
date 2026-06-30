@@ -17,6 +17,11 @@ _lark = None
 _callback_thread: threading.Thread | None = None
 _ws_client: Any = None
 
+# CRM 同步任务进行中状态：sync_type -> True/False
+# 用于去重：同步进行中再次收到相同指令时回复"已在同步中"，避免重复触发
+_crm_sync_in_progress: dict[str, bool] = {}
+_crm_sync_in_progress_lock = threading.Lock()
+
 
 def _try_forward_callback(
     open_message_id: str | None,
@@ -377,6 +382,41 @@ def _do_card_action_trigger(data: Any) -> Any:
         if not button_action and name:
             button_action = name
 
+        # 获取按钮文本，用于按文本识别 CRM 同步动作
+        button_text = ""
+        if hasattr(action, "text") and action.text:
+            button_text = getattr(action.text, "content", "") or str(action.text)
+        elif hasattr(action, "option") and action.option:
+            opt_text = getattr(action.option, "text", None)
+            if opt_text:
+                button_text = getattr(opt_text, "content", "") or str(opt_text)
+
+        logger.info(
+            f"按钮回调详情: button_action={button_action}, button_text={button_text}, "
+            f"value={value}, name={name}",
+            extra={
+                "action": "feishu.callback",
+                "button_action": button_action,
+                "button_text": button_text,
+                "value": value if isinstance(value, dict) else str(value),
+            },
+        )
+
+        # 如果 button_action 未匹配 CRM 同步，但按钮文本是"CRM 增量同步"/"CRM 全量同步"，也触发
+        if button_action not in ("crm_sync_incremental", "crm_sync_full"):
+            if "增量" in button_text and "CRM" in button_text.upper():
+                button_action = "crm_sync_incremental"
+                logger.info(
+                    f"根据按钮文本识别为 CRM 增量同步: button_text={button_text}",
+                    extra={"action": "feishu.callback", "button_text": button_text},
+                )
+            elif "全量" in button_text and "CRM" in button_text.upper():
+                button_action = "crm_sync_full"
+                logger.info(
+                    f"根据按钮文本识别为 CRM 全量同步: button_text={button_text}",
+                    extra={"action": "feishu.callback", "button_text": button_text},
+                )
+
         open_message_id = None
         if hasattr(data.event, "context") and data.event.context:
             open_message_id = (
@@ -410,6 +450,9 @@ def _do_card_action_trigger(data: Any) -> Any:
                 related_id = str(alert_id_from_value)
             elif open_message_id:
                 related_id = _get_alert_id_by_open_message_id(open_message_id)
+        elif button_action in ("crm_sync_incremental", "crm_sync_full"):
+            related_type = "crm_sync"
+            related_id = button_action.replace("crm_sync_", "")
 
         _record_interaction(
             direction="inbound",
@@ -528,6 +571,16 @@ def _do_card_action_trigger(data: Any) -> Any:
             else:
                 resp = {"toast": {"type": "error", "content": "无法找到告警记录"}}
 
+        elif button_action in ("crm_sync_incremental", "crm_sync_full"):
+            sync_type = "incremental" if button_action == "crm_sync_incremental" else "full"
+            sync_label_text = "增量" if sync_type == "incremental" else "全量"
+            threading.Thread(
+                target=_run_crm_sync_sync,
+                args=(sync_type, open_message_id, operator_open_id),
+                daemon=True,
+            ).start()
+            resp = {"toast": {"type": "info", "content": f"已触发 CRM {sync_label_text}同步"}}
+
         else:
             _try_forward_callback(open_message_id, data, button_action, value, operator_open_id)
             resp = {"toast": {"type": "info", "content": f"收到回调: {button_action}"}}
@@ -546,6 +599,174 @@ def _do_card_action_trigger(data: Any) -> Any:
         )
 
         return P2CardActionTriggerResponse(resp)
+
+
+def _run_crm_sync_sync(
+    sync_type: str,
+    open_message_id: str | None,
+    operator_open_id: str | None,
+) -> None:
+    """在飞书回调线程中执行 CRM 同步并更新卡片状态。
+
+    流程：
+    1. 更新卡片为"同步中"
+    2. 同步执行 CRM 同步调用
+    3. 根据结果更新卡片为"成功"或"失败"
+
+    所有异常都在顶层捕获并记录，避免线程静默失败。
+    """
+    label = sync_type
+    try:
+        from app.services.crm.card_updater import (
+            update_card_to_sync_result_sync,
+            update_card_to_syncing_sync,
+        )
+        from app.services.crm.sync_service import (
+            SYNC_TYPE_LABELS,
+            SYNC_TYPE_PATHS,
+            get_crm_sync_service,
+        )
+
+        label = SYNC_TYPE_LABELS.get(sync_type, sync_type)
+        logger.info(
+            f"[CRM回调] 开始执行: sync_type={sync_type}, open_message_id={open_message_id}, operator={operator_open_id}",
+            extra={
+                "action": "crm.sync.callback",
+                "sync_type": sync_type,
+                "open_message_id": open_message_id,
+                "operator_open_id": operator_open_id,
+            },
+        )
+
+        # 1. 更新卡片为同步中
+        if open_message_id:
+            try:
+                logger.info(
+                    f"[CRM回调] 步骤1: 更新卡片为同步中状态",
+                    extra={
+                        "action": "crm.sync.callback",
+                        "step": "update_card_syncing",
+                        "open_message_id": open_message_id,
+                    },
+                )
+                update_card_to_syncing_sync(open_message_id, sync_type)
+                logger.info(
+                    f"[CRM回调] 步骤1完成: 卡片已更新为同步中",
+                    extra={
+                        "action": "crm.sync.callback",
+                        "step": "update_card_syncing_done",
+                        "open_message_id": open_message_id,
+                    },
+                )
+            except Exception as e:
+                logger.warning(
+                    f"[CRM回调] 步骤1失败: 更新卡片为同步中状态失败: {e}",
+                    extra={
+                        "action": "crm.sync.callback",
+                        "step": "update_card_syncing_error",
+                        "open_message_id": open_message_id,
+                        "error": str(e),
+                    },
+                )
+
+        # 2. 同步执行 CRM 调用
+        logger.info(
+            f"[CRM回调] 步骤2: 获取 CRM 同步服务实例",
+            extra={
+                "action": "crm.sync.callback",
+                "step": "get_service",
+            },
+        )
+        service = get_crm_sync_service()
+        logger.info(
+            f"[CRM回调] 步骤2: CRM 服务配置 base_url={service.base_url}, timeout={service.timeout}",
+            extra={
+                "action": "crm.sync.callback",
+                "step": "service_config",
+                "base_url": service.base_url,
+                "timeout": service.timeout,
+            },
+        )
+
+        # 显式构建 URL 并记录，便于排查
+        url = service._build_url(sync_type)
+        logger.info(
+            f"[CRM回调] 步骤2: 即将调用 CRM 接口: {url}",
+            extra={
+                "action": "crm.sync.callback",
+                "step": "call_crm_api",
+                "url": url,
+                "sync_type": sync_type,
+            },
+        )
+
+        result = service.trigger_sync_sync(sync_type)
+        logger.info(
+            f"[CRM回调] 步骤2完成: success={result.get('success')}, status_code={result.get('status_code')}, duration_ms={result.get('duration_ms')}",
+            extra={
+                "action": "crm.sync.callback",
+                "step": "call_crm_api_done",
+                "sync_type": sync_type,
+                "success": result.get("success"),
+                "status_code": result.get("status_code"),
+                "duration_ms": result.get("duration_ms"),
+            },
+        )
+
+        # 3. 更新卡片为最终结果
+        if open_message_id:
+            try:
+                logger.info(
+                    f"[CRM回调] 步骤3: 更新卡片为最终结果",
+                    extra={
+                        "action": "crm.sync.callback",
+                        "step": "update_card_result",
+                        "open_message_id": open_message_id,
+                    },
+                )
+                update_card_to_sync_result_sync(open_message_id, sync_type, result)
+                logger.info(
+                    f"[CRM回调] 步骤3完成: 卡片已更新为最终结果",
+                    extra={
+                        "action": "crm.sync.callback",
+                        "step": "update_card_result_done",
+                        "open_message_id": open_message_id,
+                    },
+                )
+            except Exception as e:
+                logger.error(
+                    f"[CRM回调] 步骤3失败: 更新卡片为最终结果状态失败: {e}",
+                    extra={
+                        "action": "crm.sync.callback",
+                        "step": "update_card_result_error",
+                        "open_message_id": open_message_id,
+                        "error": str(e),
+                    },
+                )
+
+        logger.info(
+            f"[CRM回调] {label} 全流程完成: success={result.get('success')}",
+            extra={
+                "action": "crm.sync.callback",
+                "step": "all_done",
+                "sync_type": sync_type,
+                "success": result.get("success"),
+                "open_message_id": open_message_id,
+            },
+        )
+
+    except Exception as e:
+        logger.error(
+            f"[CRM回调] {label} 执行异常（顶层捕获）: {e}",
+            extra={
+                "action": "crm.sync.callback",
+                "step": "top_level_error",
+                "sync_type": sync_type,
+                "error": str(e),
+                "error_type": type(e).__name__,
+            },
+            exc_info=True,
+        )
 
 
 def _handle_feedback_sync(feedback_id: str) -> None:
@@ -1165,12 +1386,11 @@ def _start_callback_client() -> None:
     try:
         _ws_client.start()
         logger.info("WebSocket客户端已启动", extra={"action": "feishu.callback"})
-    except RuntimeError:
-        logger.warning(
-            "WebSocket客户端无法启动（事件循环冲突），"
-            "uvicorn reload模式下会出现此问题，"
-            "生产环境请使用 'uvicorn app.main:app' 不带 --reload",
-            extra={"action": "feishu.callback"},
+    except Exception as e:
+        logger.error(
+            f"WebSocket客户端启动失败: {type(e).__name__}: {e}",
+            extra={"action": "feishu.callback", "error": str(e), "error_type": type(e).__name__},
+            exc_info=True,
         )
 
 
@@ -1330,12 +1550,13 @@ def _do_im_message_receive_v1(data: Any) -> Any:
                             break
 
         content = getattr(message, "content", None) if message else None
-        msg_type = ""
+        # 注意：msg_type 必须从 message.message_type 获取，
+        # 不能从 content JSON 中解析（content 只有 {"text":"..."}，不含 msg_type 字段）
+        msg_type = getattr(message, "message_type", "") if message else ""
         text_content = ""
         if content:
             try:
                 msg_dict = json.loads(content) if isinstance(content, str) else content
-                msg_type = msg_dict.get("msg_type", "") if isinstance(msg_dict, dict) else ""
                 text_content = msg_dict.get("text", "") if isinstance(msg_dict, dict) else ""
 
                 logger.info(
@@ -1395,17 +1616,366 @@ def _handle_text_message(sender_id: str | None, text: str) -> None:
     if not sender_id:
         return
 
-    text = text.strip().lower()
+    # 归一化：去除首尾空白并转小写；再做去空格匹配，兼容 "CRM 增量同步"/"CRM增量同步"
+    text_lower = text.strip().lower()
+    text_normalized = text_lower.replace(" ", "")
 
-    if text in ["help", "帮助", "菜单"]:
+    # CRM 同步触发：接收文本消息 "CRM 增量同步" / "CRM 全量同步"
+    crm_sync_type: str | None = None
+    if text_normalized == "crm增量同步":
+        crm_sync_type = "incremental"
+    elif text_normalized == "crm全量同步":
+        crm_sync_type = "full"
+
+    if crm_sync_type:
+        _trigger_crm_sync_from_text(sender_id, crm_sync_type)
+        return
+
+    if text_lower in ["help", "帮助", "菜单"]:
         _send_help_menu(sender_id)
-    elif text in ["状态", "status"]:
+    elif text_lower in ["状态", "status"]:
         _send_status_info(sender_id)
     else:
         logger.info(
-            f"收到文本消息: sender_id={sender_id}, text={text}",
+            f"收到文本消息: sender_id={sender_id}, text={text_lower}",
             extra={"action": "feishu.callback", "sender_id": sender_id},
         )
+
+
+def _trigger_crm_sync_from_text(sender_id: str, sync_type: str) -> None:
+    """从文本消息触发 CRM 同步。
+
+    流程：
+    1. 检查是否已在同步中（去重），若在同步中则静默忽略，不发送任何消息
+    2. 立即回复用户"正在执行..."的文本消息
+    3. 启动后台线程执行同步调用并发送结果卡片
+
+    Args:
+        sender_id: 触发同步的用户 open_id
+        sync_type: 同步类型 "incremental" 或 "full"
+    """
+    from app.services.crm.sync_service import SYNC_TYPE_LABELS
+
+    label = SYNC_TYPE_LABELS.get(sync_type, sync_type)
+
+    logger.info(
+        f"[CRM文本触发] 收到文本指令: sender_id={sender_id}, sync_type={sync_type}, label={label}",
+        extra={
+            "action": "crm.sync.text_trigger",
+            "sender_id": sender_id,
+            "sync_type": sync_type,
+            "label": label,
+        },
+    )
+
+    # 0. 去重检查：若该 sync_type 已在同步中，忽略重复指令（不发送任何消息）
+    with _crm_sync_in_progress_lock:
+        if _crm_sync_in_progress.get(sync_type):
+            logger.info(
+                f"[CRM文本触发] 同步进行中，忽略重复指令: sender_id={sender_id}, sync_type={sync_type}",
+                extra={
+                    "action": "crm.sync.text_trigger",
+                    "sender_id": sender_id,
+                    "sync_type": sync_type,
+                    "step": "duplicate_ignored",
+                },
+            )
+            return
+        # 标记为同步中
+        _crm_sync_in_progress[sync_type] = True
+
+    # 1. 立即回复文本消息，告知用户已收到指令
+    try:
+        from app.integrations.feishu.service import get_feishu_service
+
+        feishu = get_feishu_service()
+        feishu.send_text_message(sender_id, f"⏳ 已收到指令，正在执行 {label}，请稍候...")
+        logger.info(
+            f"[CRM文本触发] 已回复执行中提示: sender_id={sender_id}",
+            extra={"action": "crm.sync.text_trigger", "sender_id": sender_id, "step": "reply_running"},
+        )
+    except Exception as e:
+        logger.error(
+            f"[CRM文本触发] 回复执行中提示失败: {e}",
+            extra={"action": "crm.sync.text_trigger", "sender_id": sender_id, "error": str(e), "step": "reply_running_error"},
+        )
+
+    # 2. 启动后台线程执行同步并发送结果卡片
+    threading.Thread(
+        target=_run_crm_sync_from_text,
+        args=(sender_id, sync_type),
+        daemon=True,
+    ).start()
+
+
+def _run_crm_sync_from_text(sender_id: str, sync_type: str) -> None:
+    """在后台线程中执行 CRM 同步，并更新卡片状态。
+
+    流程（卡片更新模式，而非新下发）：
+    1. 发送"同步中"卡片，记录 message_id
+    2. 调用 CRM 同步接口，获取 task_id 和 status_url
+    3. 如果触发成功且有 status_url：
+       - 等待指定时间（增量 5 分钟，全量 15 分钟）
+       - 查询同步状态
+       - 更新原卡片为最终结果
+    4. 如果触发失败，立即更新原卡片为失败状态
+
+    所有异常都在顶层捕获并记录，避免线程静默失败。
+    无论同步成功失败，最终都会清除同步状态，允许下一次触发。
+    """
+    import time
+
+    label = sync_type
+    card_message_id: str | None = None
+    try:
+        from app.services.crm.card_updater import (
+            send_syncing_card_sync,
+            update_card_to_sync_result_sync,
+        )
+        from app.services.crm.sync_service import (
+            SYNC_TYPE_LABELS,
+            SYNC_WAIT_SECONDS,
+            get_crm_sync_service,
+        )
+
+        label = SYNC_TYPE_LABELS.get(sync_type, sync_type)
+        wait_seconds = SYNC_WAIT_SECONDS.get(sync_type, 300)
+        logger.info(
+            f"[CRM文本触发] 开始执行同步: sender_id={sender_id}, sync_type={sync_type}, wait_seconds={wait_seconds}",
+            extra={
+                "action": "crm.sync.text_trigger",
+                "sender_id": sender_id,
+                "sync_type": sync_type,
+                "wait_seconds": wait_seconds,
+                "step": "start",
+            },
+        )
+
+        # 1. 发送"同步中"卡片，记录 message_id 用于后续更新
+        try:
+            card_message_id = send_syncing_card_sync(sender_id, sync_type)
+            logger.info(
+                f"[CRM文本触发] 已发送同步中卡片: sender_id={sender_id}, card_message_id={card_message_id}",
+                extra={"action": "crm.sync.text_trigger", "sender_id": sender_id, "card_message_id": card_message_id, "step": "send_syncing_card_done"},
+            )
+        except Exception as e:
+            logger.warning(
+                f"[CRM文本触发] 发送同步中卡片失败: {e}",
+                extra={"action": "crm.sync.text_trigger", "sender_id": sender_id, "error": str(e), "step": "send_syncing_card_error"},
+            )
+
+        # 2. 调用 CRM 同步接口
+        service = get_crm_sync_service()
+        url = service._build_url(sync_type)
+        logger.info(
+            f"[CRM文本触发] 调用 CRM 接口: url={url}",
+            extra={"action": "crm.sync.text_trigger", "url": url, "sync_type": sync_type, "step": "call_crm_api"},
+        )
+
+        trigger_result = service.trigger_sync_sync(sync_type)
+        logger.info(
+            f"[CRM文本触发] CRM 接口调用完成: success={trigger_result.get('success')}, status_code={trigger_result.get('status_code')}, duration_ms={trigger_result.get('duration_ms')}",
+            extra={
+                "action": "crm.sync.text_trigger",
+                "sync_type": sync_type,
+                "success": trigger_result.get("success"),
+                "status_code": trigger_result.get("status_code"),
+                "duration_ms": trigger_result.get("duration_ms"),
+                "step": "call_crm_api_done",
+            },
+        )
+
+        # 3. 判断是否需要等待查询状态
+        trigger_data = trigger_result.get("data") or {}
+        status_url = trigger_data.get("status_url") if isinstance(trigger_data, dict) else None
+
+        if not trigger_result.get("success") or not status_url:
+            # 触发失败，立即更新卡片为失败状态
+            logger.info(
+                f"[CRM文本触发] 触发失败或无 status_url，立即更新卡片为失败状态: success={trigger_result.get('success')}, has_status_url={bool(status_url)}",
+                extra={"action": "crm.sync.text_trigger", "success": trigger_result.get("success"), "has_status_url": bool(status_url), "step": "update_card_failed_immediately"},
+            )
+            _update_crm_sync_card(sender_id, card_message_id, sync_type, trigger_result)
+            logger.info(
+                f"[CRM文本触发] {label} 全流程完成（触发失败）: success=False",
+                extra={"action": "crm.sync.text_trigger", "sync_type": sync_type, "success": False, "sender_id": sender_id, "step": "all_done_failed"},
+            )
+            return
+
+        # 4. 触发成功，等待指定时间后查询状态
+        logger.info(
+            f"[CRM文本触发] 触发成功，等待 {wait_seconds}s 后查询同步状态: task_id={trigger_data.get('task_id')}, status_url={status_url}",
+            extra={
+                "action": "crm.sync.text_trigger",
+                "sync_type": sync_type,
+                "wait_seconds": wait_seconds,
+                "task_id": trigger_data.get("task_id"),
+                "status_url": status_url,
+                "step": "wait_before_query",
+            },
+        )
+        time.sleep(wait_seconds)
+
+        # 5. 查询同步状态
+        query_result = service.query_sync_status_sync(status_url)
+        logger.info(
+            f"[CRM文本触发] 同步状态查询完成: success={query_result.get('success')}, status_code={query_result.get('status_code')}",
+            extra={
+                "action": "crm.sync.text_trigger",
+                "sync_type": sync_type,
+                "query_success": query_result.get("success"),
+                "status_code": query_result.get("status_code"),
+                "step": "query_status_done",
+            },
+        )
+
+        # 6. 构建最终结果并更新卡片
+        final_result = _build_final_sync_result(sync_type, trigger_result, query_result)
+        _update_crm_sync_card(sender_id, card_message_id, sync_type, final_result)
+
+        logger.info(
+            f"[CRM文本触发] {label} 全流程完成: success={final_result.get('success')}",
+            extra={
+                "action": "crm.sync.text_trigger",
+                "sync_type": sync_type,
+                "success": final_result.get("success"),
+                "sender_id": sender_id,
+                "step": "all_done",
+            },
+        )
+
+    except Exception as e:
+        logger.error(
+            f"[CRM文本触发] {label} 执行异常（顶层捕获）: {e}",
+            extra={
+                "action": "crm.sync.text_trigger",
+                "sync_type": sync_type,
+                "sender_id": sender_id,
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "step": "top_level_error",
+            },
+            exc_info=True,
+        )
+        # 异常时尝试更新卡片为失败状态
+        if card_message_id:
+            try:
+                from app.services.crm.card_updater import update_card_to_sync_result_sync
+
+                error_result = {
+                    "success": False,
+                    "message": f"{label} 执行异常: {str(e)}",
+                    "error": str(e),
+                    "started_at": "",
+                    "duration_ms": 0,
+                }
+                update_card_to_sync_result_sync(card_message_id, sync_type, error_result)
+            except Exception:
+                pass
+    finally:
+        # 无论成功失败，清除同步状态，允许下一次触发
+        with _crm_sync_in_progress_lock:
+            _crm_sync_in_progress[sync_type] = False
+        logger.info(
+            f"[CRM文本触发] 已清除同步状态: sync_type={sync_type}",
+            extra={"action": "crm.sync.text_trigger", "sync_type": sync_type, "step": "clear_in_progress"},
+        )
+
+
+def _update_crm_sync_card(
+    sender_id: str,
+    card_message_id: str | None,
+    sync_type: str,
+    result: dict,
+) -> None:
+    """更新 CRM 同步卡片为最终结果。
+
+    优先使用 update_card_message 更新原卡片；
+    若 card_message_id 为空（发送同步中卡片失败），则降级为发送新卡片。
+    """
+    from app.services.crm.card_updater import (
+        send_sync_result_card_sync,
+        update_card_to_sync_result_sync,
+    )
+
+    if card_message_id:
+        try:
+            update_card_to_sync_result_sync(card_message_id, sync_type, result)
+            logger.info(
+                f"[CRM文本触发] 已更新卡片为最终结果: card_message_id={card_message_id}",
+                extra={"action": "crm.sync.text_trigger", "card_message_id": card_message_id, "step": "update_card_result_done"},
+            )
+            return
+        except Exception as e:
+            logger.warning(
+                f"[CRM文本触发] 更新卡片失败，降级为发送新卡片: {e}",
+                extra={"action": "crm.sync.text_trigger", "card_message_id": card_message_id, "error": str(e), "step": "update_card_fallback"},
+            )
+
+    # 降级：发送新卡片
+    try:
+        send_sync_result_card_sync(sender_id, sync_type, result)
+        logger.info(
+            f"[CRM文本触发] 已发送结果卡片（降级）: sender_id={sender_id}",
+            extra={"action": "crm.sync.text_trigger", "sender_id": sender_id, "step": "send_result_card_fallback_done"},
+        )
+    except Exception as e:
+        logger.error(
+            f"[CRM文本触发] 发送结果卡片（降级）失败: {e}",
+            extra={"action": "crm.sync.text_trigger", "sender_id": sender_id, "error": str(e), "step": "send_result_card_fallback_error"},
+        )
+
+
+def _build_final_sync_result(
+    sync_type: str,
+    trigger_result: dict,
+    query_result: dict,
+) -> dict:
+    """根据触发结果和状态查询结果，构建用于更新卡片的最终结果。
+
+    判断同步是否完成的规则：
+    - 查询成功且返回数据中 status 字段为 completed/success/done 视为成功
+    - 否则视为未完成（但仍更新卡片显示当前状态）
+    """
+    from app.services.crm.sync_service import SYNC_TYPE_LABELS
+
+    label = SYNC_TYPE_LABELS.get(sync_type, sync_type)
+    trigger_data = trigger_result.get("data") or {}
+    query_data = query_result.get("data") or {}
+
+    # 判断同步任务状态
+    task_status = ""
+    if isinstance(query_data, dict):
+        task_status = str(query_data.get("status", "")).lower()
+
+    # 视为成功的状态值
+    success_statuses = {"completed", "success", "done", "finished", "succeeded"}
+    is_success = query_result.get("success", False) and (
+        task_status in success_statuses or not task_status
+    )
+
+    # 合并数据用于卡片展示
+    combined_data = {
+        "trigger": trigger_data,
+        "query": query_data,
+    }
+
+    if is_success:
+        message = f"{label} 已完成"
+    else:
+        message = f"{label} 状态查询完成（当前状态: {task_status or 'unknown'}）"
+
+    return {
+        "success": is_success,
+        "message": message,
+        "sync_type": sync_type,
+        "label": label,
+        "started_at": trigger_result.get("started_at", ""),
+        "duration_ms": trigger_result.get("duration_ms", 0),
+        "status_code": query_result.get("status_code", ""),
+        "data": combined_data,
+        "error": query_result.get("error", "") if not is_success else "",
+    }
 
 
 def _send_help_menu(user_id: str) -> None:

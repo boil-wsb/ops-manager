@@ -536,7 +536,7 @@ async def get_asset_tree(
 @router.get("/assets/users-for-owner")
 async def get_users_for_owner(
     keyword: str | None = Query(None, description="搜索用户名或姓名"),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
 ):
     """获取用户列表用于负责人选择，无需认证"""
@@ -546,7 +546,7 @@ async def get_users_for_owner(
 
     query = select(User.id, User.username, User.full_name, User.is_active).where(
         User.is_active,
-        User.feishu_open_id is not None,
+        User.feishu_open_id.isnot(None),
     )
 
     if keyword:

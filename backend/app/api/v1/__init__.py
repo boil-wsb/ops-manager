@@ -10,6 +10,7 @@ from app.api.v1 import (
     assets,
     audit_logs,
     auth,
+    crm_sync,
     dashboard,
     departments,
     feishu_interactions,

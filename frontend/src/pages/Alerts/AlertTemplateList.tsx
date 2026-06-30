@@ -224,14 +224,27 @@ const AlertTemplateList = () => {
             {previewData.template.subjectTemplate && (
               <div style={{ marginBottom: 16 }}>
                 <p>
-                  <strong>主题渲染结果：</strong>
+                  <strong>主题模板：</strong>
                 </p>
                 <TextArea
-                  value={previewData.template.subjectTemplate
-                    .replace('{{ .Labels.summary }}', previewData.annotations?.summary || '')
-                    .replace('{{ .Labels.alertname }}', previewData.labels?.alertname || '')}
+                  value={previewData.template.subjectTemplate}
                   readOnly
                   rows={2}
+                  style={{ fontFamily: 'monospace' }}
+                />
+              </div>
+            )}
+
+            {previewData.template.bodyTemplate && (
+              <div style={{ marginBottom: 16 }}>
+                <p>
+                  <strong>内容模板：</strong>
+                </p>
+                <TextArea
+                  value={previewData.template.bodyTemplate}
+                  readOnly
+                  rows={10}
+                  style={{ fontFamily: 'monospace' }}
                 />
               </div>
             )}
@@ -245,6 +258,7 @@ const AlertTemplateList = () => {
                   value={JSON.stringify(previewData.template.cardConfig, null, 2)}
                   readOnly
                   rows={10}
+                  style={{ fontFamily: 'monospace' }}
                 />
               </div>
             )}

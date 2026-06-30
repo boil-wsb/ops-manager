@@ -135,6 +135,11 @@ class Settings(BaseSettings):
     auth_excluded_paths: str = Field(default="", alias="AUTH_EXCLUDED_PATHS")
     auth_trusted_networks: str = Field(default="", alias="AUTH_TRUSTED_NETWORKS")
 
+    # Alert Aggregation Configuration
+    alert_aggregation_window_seconds: int = Field(
+        default=300, alias="ALERT_AGGREGATION_WINDOW_SECONDS"
+    )
+
     # Default Admin Configuration
     default_admin_username: str = Field(default="admin", alias="DEFAULT_ADMIN_USERNAME")
     default_admin_password: str = Field(default="admin123", alias="DEFAULT_ADMIN_PASSWORD")
@@ -153,6 +158,10 @@ class Settings(BaseSettings):
     )
     pcinfo_update_server_host: str = Field(default="localhost", alias="PCINFO_UPDATE_SERVER_HOST")
     pcinfo_update_server_port: int = Field(default=8080, alias="PCINFO_UPDATE_SERVER_PORT")
+
+    # CRM Sync Configuration
+    crm_sync_url: str = Field(default="http://192.168.23.36:9091", alias="CRM_SYNC_URL")
+    crm_sync_timeout: int = Field(default=30, alias="CRM_SYNC_TIMEOUT")
 
     @property
     def cors_origins(self) -> list[str]:

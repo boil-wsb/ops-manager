@@ -12,6 +12,7 @@ from app.api.v1 import (
     assets,
     audit_logs,
     auth,
+    crm_sync,
     dashboard,
     departments,
     feishu_interactions,
@@ -65,3 +66,4 @@ api_router.include_router(system_configs.router, prefix="/v1", tags=["系统配�
 api_router.include_router(it_reporter.router, prefix="/v1", tags=["IT巡检报告"])
 api_router.include_router(health_check.router, prefix="/v1", tags=["每日健康巡检"])
 api_router.include_router(open_id.router, prefix="/v1", tags=["Open ID 查询"])
+api_router.include_router(crm_sync.router, prefix="/v1", tags=["CRM 同步"])

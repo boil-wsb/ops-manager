@@ -2,12 +2,42 @@
 Feishu (Lark) notification service using lark_oapi SDK.
 """
 
+import time
 from typing import Any
 
 from app.config import settings
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
+
+_FEISHU_MAX_RETRIES = 3
+_FEISHU_RETRY_BASE_DELAY = 1.0
+_FEISHU_RETRYABLE_ERROR_CODES = {99991400, 99991401, 99991663, 99991668, 99991661}
+
+
+def _retry_api_call(func, *args, max_retries=_FEISHU_MAX_RETRIES, **kwargs):
+    last_exc = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            return func(*args, **kwargs)
+        except Exception as exc:
+            last_exc = exc
+            err_msg = str(exc).lower()
+            is_retryable = any(
+                kw in err_msg
+                for kw in ("timeout", "connection", "network", "502", "503", "504", "temporary")
+            )
+            if attempt < max_retries and is_retryable:
+                delay = _FEISHU_RETRY_BASE_DELAY * (2 ** (attempt - 1))
+                logger.warning(
+                    f"飞书API调用失败(第{attempt}次)，{delay:.1f}s后重试: {str(exc)[:200]}",
+                    extra={"action": "feishu.retry"},
+                )
+                time.sleep(delay)
+            else:
+                break
+    if last_exc:
+        raise last_exc
 
 
 class FeishuNotificationService:
@@ -72,7 +102,10 @@ class FeishuNotificationService:
                 .build()
             )
 
-            response = self._get_client().im.v1.message.create(request)
+            def _do_send():
+                return self._get_client().im.v1.message.create(request)
+
+            response = _retry_api_call(_do_send)
 
             if response.success():
                 message_id = response.data.message_id if response.data else None
@@ -144,7 +177,10 @@ class FeishuNotificationService:
                 .build()
             )
 
-            response = self._get_client().im.v1.message.create(request)
+            def _do_send_text():
+                return self._get_client().im.v1.message.create(request)
+
+            response = _retry_api_call(_do_send_text)
 
             if response.success():
                 logger.info(
@@ -301,7 +337,10 @@ class FeishuNotificationService:
                 .build()
             )
 
-            response = self._get_client().im.v1.message.patch(request)
+            def _do_patch():
+                return self._get_client().im.v1.message.patch(request)
+
+            response = _retry_api_call(_do_patch)
 
             if response.success():
                 logger.info(
@@ -322,6 +361,107 @@ class FeishuNotificationService:
                 extra={"action": "feishu.notify", "open_message_id": open_message_id},
             )
             return {"success": False, "error": str(exc)}
+
+    def build_card_from_markdown(
+        self,
+        title: str,
+        markdown_content: str,
+        severity: str = "info",
+        status: str = "firing",
+        with_actions: bool = True,
+        alertname: str = "",
+        instance: str = "",
+    ) -> dict[str, Any]:
+        """Build Feishu interactive card from markdown content.
+
+        Args:
+            title: Card header title
+            markdown_content: Markdown content for the card body
+            severity: Alert severity for header color
+            status: Alert status (firing/resolved)
+            with_actions: Whether to include action buttons
+            alertname: Alert name for action callbacks
+            instance: Instance identifier for action callbacks
+
+        Returns:
+            Card content dict
+        """
+        if status == "resolved":
+            header_template = "green"
+        elif severity == "critical":
+            header_template = "red"
+        elif severity == "warning":
+            header_template = "orange"
+        else:
+            header_template = "blue"
+
+        elements = [
+            {
+                "tag": "div",
+                "text": {"tag": "lark_md", "content": markdown_content},
+            },
+        ]
+
+        if with_actions and status == "firing" and alertname and instance:
+            action_id = f"{alertname}_{instance}".replace(".", "_").replace(":", "_")
+            elements.append({"tag": "hr"})
+            elements.append(
+                {
+                    "tag": "column_set",
+                    "flex_mode": "center",
+                    "columns": [
+                        {
+                            "tag": "column",
+                            "width": "stretch",
+                            "elements": [
+                                {
+                                    "tag": "button",
+                                    "text": {"tag": "plain_text", "content": "转交 IT 处理"},
+                                    "type": "default",
+                                    "width": "fill",
+                                    "name": "transfer_it",
+                                    "behaviors": [
+                                        {
+                                            "type": "callback",
+                                            "value": {"action": f"transfer_it_{action_id}"},
+                                        }
+                                    ],
+                                }
+                            ],
+                        },
+                        {
+                            "tag": "column",
+                            "width": "stretch",
+                            "elements": [
+                                {
+                                    "tag": "button",
+                                    "text": {"tag": "plain_text", "content": "知道了，我来处理"},
+                                    "type": "primary",
+                                    "width": "fill",
+                                    "name": "acknowledge",
+                                    "behaviors": [
+                                        {
+                                            "type": "callback",
+                                            "value": {"action": f"acknowledge_{action_id}"},
+                                        }
+                                    ],
+                                }
+                            ],
+                        },
+                    ],
+                }
+            )
+
+        card = {
+            "schema": "2.0",
+            "header": {
+                "title": {"tag": "plain_text", "content": title},
+                "template": header_template,
+            },
+            "body": {"elements": elements},
+        }
+
+        return card
 
     def build_resolved_card(
         self,
