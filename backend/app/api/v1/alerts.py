@@ -114,16 +114,12 @@ def parse_alertmanager_datetime(dt_value: datetime | str | None) -> datetime | N
 async def process_alert(
     db: AsyncSession,
     alert_data: dict[str, Any],
-    external_url: str = "",
-    all_alerts: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Process a single alert from Alertmanager webhook.
 
     Args:
         db: Database session
         alert_data: Single alert data from Alertmanager payload
-        external_url: ExternalURL from Alertmanager payload
-        all_alerts: Full alerts list from Alertmanager payload
 
     Returns:
         Processing result with suppressed flag and history ID
@@ -136,6 +132,7 @@ async def process_alert(
     starts_at = parse_alertmanager_datetime(alert_data.get("startsAt"))
     ends_at = parse_alertmanager_datetime(alert_data.get("endsAt"))
 
+    # Map Alertmanager status to our status
     if status_str == "resolved":
         alert_status = AlertHistoryStatus.RESOLVED
     else:
@@ -143,6 +140,40 @@ async def process_alert(
 
     instance = labels.get("instance", "")
 
+    # When resolved, batch-update all non-resolved records with same alertname+instance
+    if status_str == "resolved" and alertname and instance:
+        try:
+            pending_query = select(AlertHistory).where(
+                and_(
+                    AlertHistory.alertname == alertname,
+                    AlertHistory.labels.op("->>")("instance") == instance,
+                    AlertHistory.status != AlertHistoryStatus.RESOLVED.value,
+                )
+            )
+            pending_result = await db.execute(pending_query)
+            pending_alerts = pending_result.scalars().all()
+            if pending_alerts:
+                now = now_shanghai()
+                for pending in pending_alerts:
+                    pending.status = AlertHistoryStatus.RESOLVED.value
+                    pending.ends_at = now
+                await db.commit()
+                logger.info(
+                    f"Batch resolved {len(pending_alerts)} pending alerts for alertname={alertname}, instance={instance}",
+                    extra={
+                        "action": "alert.resolve",
+                        "alertname": alertname,
+                        "instance": instance,
+                        "resolved_count": len(pending_alerts),
+                    },
+                )
+        except Exception as exc:
+            logger.warning(
+                f"Failed to batch resolve pending alerts: {exc}",
+                extra={"action": "alert.resolve", "error": str(exc)},
+            )
+
+    # Check if alert should be suppressed
     try:
         is_suppressed, silence_id = await alert_inhibition_service.check_alert_inhibition(
             db=db,
@@ -166,6 +197,7 @@ async def process_alert(
     if is_suppressed:
         alert_status = AlertHistoryStatus.SUPPRESSED
 
+    # Create or update alert history record
     try:
         logger.info(
             f"Processing history record: alertname={alertname}, status={alert_status.value}, severity={severity}",
@@ -177,6 +209,7 @@ async def process_alert(
             },
         )
 
+        # For firing alerts, check if a matching record already exists (same alertname + instance + starts_at)
         existing_record = None
         if alert_status == AlertHistoryStatus.FIRING and instance:
             existing_query = (
@@ -196,14 +229,13 @@ async def process_alert(
             existing_record = existing_result.scalar_one_or_none()
 
         if existing_record:
+            # Update existing record instead of creating a duplicate
             existing_record.status = alert_status.value
             existing_record.severity = severity
             existing_record.labels = labels
             existing_record.annotations = annotations
             existing_record.is_suppressed = is_suppressed
             existing_record.silence_id = silence_id
-            if ends_at:
-                existing_record.ends_at = ends_at
             await db.commit()
             await db.refresh(existing_record)
             history = existing_record
@@ -237,35 +269,28 @@ async def process_alert(
         )
         raise
 
-    alerts_list = all_alerts if all_alerts is not None else [alert_data]
-
-    starts_at_str = starts_at.isoformat() if starts_at else now_shanghai().isoformat()
-    ends_at_str = ends_at.isoformat() if ends_at else ""
-
+    # Prepare alert data for notification
     alert_notification_data = {
         "alertname": alertname,
         "status": status_str,
         "severity": severity,
-        "instance": instance,
+        "instance": labels.get("instance", ""),
         "description": annotations.get("description", ""),
-        "starts_at": starts_at_str,
-        "ends_at": ends_at_str,
+        "starts_at": starts_at.isoformat() if starts_at else now_shanghai().isoformat(),
         "labels": labels,
         "annotations": annotations,
         "is_suppressed": is_suppressed,
         "silence_id": silence_id,
         "history_id": history.id,
-        "alerts": alerts_list,
-        "externalURL": external_url or labels.get("externalURL", annotations.get("externalURL", "")),
-        "generatorURL": alert_data.get("generatorURL", labels.get("generatorURL", "")),
     }
 
-    is_aggregated = False
-
+    # Send notification asynchronously if not suppressed
     if not is_suppressed:
+        # Aggregation check: skip notification if same alertname+instance
+        # was already notified within the aggregation window
         aggregation_window = settings.alert_aggregation_window_seconds
-        # resolved告警不参与聚合检查，必须发送通知以更新飞书卡片状态
-        if aggregation_window > 0 and instance and status_str != "resolved":
+        is_aggregated = False
+        if aggregation_window > 0 and instance:
             window_start = now_shanghai() - timedelta(seconds=aggregation_window)
             agg_query = (
                 select(func.count(AlertHistory.id))
@@ -314,39 +339,6 @@ async def process_alert(
             f"Alert suppressed by silence rule: {alertname}, silence_id={silence_id}",
             extra={"action": "alert.receive", "alertname": alertname, "silence_id": silence_id},
         )
-
-    if status_str == "resolved" and alertname and instance:
-        try:
-            pending_query = select(AlertHistory).where(
-                and_(
-                    AlertHistory.alertname == alertname,
-                    AlertHistory.labels.op("->>")("instance") == instance,
-                    AlertHistory.status != AlertHistoryStatus.RESOLVED.value,
-                    AlertHistory.id != history.id,
-                )
-            )
-            pending_result = await db.execute(pending_query)
-            pending_alerts = pending_result.scalars().all()
-            if pending_alerts:
-                now = now_shanghai()
-                for pending in pending_alerts:
-                    pending.status = AlertHistoryStatus.RESOLVED.value
-                    pending.ends_at = now
-                await db.commit()
-                logger.info(
-                    f"Batch resolved {len(pending_alerts)} pending alerts for alertname={alertname}, instance={instance}",
-                    extra={
-                        "action": "alert.resolve",
-                        "alertname": alertname,
-                        "instance": instance,
-                        "resolved_count": len(pending_alerts),
-                    },
-                )
-        except Exception as exc:
-            logger.warning(
-                f"Failed to batch resolve pending alerts: {exc}",
-                extra={"action": "alert.resolve", "error": str(exc)},
-            )
 
     return {
         "history_id": history.id,
@@ -399,18 +391,10 @@ async def receive_alertmanager_webhook(
         },
     )
 
-    external_url = payload.externalURL or ""
-    alerts_raw = [a.model_dump() for a in payload.alerts]
-
     results = []
-    for alert_dict in alerts_raw:
+    for alert in payload.alerts:
         try:
-            result = await process_alert(
-                db,
-                alert_dict,
-                external_url=external_url,
-                all_alerts=alerts_raw,
-            )
+            result = await process_alert(db, alert.model_dump())
             results.append(result)
         except Exception as exc:
             import traceback
@@ -424,7 +408,7 @@ async def receive_alertmanager_webhook(
                 {
                     "error": str(exc),
                     "error_detail": error_trace,
-                    "alert": alert_dict,
+                    "alert": alert.model_dump(),
                 }
             )
 
