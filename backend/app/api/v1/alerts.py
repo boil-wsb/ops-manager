@@ -209,8 +209,11 @@ async def process_alert(
             },
         )
 
-        # For firing alerts, check if a matching record already exists (same alertname + instance + starts_at)
+        # For firing alerts, check if a matching record already exists
+        # (same alertname + instance + starts_at), regardless of current status.
+        # This prevents duplicate records when alerts flap (firing→resolved→firing).
         existing_record = None
+        already_notified = False
         if alert_status == AlertHistoryStatus.FIRING and instance:
             existing_query = (
                 select(AlertHistory)
@@ -219,7 +222,6 @@ async def process_alert(
                         AlertHistory.alertname == alertname,
                         AlertHistory.labels.op("->>")("instance") == instance,
                         AlertHistory.starts_at == starts_at,
-                        AlertHistory.status != AlertHistoryStatus.RESOLVED.value,
                     )
                 )
                 .order_by(AlertHistory.id.desc())
@@ -227,6 +229,10 @@ async def process_alert(
             )
             existing_result = await db.execute(existing_query)
             existing_record = existing_result.scalar_one_or_none()
+            # If the existing record was already notified, skip re-notification
+            # to prevent duplicate cards during alert flapping.
+            if existing_record and existing_record.notification_sent:
+                already_notified = True
 
         if existing_record:
             # Update existing record instead of creating a duplicate
@@ -236,12 +242,14 @@ async def process_alert(
             existing_record.annotations = annotations
             existing_record.is_suppressed = is_suppressed
             existing_record.silence_id = silence_id
+            # Clear ends_at when reverting from resolved back to firing
+            existing_record.ends_at = None
             await db.commit()
             await db.refresh(existing_record)
             history = existing_record
             logger.info(
-                f"Updated existing history record: id={history.id}",
-                extra={"action": "alert.receive", "history_id": history.id},
+                f"Updated existing history record: id={history.id}, already_notified={already_notified}",
+                extra={"action": "alert.receive", "history_id": history.id, "already_notified": already_notified},
             )
         else:
             history = await crud_alert_history.create_from_alertmanager(
@@ -286,54 +294,74 @@ async def process_alert(
 
     # Send notification asynchronously if not suppressed
     if not is_suppressed:
-        # Aggregation check: skip notification if same alertname+instance
-        # was already notified within the aggregation window
-        aggregation_window = settings.alert_aggregation_window_seconds
-        is_aggregated = False
-        if aggregation_window > 0 and instance:
-            window_start = now_shanghai() - timedelta(seconds=aggregation_window)
-            agg_query = (
-                select(func.count(AlertHistory.id))
-                .where(
-                    and_(
-                        AlertHistory.alertname == alertname,
-                        AlertHistory.labels.op("->>")("instance") == instance,
-                        AlertHistory.notification_sent.is_(True),
-                        AlertHistory.status != AlertHistoryStatus.RESOLVED.value,
-                        AlertHistory.id != history.id,
-                        AlertHistory.created_at >= window_start,
+        # Skip notification if this alert instance was already notified
+        # (prevents duplicate cards during alert flapping firing→resolved→firing)
+        if already_notified:
+            logger.info(
+                f"Alert notification skipped (already notified for this instance): "
+                f"{alertname}, instance={instance}, history_id={history.id}",
+                extra={
+                    "action": "alert.aggregate",
+                    "alertname": alertname,
+                    "instance": instance,
+                    "history_id": history.id,
+                    "reason": "already_notified",
+                },
+            )
+            is_aggregated = True
+        else:
+            # Aggregation check: skip notification if same alertname+instance
+            # was already notified within the aggregation window.
+            # Note: status != RESOLVED is kept here — resolved records should NOT
+            # suppress a genuinely new alert (different starts_at) that fires
+            # within the window. The already_notified check above handles the
+            # flap case (same starts_at) separately.
+            aggregation_window = settings.alert_aggregation_window_seconds
+            is_aggregated = False
+            if aggregation_window > 0 and instance:
+                window_start = now_shanghai() - timedelta(seconds=aggregation_window)
+                agg_query = (
+                    select(func.count(AlertHistory.id))
+                    .where(
+                        and_(
+                            AlertHistory.alertname == alertname,
+                            AlertHistory.labels.op("->>")("instance") == instance,
+                            AlertHistory.notification_sent.is_(True),
+                            AlertHistory.status != AlertHistoryStatus.RESOLVED.value,
+                            AlertHistory.id != history.id,
+                            AlertHistory.created_at >= window_start,
+                        )
                     )
                 )
-            )
-            agg_result = await db.execute(agg_query)
-            recent_count = agg_result.scalar() or 0
-            if recent_count > 0:
-                is_aggregated = True
-                logger.info(
-                    f"Alert aggregated (skipped notification): "
-                    f"{alertname}, instance={instance}, "
-                    f"recent_count={recent_count}, window={aggregation_window}s",
-                    extra={
-                        "action": "alert.aggregate",
-                        "alertname": alertname,
-                        "instance": instance,
-                        "recent_count": recent_count,
-                        "window_seconds": aggregation_window,
-                    },
-                )
+                agg_result = await db.execute(agg_query)
+                recent_count = agg_result.scalar() or 0
+                if recent_count > 0:
+                    is_aggregated = True
+                    logger.info(
+                        f"Alert aggregated (skipped notification): "
+                        f"{alertname}, instance={instance}, "
+                        f"recent_count={recent_count}, window={aggregation_window}s",
+                        extra={
+                            "action": "alert.aggregate",
+                            "alertname": alertname,
+                            "instance": instance,
+                            "recent_count": recent_count,
+                            "window_seconds": aggregation_window,
+                        },
+                    )
 
-        if not is_aggregated:
-            await send_alert_notification(alert_notification_data, db)
-            logger.info(
-                f"Alert notification sent: {alertname}, history_id={history.id}",
-                extra={"action": "alert.receive", "alertname": alertname, "history_id": history.id},
-            )
-        else:
-            logger.info(
-                f"Alert notification skipped due to aggregation: "
-                f"{alertname}, history_id={history.id}",
-                extra={"action": "alert.aggregate", "alertname": alertname, "history_id": history.id},
-            )
+            if not is_aggregated:
+                await send_alert_notification(alert_notification_data, db)
+                logger.info(
+                    f"Alert notification sent: {alertname}, history_id={history.id}",
+                    extra={"action": "alert.receive", "alertname": alertname, "history_id": history.id},
+                )
+            else:
+                logger.info(
+                    f"Alert notification skipped due to aggregation: "
+                    f"{alertname}, history_id={history.id}",
+                    extra={"action": "alert.aggregate", "alertname": alertname, "history_id": history.id},
+                )
     else:
         logger.info(
             f"Alert suppressed by silence rule: {alertname}, silence_id={silence_id}",
