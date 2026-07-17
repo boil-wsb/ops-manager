@@ -3,7 +3,7 @@ Alert template service.
 """
 
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from textwrap import dedent
 from typing import Any
 
@@ -110,11 +110,11 @@ class AlertTemplateService:
         ends_at_str = ""
         if starts_at:
             if starts_at.tzinfo is None:
-                starts_at = starts_at.replace(tzinfo=timezone.utc)
+                starts_at = starts_at.replace(tzinfo=UTC)
             starts_at_str = starts_at.astimezone(cst).strftime("%Y-%m-%d %H:%M:%S")
         if ends_at:
             if ends_at.tzinfo is None:
-                ends_at = ends_at.replace(tzinfo=timezone.utc)
+                ends_at = ends_at.replace(tzinfo=UTC)
             ends_at_str = ends_at.astimezone(cst).strftime("%Y-%m-%d %H:%M:%S")
 
         return {
@@ -256,7 +256,7 @@ class AlertTemplateService:
                     cst = timezone(timedelta(hours=8))
                     if isinstance(time_val, datetime):
                         if time_val.tzinfo is None:
-                            time_val = time_val.replace(tzinfo=timezone.utc)
+                            time_val = time_val.replace(tzinfo=UTC)
                         return time_val.astimezone(cst).strftime("%Y-%m-%d %H:%M:%S")
                     if time_val and isinstance(time_val, str):
                         time_str = time_val.strip()
@@ -274,7 +274,7 @@ class AlertTemplateService:
                                 continue
                         if dt:
                             if dt.tzinfo is None:
-                                dt = dt.replace(tzinfo=timezone.utc)
+                                dt = dt.replace(tzinfo=UTC)
                             return dt.astimezone(cst).strftime("%Y-%m-%d %H:%M:%S")
                         return time_str
                     return str(time_val) if time_val else ""

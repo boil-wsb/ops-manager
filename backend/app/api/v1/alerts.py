@@ -2,6 +2,7 @@
 Alert management API routes - Alertmanager Webhook.
 """
 
+import json
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -11,13 +12,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
 from app.config import settings
+from app.core.audit.sanitizer import sanitize_sensitive_data
 from app.core.logging import get_logger
 from app.core.tz import now_shanghai
 from app.crud.crud_alert import crud_alert_history, crud_alert_silence, crud_alert_template
 from app.models.alert import AlertHistory, AlertHistoryStatus
 from app.schemas.alert import AlertmanagerWebhookPayload
 from app.services.alerts.alert_inhibition import alert_inhibition_service
-from app.services.alerts.notification_task import send_alert_notification
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -140,14 +141,25 @@ async def process_alert(
 
     instance = labels.get("instance", "")
 
-    # When resolved, batch-update all non-resolved records with same alertname+instance
+    # When resolved, batch-update all firing records with same alertname+instance+starts_at
+    # I-01 修复:
+    # 1. 加 starts_at 过滤，仅影响当前告警周期，避免误伤上一周期已 resolved 的记录
+    # 2. 排除 SUPPRESSED 状态（被抑制的告警不应被 resolved webhook 批量改为 resolved，
+    #    抑制规则由 alert_inhibition_service 管理）
+    # 3. 显式过滤 status='firing'，避免误改已 resolved 的历史记录（原条件 status != RESOLVED
+    #    会命中 SUPPRESSED，且语义模糊）
+    # ND-2 修复（第二轮审查）：原 starts_at=None 时整个批量 resolve 块被跳过，
+    # 旧 firing 记录状态保持 firing。Alertmanager 协议保证总会带 startsAt，
+    # 但防御性处理：starts_at 为 None 时 fallback 使用当前时间，避免漏处理。
     if status_str == "resolved" and alertname and instance:
+        effective_starts_at = starts_at if starts_at is not None else now_shanghai()
         try:
             pending_query = select(AlertHistory).where(
                 and_(
                     AlertHistory.alertname == alertname,
                     AlertHistory.labels.op("->>")("instance") == instance,
-                    AlertHistory.status != AlertHistoryStatus.RESOLVED.value,
+                    AlertHistory.starts_at == effective_starts_at,
+                    AlertHistory.status == AlertHistoryStatus.FIRING.value,
                 )
             )
             pending_result = await db.execute(pending_query)
@@ -159,11 +171,13 @@ async def process_alert(
                     pending.ends_at = now
                 await db.commit()
                 logger.info(
-                    f"Batch resolved {len(pending_alerts)} pending alerts for alertname={alertname}, instance={instance}",
+                    f"Batch resolved {len(pending_alerts)} firing alerts for "
+                    f"alertname={alertname}, instance={instance}, starts_at={effective_starts_at}",
                     extra={
                         "action": "alert.resolve",
                         "alertname": alertname,
                         "instance": instance,
+                        "starts_at": effective_starts_at.isoformat() if effective_starts_at else None,
                         "resolved_count": len(pending_alerts),
                     },
                 )
@@ -212,6 +226,8 @@ async def process_alert(
         # For firing alerts, check if a matching record already exists
         # (same alertname + instance + starts_at), regardless of current status.
         # This prevents duplicate records when alerts flap (firing→resolved→firing).
+        # C-04 修复: 加 with_for_update() 行锁，减少并发 UPDATE 场景的冲突
+        # 终极方案: 部分唯一索引 ix_alert_history_firing_unique 兜底并发 INSERT
         existing_record = None
         already_notified = False
         if alert_status == AlertHistoryStatus.FIRING and instance:
@@ -226,6 +242,7 @@ async def process_alert(
                 )
                 .order_by(AlertHistory.id.desc())
                 .limit(1)
+                .with_for_update()  # C-04: 行锁，锁定已存在的记录
             )
             existing_result = await db.execute(existing_query)
             existing_record = existing_result.scalar_one_or_none()
@@ -309,6 +326,7 @@ async def process_alert(
                 },
             )
             is_aggregated = True
+            notification_ctx = None
         else:
             # Aggregation check: skip notification if same alertname+instance
             # was already notified within the aggregation window.
@@ -351,22 +369,36 @@ async def process_alert(
                     )
 
             if not is_aggregated:
-                await send_alert_notification(alert_notification_data, db)
-                logger.info(
-                    f"Alert notification sent: {alertname}, history_id={history.id}",
-                    extra={"action": "alert.receive", "alertname": alertname, "history_id": history.id},
-                )
+                # 三阶段分离: 阶段 1 (prepare) 在 DB session 内完成所有 DB 操作
+                # 阶段 2 (execute) 在 db_operation_with_retry 外执行飞书调用
+                # 阶段 3 (save) 使用新 session 保存 message_id
+                from app.services.alerts.notification_task import prepare_alert_notification
+
+                notification_ctx = await prepare_alert_notification(db, alert_notification_data)
+                if notification_ctx:
+                    logger.info(
+                        f"Alert notification prepared: {alertname}, history_id={history.id}",
+                        extra={"action": "alert.receive", "alertname": alertname, "history_id": history.id},
+                    )
+                else:
+                    logger.info(
+                        f"Alert notification skipped (no recipients or template): "
+                        f"{alertname}, history_id={history.id}",
+                        extra={"action": "alert.receive", "alertname": alertname, "history_id": history.id},
+                    )
             else:
                 logger.info(
                     f"Alert notification skipped due to aggregation: "
                     f"{alertname}, history_id={history.id}",
                     extra={"action": "alert.aggregate", "alertname": alertname, "history_id": history.id},
                 )
+                notification_ctx = None
     else:
         logger.info(
             f"Alert suppressed by silence rule: {alertname}, silence_id={silence_id}",
             extra={"action": "alert.receive", "alertname": alertname, "silence_id": silence_id},
         )
+        notification_ctx = None
 
     return {
         "history_id": history.id,
@@ -375,6 +407,8 @@ async def process_alert(
         "is_suppressed": is_suppressed,
         "silence_id": silence_id,
         "is_aggregated": is_aggregated if not is_suppressed else False,
+        # 三阶段分离: 返回 notification_ctx 供调用方执行飞书调用
+        "notification_ctx": notification_ctx,
     }
 
 
@@ -404,10 +438,24 @@ async def receive_alertmanager_webhook(
     This endpoint handles the Alertmanager v4 webhook format and processes
     alerts through the notification pipeline.
     """
-    logger.info(
-        f"Full webhook payload: {payload.model_dump_json(indent=2)}",
-        extra={"action": "alert.receive"},
-    )
+    # I-04 修复: webhook payload 脱敏 + 截断到 500 字符
+    # 1. 用 sanitize_sensitive_data 递归脱敏 labels/annotations 中的敏感字段
+    #    (password/token/api_key/authorization 等 → 前后2字符+***)
+    # 2. 截断到 500 字符，避免大 payload 占用日志空间
+    try:
+        sanitized_payload = sanitize_sensitive_data(payload.model_dump())
+        payload_json = json.dumps(sanitized_payload, ensure_ascii=False, default=str)
+        if len(payload_json) > 500:
+            payload_json = payload_json[:500] + f"...(truncated, total={len(payload_json)})"
+        logger.info(
+            f"Webhook payload (sanitized): {payload_json}",
+            extra={"action": "alert.receive"},
+        )
+    except Exception as exc:
+        logger.warning(
+            f"Failed to sanitize webhook payload: {exc}",
+            extra={"action": "alert.receive", "error": str(exc)},
+        )
     logger.info(
         f"Received Alertmanager webhook: receiver={payload.receiver}, "
         f"status={payload.status}, alerts_count={len(payload.alerts)}",
@@ -422,7 +470,71 @@ async def receive_alertmanager_webhook(
     results = []
     for alert in payload.alerts:
         try:
-            result = await process_alert(db, alert.model_dump())
+            # 每个 alert 使用独立 DB session，避免单个 alert 失败导致
+            # session 进 rollback 状态后污染后续 alert（PendingRollbackError）
+            from app.db.session import db_operation_with_retry
+
+            async def _process_op(session, alert_data=alert.model_dump()):
+                return await process_alert(session, alert_data)
+
+            result = await db_operation_with_retry(_process_op, max_retries=2, retry_delay=1.0)
+
+            # 三阶段分离: 阶段 2 (execute) - 飞书调用（不持有 DB session）
+            # 在 db_operation_with_retry 外执行，DB session 已释放
+            notification_ctx = result.pop("notification_ctx", None)
+            if notification_ctx:
+                from app.services.alerts.notification_task import (
+                    execute_feishu_notification,
+                    save_notification_result,
+                )
+
+                feishu_result = await execute_feishu_notification(notification_ctx)
+
+                # 阶段 3 (save) - 保存 message_id（新 DB session）
+                # C-03 修复: 移除 contextlib.suppress 静默吞异常，
+                # 改为 try/except + save_failed 标志，失败时记录 ERROR 日志
+                # 并在 result 上设置 save_failed=True 供调用方感知
+                if feishu_result.needs_save:
+                    # B023 修复：通过默认参数绑定循环变量，避免闭包延迟绑定陷阱
+                    async def _save_op(session, _ctx=notification_ctx, _result=feishu_result):
+                        await save_notification_result(
+                            session, _ctx, _result
+                        )
+
+                    try:
+                        await db_operation_with_retry(
+                            _save_op, max_retries=1, retry_delay=1.0
+                        )
+                    except Exception as save_exc:
+                        import traceback as _tb
+
+                        logger.error(
+                            f"Failed to save notification result: "
+                            f"alertname={result.get('alertname')}, "
+                            f"history_id={result.get('history_id')}, "
+                            f"error={save_exc}\n{_tb.format_exc()}",
+                            extra={
+                                "action": "alert.receive",
+                                "alertname": result.get("alertname"),
+                                "history_id": result.get("history_id"),
+                                "save_failed": True,
+                                "error": str(save_exc),
+                            },
+                        )
+                        result["save_failed"] = True
+
+                logger.info(
+                    f"Alert notification sent: {result.get('alertname')}, "
+                    f"history_id={result.get('history_id')}, "
+                    f"save_failed={result.get('save_failed', False)}",
+                    extra={
+                        "action": "alert.receive",
+                        "alertname": result.get("alertname"),
+                        "history_id": result.get("history_id"),
+                        "save_failed": result.get("save_failed", False),
+                    },
+                )
+
             results.append(result)
         except Exception as exc:
             import traceback

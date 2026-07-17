@@ -1,0 +1,10 @@
+[run]
+concurrency = thread
+sigterm = true
+
+[report]
+exclude_lines =
+    pragma: no cover
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:

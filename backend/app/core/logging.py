@@ -162,6 +162,20 @@ def configure_logging() -> None:
     logging.getLogger("fastapi").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
+    # 让 uvicorn 日志传播到 root logger，确保文件 handler 能捕获
+    # 根因：uvicorn 默认 LOGGING_CONFIG 对 "uvicorn" 和 "uvicorn.access" 设置
+    # propagate=False 并挂载自己的 stderr/stdout handler，导致
+    # "Exception in ASGI application"（由 Starlette ServerErrorMiddleware 通过
+    # uvicorn.error logger 输出）只打印到控制台，不写入日志文件
+    for uv_name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
+        uv_logger = logging.getLogger(uv_name)
+        uv_logger.handlers = []  # 移除 uvicorn 自带 handler，统一使用 root 的 file+console
+        uv_logger.propagate = True
+        # 显式设置 level：uvicorn 主 logger 和 uvicorn.error 用 INFO（确保启动日志写入文件），
+        # uvicorn.access 保持上面的 WARNING（避免大量访问日志）
+        if uv_name in ("uvicorn", "uvicorn.error"):
+            uv_logger.setLevel(logging.INFO)
+
 
 def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(name)

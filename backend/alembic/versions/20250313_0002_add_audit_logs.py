@@ -5,17 +5,18 @@ Revises: 0001_initial
 Create Date: 2025-03-13 00:00:00.000000
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = '0002_add_audit_logs'
 down_revision: str = '0001_initial'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -41,7 +42,7 @@ def upgrade() -> None:
         sa.Column('duration_ms', sa.Integer(), nullable=True),
         sa.PrimaryKeyConstraint('id')
     )
-    
+
     # Create indexes
     op.create_index('ix_audit_logs_id', 'audit_logs', ['id'], unique=False)
     op.create_index('ix_audit_logs_operation_type', 'audit_logs', ['operation_type'], unique=False)
@@ -51,7 +52,7 @@ def upgrade() -> None:
     op.create_index('ix_audit_logs_operation_time', 'audit_logs', ['operation_time'], unique=False)
     op.create_index('ix_audit_logs_request_id', 'audit_logs', ['request_id'], unique=False)
     op.create_index('ix_audit_logs_status', 'audit_logs', ['status'], unique=False)
-    
+
     # Create composite indexes
     op.create_index('idx_audit_logs_module_time', 'audit_logs', ['operation_module', 'operation_time'], unique=False)
     op.create_index('idx_audit_logs_operator_time', 'audit_logs', ['operator_id', 'operation_time'], unique=False)
@@ -74,6 +75,6 @@ def downgrade() -> None:
     op.drop_index('ix_audit_logs_operation_module', table_name='audit_logs')
     op.drop_index('ix_audit_logs_operation_type', table_name='audit_logs')
     op.drop_index('ix_audit_logs_id', table_name='audit_logs')
-    
+
     # Drop table
     op.drop_table('audit_logs')

@@ -15,8 +15,19 @@ export interface DepartmentNode {
   feishuDepartmentId: string;
   memberCount: number;
   isRoot: boolean;
+  leaderId?: number | null;
+  leaderUsername?: string | null;
+  leaderFullName?: string | null;
   children: DepartmentNode[];
   users: DepartmentUser[];
+}
+
+export interface DepartmentLeaderInfo {
+  id: number;
+  name: string;
+  leaderId: number | null;
+  leaderUsername: string | null;
+  leaderFullName: string | null;
 }
 
 export const departmentApi = {
@@ -27,6 +38,11 @@ export const departmentApi = {
 
   syncFromFeishu: async (): Promise<{ message: string; status: string }> => {
     const response = await api.post<{ message: string; status: string }>('/departments/sync');
+    return response.data;
+  },
+
+  setLeader: async (deptId: number, leaderId: number | null): Promise<DepartmentLeaderInfo> => {
+    const response = await api.put<DepartmentLeaderInfo>(`/departments/${deptId}/leader`, { leaderId });
     return response.data;
   },
 };

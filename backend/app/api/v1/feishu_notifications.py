@@ -2,6 +2,7 @@
 Feishu notification API endpoints.
 """
 
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -77,10 +78,26 @@ class FeishuCardUpdateRequest(BaseModel):
     )
 
 
+class FeishuCardUpdateTargetResult(BaseModel):
+    """单个目标的卡片更新结果（1:N 批量更新时使用）."""
+
+    record_id: int
+    message_id: str
+    chat_id: str | None = None
+    matched_user: str | None = None
+    success: bool
+    error: str | None = None
+
+
 class FeishuCardUpdateResponse(BaseModel):
     success: bool
     message_id: str | None = None
     error: str | None = None
+    # 1:N 场景: 按 open_message_id 批量更新时，每个目标的独立结果
+    details: list[FeishuCardUpdateTargetResult] | None = None
+    # 批量更新时的总数与成功数
+    total: int | None = None
+    succeeded: int | None = None
 
 
 async def _get_user_by_identifier(db: AsyncSession, identifier: str) -> User | None:
@@ -116,7 +133,51 @@ async def send_feishu_card_notification(
     - If `user` is provided, matches the user and sends to their feishu_open_id.
     - `open_message_id` is an optional custom identifier for later card updates.
     Records the notification in the database.
+
+    幂等性: 若 `open_message_id` + 目标（chat_id 或 user）已有 success=True 的记录，
+    直接返回已有记录，避免调用方超时回退重发导致重复发送飞书卡片。
+    注意: 同一 open_message_id 发送到多个群/用户是合法的 1:N 通知场景，
+    幂等性检查必须加上目标维度，避免误杀多群通知。
     """
+    # 幂等性检查: open_message_id + 目标 已有成功记录时直接返回，不重复发送
+    # 根因: devops-webhook 超时回退重发会导致同一 (open_message_id, 目标) 的 2 次 POST 请求，
+    # 两次都会发送飞书卡片到同一目标，造成重复通知。
+    # 关键: 必须加上 chat_id/user 维度，否则 pipeline_5010 这种一次通知多群的场景会被误杀。
+    if request.open_message_id:
+        # 目标标识: chat_id 优先，否则用 user（user 字段在 NotificationRecord 里可能是 "chat:xxx" 或用户名）
+        target_user = f"chat:{request.chat_id}" if request.chat_id else request.user
+        idempotency_result = await db.execute(
+            select(NotificationRecord)
+            .where(
+                NotificationRecord.open_message_id == request.open_message_id,
+                NotificationRecord.user == target_user,
+                NotificationRecord.success.is_(True),
+            )
+            .order_by(NotificationRecord.id.desc())
+            .limit(1)
+        )
+        existing_record = idempotency_result.scalars().first()
+        if existing_record:
+            logger.info(
+                f"幂等性检查命中: open_message_id={request.open_message_id} "
+                f"target={target_user} 已有成功记录 id={existing_record.id}, 跳过重复发送",
+                extra={
+                    "action": "feishu.notify",
+                    "open_message_id": request.open_message_id,
+                    "target": target_user,
+                    "existing_id": existing_record.id,
+                },
+            )
+            return FeishuCardSendResponse(
+                success=True,
+                message_id=existing_record.message_id,
+                matched_user=existing_record.matched_user,
+                chat_id=existing_record.chat_id,
+                callback_id=existing_record.callback_id,
+                open_message_id=existing_record.open_message_id,
+                callback_url=existing_record.callback_url,
+            )
+
     if request.chat_id:
         record_create = NotificationRecordCreate(
             user=f"chat:{request.chat_id}",
@@ -135,7 +196,10 @@ async def send_feishu_card_notification(
 
         try:
             feishu_service = get_feishu_service()
-            result = feishu_service.send_message_to_user(
+            # 飞书 SDK 是同步阻塞调用，使用 asyncio.to_thread 避免阻塞事件循环
+            # （历史教训：直调导致 devops-webhook 40s 超时回退重发，消息重复）
+            result = await asyncio.to_thread(
+                feishu_service.send_message_to_user,
                 user_id=request.chat_id,
                 msg_type="interactive",
                 content=request.card_content,
@@ -247,7 +311,9 @@ async def send_feishu_card_notification(
 
     try:
         feishu_service = get_feishu_service()
-        result = feishu_service.send_message_to_user(
+        # 飞书 SDK 是同步阻塞调用，使用 asyncio.to_thread 避免阻塞事件循环
+        result = await asyncio.to_thread(
+            feishu_service.send_message_to_user,
             user_id=user.feishu_open_id,
             msg_type="interactive",
             content=request.card_content,
@@ -338,10 +404,20 @@ async def update_feishu_card(
 
     Validates callback_id matches the original record before updating.
     """
-    result = await db.execute(
-        select(NotificationRecord).where(NotificationRecord.message_id == message_id)
-    )
-    record = result.scalar_one_or_none()
+    try:
+        result = await db.execute(
+            select(NotificationRecord)
+            .where(NotificationRecord.message_id == message_id)
+            .order_by(NotificationRecord.id.desc())
+            .limit(1)
+        )
+        record = result.scalars().first()
+    except Exception as e:
+        logger.error(
+            f"DB query failed for message_id={message_id}: {e}",
+            extra={"action": "feishu.notify", "message_id": message_id, "error": str(e)},
+        )
+        raise HTTPException(status_code=500, detail="Database query failed") from e
 
     if not record:
         raise HTTPException(status_code=404, detail="Notification record not found")
@@ -357,7 +433,9 @@ async def update_feishu_card(
 
     try:
         feishu_service = get_feishu_service()
-        update_result = feishu_service.update_card_message(
+        # 飞书 SDK 是同步阻塞调用，使用 asyncio.to_thread 避免阻塞事件循环
+        update_result = await asyncio.to_thread(
+            feishu_service.update_card_message,
             open_message_id=message_id,
             card_content=card_content,
         )
@@ -367,8 +445,7 @@ async def update_feishu_card(
                 db,
                 record_id=record.id,
                 obj_in=NotificationRecordUpdate(
-                    card_content=request.card_content,
-                    open_message_id=message_id,
+                    card_content=card_content,
                     success=True,
                 ),
             )
@@ -421,90 +498,178 @@ async def update_feishu_card_by_open_message_id(
     request: FeishuCardUpdateRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    """Update a Feishu interactive card by open_message_id.
+    """Update Feishu interactive cards by open_message_id (支持 1:N 批量更新).
 
-    Looks up the notification record by open_message_id, then uses the stored
-    Feishu message_id to update the card.
+    Looks up ALL notification records matching open_message_id (success=True),
+    then updates each card independently via Feishu API. Each target's update
+    is isolated — one failure does not affect others.
+
+    1:N 场景: 同一 open_message_id 可能已发送到多个群/用户（如 pipeline_5010
+    发送到 2 个群），每张卡片有独立的 message_id，必须分别更新。
+
+    Returns:
+        - success=True 仅当所有目标都更新成功
+        - details 字段包含每个目标的独立结果
     """
-    result = await db.execute(
-        select(NotificationRecord).where(NotificationRecord.open_message_id == open_message_id)
-    )
-    record = result.scalar_one_or_none()
-
-    if not record:
-        raise HTTPException(
-            status_code=404, detail="Notification record not found by open_message_id"
-        )
-
-    if not record.message_id:
-        raise HTTPException(
-            status_code=400, detail="No Feishu message_id associated with this record"
-        )
-
-    if request.callback_id and record.callback_id and record.callback_id != request.callback_id:
-        raise HTTPException(status_code=403, detail="callback_id does not match")
-
-    card_content = request.card_content or record.card_content
-    if not card_content:
-        raise HTTPException(
-            status_code=400, detail="No card_content provided and no saved content found"
-        )
-
     try:
-        feishu_service = get_feishu_service()
-        update_result = feishu_service.update_card_message(
-            open_message_id=record.message_id,
-            card_content=card_content,
+        result = await db.execute(
+            select(NotificationRecord)
+            .where(
+                NotificationRecord.open_message_id == open_message_id,
+                NotificationRecord.success.is_(True),
+                NotificationRecord.message_id.isnot(None),
+            )
+            .order_by(NotificationRecord.id.asc())
         )
-
-        if update_result.get("success"):
-            await notification_record.update(
-                db,
-                record_id=record.id,
-                obj_in=NotificationRecordUpdate(
-                    card_content=card_content,
-                    open_message_id=record.message_id,
-                    success=True,
-                ),
-            )
-            return FeishuCardUpdateResponse(
-                success=True,
-                message_id=record.message_id,
-            )
-        else:
-            await notification_record.update(
-                db,
-                record_id=record.id,
-                obj_in=NotificationRecordUpdate(
-                    success=False,
-                    error=update_result.get("error", "Unknown error"),
-                ),
-            )
-            return FeishuCardUpdateResponse(
-                success=False,
-                message_id=record.message_id,
-                error=update_result.get("error", "Unknown error"),
-            )
-    except RuntimeError as e:
-        logger.error(
-            f"Failed to update card by open_message_id: {e}",
-            extra={"action": "feishu.notify", "open_message_id": open_message_id, "error": str(e)},
-        )
-        await notification_record.update(
-            db,
-            record_id=record.id,
-            obj_in=NotificationRecordUpdate(success=False, error=str(e)),
-        )
-        return FeishuCardUpdateResponse(success=False, message_id=record.message_id, error=str(e))
-
+        records = result.scalars().all()
     except Exception as e:
         logger.error(
-            f"Unexpected error updating card by open_message_id: {e}",
+            f"DB query failed for open_message_id={open_message_id}: {e}",
             extra={"action": "feishu.notify", "open_message_id": open_message_id, "error": str(e)},
         )
-        await notification_record.update(
-            db,
-            record_id=record.id,
-            obj_in=NotificationRecordUpdate(success=False, error=str(e)),
+        raise HTTPException(status_code=500, detail="Database query failed") from e
+
+    if not records:
+        raise HTTPException(
+            status_code=404,
+            detail="No successful notification records found by open_message_id",
         )
-        return FeishuCardUpdateResponse(success=False, message_id=record.message_id, error=str(e))
+
+    # 校验 callback_id（所有记录的 callback_id 必须一致）
+    if request.callback_id:
+        for r in records:
+            if r.callback_id and r.callback_id != request.callback_id:
+                raise HTTPException(status_code=403, detail="callback_id does not match")
+
+    feishu_service = get_feishu_service()
+    details: list[FeishuCardUpdateTargetResult] = []
+    succeeded = 0
+    first_message_id: str | None = None
+    first_error: str | None = None
+
+    for record in records:
+        if not record.message_id:
+            details.append(
+                FeishuCardUpdateTargetResult(
+                    record_id=record.id,
+                    message_id="",
+                    chat_id=record.chat_id,
+                    matched_user=record.matched_user,
+                    success=False,
+                    error="No Feishu message_id associated",
+                )
+            )
+            continue
+
+        if first_message_id is None:
+            first_message_id = record.message_id
+
+        # 卡片内容: 请求传入优先，否则用记录保存的
+        card_content = request.card_content or record.card_content
+        if not card_content:
+            details.append(
+                FeishuCardUpdateTargetResult(
+                    record_id=record.id,
+                    message_id=record.message_id,
+                    chat_id=record.chat_id,
+                    matched_user=record.matched_user,
+                    success=False,
+                    error="No card_content available",
+                )
+            )
+            continue
+
+        try:
+            # 飞书 SDK 是同步阻塞调用，使用 asyncio.to_thread 避免阻塞事件循环
+            update_result = await asyncio.to_thread(
+                feishu_service.update_card_message,
+                open_message_id=record.message_id,
+                card_content=card_content,
+            )
+
+            if update_result.get("success"):
+                await notification_record.update(
+                    db,
+                    record_id=record.id,
+                    obj_in=NotificationRecordUpdate(
+                        card_content=card_content,
+                        success=True,
+                    ),
+                )
+                succeeded += 1
+                details.append(
+                    FeishuCardUpdateTargetResult(
+                        record_id=record.id,
+                        message_id=record.message_id,
+                        chat_id=record.chat_id,
+                        matched_user=record.matched_user,
+                        success=True,
+                    )
+                )
+            else:
+                err = update_result.get("error", "Unknown error")
+                if first_error is None:
+                    first_error = err
+                await notification_record.update(
+                    db,
+                    record_id=record.id,
+                    obj_in=NotificationRecordUpdate(success=False, error=err),
+                )
+                details.append(
+                    FeishuCardUpdateTargetResult(
+                        record_id=record.id,
+                        message_id=record.message_id,
+                        chat_id=record.chat_id,
+                        matched_user=record.matched_user,
+                        success=False,
+                        error=err,
+                    )
+                )
+        except Exception as e:
+            logger.error(
+                f"Failed to update card for record id={record.id} "
+                f"(open_message_id={open_message_id}): {e}",
+                extra={
+                    "action": "feishu.notify",
+                    "open_message_id": open_message_id,
+                    "record_id": record.id,
+                    "error": str(e),
+                },
+            )
+            if first_error is None:
+                first_error = str(e)
+            await notification_record.update(
+                db,
+                record_id=record.id,
+                obj_in=NotificationRecordUpdate(success=False, error=str(e)),
+            )
+            details.append(
+                FeishuCardUpdateTargetResult(
+                    record_id=record.id,
+                    message_id=record.message_id,
+                    chat_id=record.chat_id,
+                    matched_user=record.matched_user,
+                    success=False,
+                    error=str(e),
+                )
+            )
+
+    all_success = succeeded == len(records)
+    logger.info(
+        f"批量卡片更新完成 open_message_id={open_message_id}: "
+        f"total={len(records)} succeeded={succeeded}",
+        extra={
+            "action": "feishu.notify",
+            "open_message_id": open_message_id,
+            "total": len(records),
+            "succeeded": succeeded,
+        },
+    )
+    return FeishuCardUpdateResponse(
+        success=all_success,
+        message_id=first_message_id,
+        error=None if all_success else (first_error or "Partial failure"),
+        details=details,
+        total=len(records),
+        succeeded=succeeded,
+    )

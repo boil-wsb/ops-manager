@@ -173,6 +173,20 @@ class CertificateResponse(CertificateBase):
     updated_at: datetime
 
 
+class CertificateListResponse(BaseModel):
+    """Certificate list response schema with pagination metadata.
+
+    I-19 修复：原接口返回 list 全量数据，前端分页；现改为服务端分页
+    （上限 500），返回 {total, items, page, pageSize, totalPages}。
+    """
+
+    total: int
+    items: list[CertificateResponse]
+    page: int
+    pageSize: int
+    totalPages: int
+
+
 class CertificateSyncResponse(BaseModel):
     """Certificate sync response schema."""
 

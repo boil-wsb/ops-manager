@@ -4,7 +4,7 @@ Department model for Feishu organizational structure.
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
@@ -34,6 +34,10 @@ class Department(BaseModel):
     sync_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, comment="最后同步时间"
     )
+    leader_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True, comment="部门负责人"
+    )
 
     # Relationships
     children: Mapped[list["Department"]] = relationship(
@@ -46,6 +50,12 @@ class Department(BaseModel):
     users: Mapped[list["User"]] = relationship(
         "User",
         back_populates="department",
+        foreign_keys="User.department_id",
+        lazy="selectin",
+    )
+    leader: Mapped["User | None"] = relationship(
+        "User",
+        foreign_keys=[leader_id],
         lazy="selectin",
     )
 

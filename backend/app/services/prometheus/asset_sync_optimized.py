@@ -62,9 +62,20 @@ class OptimizedAssetSyncService:
             return self._node_cache.nodes
 
         logger.debug("从Prometheus获取节点...", extra={"action": "asset.sync"})
-        nodes = await self.prometheus_client.get_all_nodes()
+        # 合并 Linux（node_exporter）与 Windows（windows_exporter）节点
+        linux_nodes = await self.prometheus_client.get_all_nodes()
+        windows_nodes = await self.prometheus_client.get_all_windows_nodes()
+        nodes = linux_nodes + windows_nodes
         self._node_cache = NodeCache(nodes=nodes, timestamp=now_shanghai())
-        logger.debug(f"缓存 {len(nodes)} 个节点", extra={"action": "asset.sync"})
+        logger.info(
+            "节点列表获取完成",
+            extra={
+                "action": "asset.sync",
+                "linux_count": len(linux_nodes),
+                "windows_count": len(windows_nodes),
+                "total": len(nodes),
+            },
+        )
         return nodes
 
     async def _get_node_details(self, instance: str, node: dict[str, Any]) -> dict[str, Any]:
@@ -80,7 +91,11 @@ class OptimizedAssetSyncService:
         """
         # 并行获取状态和指标
         status_task = self.prometheus_client.get_node_status(instance)
-        metrics_task = self.prometheus_client.get_node_metrics(instance)
+        # Windows 节点使用 windows_* 系列指标，Linux 节点使用 node_* 系列指标
+        if node.get("is_windows"):
+            metrics_task = self.prometheus_client.get_windows_node_metrics(instance)
+        else:
+            metrics_task = self.prometheus_client.get_node_metrics(instance)
 
         status, metrics = await asyncio.gather(status_task, metrics_task)
 
@@ -234,11 +249,13 @@ class OptimizedAssetSyncService:
             )
 
             # 收集 Prometheus 中所有 instance 的 IP 集合，用于反向比对
+            # Windows 节点 instance 为中文主机名，需优先使用真实 IP
             prometheus_ips = set()
             for node in nodes:
                 instance = node.get("instance", "")
                 if instance:
-                    prometheus_ips.add(self._extract_ip_from_instance(instance))
+                    ip = node.get("ip_address") or self._extract_ip_from_instance(instance)
+                    prometheus_ips.add(ip)
 
             for node in nodes:
                 instance = node.get("instance", "")
@@ -438,7 +455,8 @@ class OptimizedAssetSyncService:
     def _map_prometheus_node_to_asset_data(self, node: dict[str, Any]) -> dict[str, Any]:
         """将 Prometheus 节点数据映射为 Asset 模型字段"""
         instance = node.get("instance", "")
-        ip_address = self._extract_ip_from_instance(instance)
+        # Windows 节点 instance 为中文主机名，优先使用预解析的真实 IP
+        ip_address = node.get("ip_address") or self._extract_ip_from_instance(instance)
         nodename = node.get("nodename", "")
         sysname = node.get("sysname", "")
         release = node.get("release", "")

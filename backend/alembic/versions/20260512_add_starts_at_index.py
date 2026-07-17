@@ -5,15 +5,14 @@ Revises: add_open_msg_id_notif
 Create Date: 2026-05-12 10:00:00.000000
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 from alembic import op
 
-
 revision: str = "add_starts_at_index"
-down_revision: Union[str, None] = "add_open_msg_id_notif"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "add_open_msg_id_notif"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

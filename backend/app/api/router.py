@@ -32,6 +32,7 @@ from app.api.v1 import (
     permissions,
     roles,
     scheduled_tasks,
+    suggestions,
     system_configs,
     users,
 )
@@ -67,3 +68,4 @@ api_router.include_router(it_reporter.router, prefix="/v1", tags=["IT巡检报�
 api_router.include_router(health_check.router, prefix="/v1", tags=["每日健康巡检"])
 api_router.include_router(open_id.router, prefix="/v1", tags=["Open ID 查询"])
 api_router.include_router(crm_sync.router, prefix="/v1", tags=["CRM 同步"])
+api_router.include_router(suggestions.router, prefix="/v1", tags=["匿名建议"])

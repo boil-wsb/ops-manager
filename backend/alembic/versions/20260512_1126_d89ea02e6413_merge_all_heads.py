@@ -5,17 +5,13 @@ Revises: add_chat_id_receive_type, create_feishu_interactions, add_starts_at_ind
 Create Date: 2026-05-12 11:26:49.457114
 
 """
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-
+from collections.abc import Sequence
 
 # revision identifiers, used by Alembic.
 revision: str = 'd89ea02e6413'
-down_revision: Union[str, None] = ('add_chat_id_receive_type', 'create_feishu_interactions', 'add_starts_at_index')
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = ('add_chat_id_receive_type', 'create_feishu_interactions', 'add_starts_at_index')
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

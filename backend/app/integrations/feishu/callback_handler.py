@@ -291,6 +291,13 @@ def _try_forward_callback(
                 "open_message_id": open_message_id,
             },
         )
+        # ND-7 修复（第二轮审查）：异常路径必须先 dispose 原 engine，
+        # 否则连接池泄漏（每次异常都留下一个未关闭的 engine）
+        try:
+            if "engine" in dir():
+                engine.dispose()
+        except Exception:
+            pass
         try:
             from sqlalchemy import create_engine as _create_engine
             from sqlalchemy import text as _text
@@ -453,6 +460,15 @@ def _do_card_action_trigger(data: Any) -> Any:
         elif button_action in ("crm_sync_incremental", "crm_sync_full"):
             related_type = "crm_sync"
             related_id = button_action.replace("crm_sync_", "")
+        elif button_action.startswith("suggestion_approve_"):
+            related_type = "suggestion"
+            related_id = button_action.replace("suggestion_approve_", "")
+        elif button_action.startswith("suggestion_reject_"):
+            related_type = "suggestion"
+            related_id = button_action.replace("suggestion_reject_", "")
+        elif button_action.startswith("suggestion_archive_"):
+            related_type = "suggestion"
+            related_id = button_action.replace("suggestion_archive_", "")
 
         _record_interaction(
             direction="inbound",
@@ -581,6 +597,46 @@ def _do_card_action_trigger(data: Any) -> Any:
             ).start()
             resp = {"toast": {"type": "info", "content": f"已触发 CRM {sync_label_text}同步"}}
 
+        elif button_action.startswith("suggestion_approve_"):
+            assignment_id = button_action.replace("suggestion_approve_", "")
+            threading.Thread(
+                target=_handle_suggestion_approve,
+                args=(assignment_id, open_message_id, operator_open_id),
+                daemon=True,
+            ).start()
+            resp = {"toast": {"type": "success", "content": "建议已审批通过，已转市场部"}}
+
+        elif button_action.startswith("suggestion_reject_"):
+            assignment_id = button_action.replace("suggestion_reject_", "")
+            threading.Thread(
+                target=_handle_suggestion_reject,
+                args=(assignment_id, open_message_id, operator_open_id),
+                daemon=True,
+            ).start()
+            resp = {"toast": {"type": "info", "content": "建议已驳回"}}
+
+        elif button_action.startswith("suggestion_archive_"):
+            suggestion_id = button_action.replace("suggestion_archive_", "")
+            market_result = ""
+            if form_value and isinstance(form_value, dict):
+                market_result = form_value.get("market_result", "") or ""
+            if not market_result and input_value and isinstance(input_value, dict):
+                market_result = input_value.get("market_result", "") or ""
+
+            if not market_result or not market_result.strip():
+                resp = {"toast": {"type": "error", "content": "请填写执行结果"}}
+                from lark_oapi.event.callback.model.p2_card_action_trigger import (
+                    P2CardActionTriggerResponse,
+                )
+                return P2CardActionTriggerResponse(resp)
+
+            threading.Thread(
+                target=_handle_suggestion_archive,
+                args=(suggestion_id, market_result, open_message_id, operator_open_id),
+                daemon=True,
+            ).start()
+            resp = {"toast": {"type": "success", "content": "建议已存档"}}
+
         else:
             _try_forward_callback(open_message_id, data, button_action, value, operator_open_id)
             resp = {"toast": {"type": "info", "content": f"收到回调: {button_action}"}}
@@ -599,6 +655,411 @@ def _do_card_action_trigger(data: Any) -> Any:
         )
 
         return P2CardActionTriggerResponse(resp)
+
+
+def _get_sync_engine():
+    """Get a sync SQLAlchemy engine for use in callback threads."""
+    from sqlalchemy import create_engine
+
+    from app.config import settings
+
+    sync_db_url = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
+    return create_engine(sync_db_url, pool_pre_ping=True)
+
+
+def _handle_suggestion_approve(
+    assignment_id: str, open_message_id: str | None, operator_open_id: str | None
+) -> None:
+    """处理建议审批通过: 更新状态 + 更新原卡片 + 发送市场部卡片。
+
+    C-07/C-08 修复：UPDATE 加 WHERE status='pending' 前置条件 + rowcount 检查，
+    仅当 rowcount=1（即本次成功转换状态）时才发送市场部卡片，避免并发审批重复发送。
+    I-09 修复：移除 asyncio.run()，直接同步调用飞书 service。
+    """
+    from sqlalchemy import text
+
+    try:
+        engine = _get_sync_engine()
+        with engine.connect() as conn:
+            # 查询 assignment 和 suggestion（同时读取 assignment.status 用于幂等判断）
+            row = conn.execute(
+                text(
+                    "SELECT sa.id, sa.suggestion_id, sa.open_message_id, sa.status AS assign_status, "
+                    "s.content, s.highlights, s.innovation_ideas "
+                    "FROM suggestion_assignments sa "
+                    "JOIN suggestions s ON s.id = sa.suggestion_id "
+                    "WHERE sa.id = :aid"
+                ),
+                {"aid": int(assignment_id)},
+            ).fetchone()
+
+            if not row:
+                logger.error(f"建议审批通过失败: assignment={assignment_id} 不存在")
+                engine.dispose()
+                return
+
+            _, suggestion_id, assign_msg_id, assign_status, content, highlights, innovation_ideas = row
+
+            # 查询审批人姓名
+            approver_name = "未知"
+            if operator_open_id:
+                user_row = conn.execute(
+                    text("SELECT full_name, username FROM users WHERE feishu_open_id = :oid"),
+                    {"oid": operator_open_id},
+                ).fetchone()
+                if user_row:
+                    approver_name = user_row[0] or user_row[1] or "未知"
+
+            # C-07: 更新 assignment 状态，加 WHERE status='pending' 前置条件
+            # C-08: 通过 rowcount 判断是否本次成功转换，避免并发审批重复发送市场部卡片
+            assign_result = conn.execute(
+                text(
+                    "UPDATE suggestion_assignments SET status = 'approved', reviewed_at = NOW() "
+                    "WHERE id = :aid AND status = 'pending'"
+                ),
+                {"aid": int(assignment_id)},
+            )
+            assignment_updated = assign_result.rowcount
+
+            # C-07: 更新 suggestion 状态，加 WHERE status='pending' 前置条件
+            conn.execute(
+                text(
+                    "UPDATE suggestions SET status = 'approved' WHERE id = :sid AND status = 'pending'"
+                ),
+                {"sid": suggestion_id},
+            )
+            conn.commit()
+
+        engine.dispose()
+
+        # C-08: 若 assignment 已被其他线程审批（rowcount=0），跳过市场部卡片发送
+        if assignment_updated == 0:
+            logger.warning(
+                f"建议审批跳过（assignment 已被处理或状态非 pending）: "
+                f"assignment={assignment_id}, suggestion={suggestion_id}, current_status={assign_status}",
+                extra={
+                    "action": "suggestion.approve",
+                    "assignment_id": assignment_id,
+                    "suggestion_id": suggestion_id,
+                    "current_status": assign_status,
+                    "skipped": True,
+                },
+            )
+            return
+
+        logger.info(
+            f"建议审批通过: suggestion={suggestion_id}, assignment={assignment_id}, approver={approver_name}",
+            extra={"action": "suggestion.approve", "suggestion_id": suggestion_id, "assignment_id": assignment_id},
+        )
+
+        # I-09: 更新原卡片为"已审批"（直接同步调用，移除 asyncio.run）
+        card_msg_id = assign_msg_id or open_message_id
+        if card_msg_id:
+            try:
+                _sync_update_to_approved(card_msg_id, approver_name)
+            except Exception as e:
+                logger.error(
+                    f"更新审批卡片失败: msg_id={card_msg_id}, error={e}",
+                    extra={"action": "suggestion.update", "message_id": card_msg_id, "error": str(e)},
+                )
+
+        # I-09: 发送市场部卡片（直接同步调用，移除 asyncio.run）
+        try:
+            _sync_send_market_card(suggestion_id, content, highlights, innovation_ideas, approver_name)
+        except Exception as e:
+            logger.error(
+                f"发送市场部卡片失败: suggestion={suggestion_id}, error={e}",
+                extra={"action": "suggestion.approve", "suggestion_id": suggestion_id, "error": str(e)},
+            )
+
+    except Exception as e:
+        logger.error(
+            f"处理建议审批通过失败: assignment={assignment_id}, error={e}",
+            extra={"action": "suggestion.approve", "assignment_id": assignment_id, "error": str(e)},
+        )
+
+
+def _sync_update_to_approved(open_message_id: str, approver_name: str) -> None:
+    """I-09: 同步版本，直接调用飞书 service，避免 asyncio.run()。"""
+    from app.services.suggestion_service import update_to_approved_sync
+
+    update_to_approved_sync(open_message_id, approver_name)
+
+
+def _sync_send_market_card(
+    suggestion_id: int, content: str, highlights: str | None, innovation_ideas: str | None, approver_name: str
+) -> None:
+    """I-09: 同步版本，直接调用飞书 service，避免 asyncio.run()。"""
+    from app.core.tz import now_shanghai
+    from app.services.suggestion_service import send_market_card_sync
+
+    # 用同步引擎查询市场部通知组成员
+    open_ids: list[str] = []
+    try:
+        engine = _get_sync_engine()
+        from sqlalchemy import text
+
+        with engine.connect() as conn:
+            result = conn.execute(
+                text(
+                    "SELECT u.feishu_open_id FROM notification_groups g "
+                    "JOIN notification_group_members m ON m.notification_group_id = g.id "
+                    "JOIN users u ON u.id = m.user_id "
+                    "WHERE g.notification_type = 'suggestion_market_review' "
+                    "AND g.is_active = true AND u.feishu_open_id IS NOT NULL"
+                )
+            )
+            for row in result:
+                if row[0]:
+                    open_ids.append(row[0])
+        engine.dispose()
+    except Exception as e:
+        logger.error(
+            f"查询市场部通知组成员失败: {e}",
+            extra={"action": "suggestion.approve", "suggestion_id": suggestion_id, "error": str(e)},
+        )
+
+    if not open_ids:
+        logger.warning(
+            f"市场部通知组无成员,无法发送市场部卡片: suggestion={suggestion_id}",
+            extra={"action": "suggestion.approve", "suggestion_id": suggestion_id},
+        )
+        return
+
+    approved_at_str = now_shanghai().strftime("%Y-%m-%d %H:%M")
+    for oid in open_ids:
+        # I-07: send_market_card_sync 内部已实现 3 次指数退避重试
+        msg_id = send_market_card_sync(
+            open_id=oid,
+            suggestion_id=suggestion_id,
+            content=content,
+            highlights=highlights,
+            innovation_ideas=innovation_ideas,
+            approver_name=approver_name,
+            approved_at_str=approved_at_str,
+        )
+        logger.info(
+            f"市场部卡片已发送: suggestion={suggestion_id}, open_id={oid}, msg_id={msg_id}",
+            extra={"action": "suggestion.approve", "suggestion_id": suggestion_id, "message_id": msg_id},
+        )
+
+
+def _sync_update_to_rejected(open_message_id: str, reject_reason: str) -> None:
+    """I-09: 同步版本，直接调用飞书 service，避免 asyncio.run()。"""
+    from app.services.suggestion_service import update_to_rejected_sync
+
+    update_to_rejected_sync(open_message_id, reject_reason)
+
+
+def _sync_update_to_archived(open_message_id: str, market_result: str) -> None:
+    """I-09: 同步版本，直接调用飞书 service，避免 asyncio.run()。"""
+    from app.services.suggestion_service import update_to_archived_sync
+
+    update_to_archived_sync(open_message_id, market_result)
+
+
+def _handle_suggestion_reject(
+    assignment_id: str, open_message_id: str | None, operator_open_id: str | None
+) -> None:
+    """处理建议驳回: 更新状态 + 更新原卡片。
+
+    C-07/C-08 修复：UPDATE 加 WHERE status='pending' 前置条件 + rowcount 检查，
+    仅当 rowcount=1（即本次成功转换状态）时才更新原卡片，避免并发驳回重复更新。
+    I-09 修复：移除 asyncio.run()，直接同步调用飞书 service。
+    """
+    from sqlalchemy import text
+
+    try:
+        engine = _get_sync_engine()
+        with engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT sa.id, sa.suggestion_id, sa.open_message_id, sa.status AS assign_status "
+                    "FROM suggestion_assignments sa "
+                    "WHERE sa.id = :aid"
+                ),
+                {"aid": int(assignment_id)},
+            ).fetchone()
+
+            if not row:
+                logger.error(f"建议驳回失败: assignment={assignment_id} 不存在")
+                engine.dispose()
+                return
+
+            _, suggestion_id, assign_msg_id, assign_status = row
+
+            # 查询驳回人 user_id
+            reviewer_id = None
+            if operator_open_id:
+                user_row = conn.execute(
+                    text("SELECT id FROM users WHERE feishu_open_id = :oid"),
+                    {"oid": operator_open_id},
+                ).fetchone()
+                if user_row:
+                    reviewer_id = user_row[0]
+
+            # C-07: 更新 assignment 状态，加 WHERE status='pending' 前置条件
+            # C-08: 通过 rowcount 判断是否本次成功转换，避免并发驳回重复更新卡片
+            assign_result = conn.execute(
+                text(
+                    "UPDATE suggestion_assignments SET status = 'rejected', reviewed_at = NOW() "
+                    "WHERE id = :aid AND status = 'pending'"
+                ),
+                {"aid": int(assignment_id)},
+            )
+            assignment_updated = assign_result.rowcount
+
+            # C-07: 更新 suggestion 状态，加 WHERE status='pending' 前置条件
+            conn.execute(
+                text(
+                    "UPDATE suggestions SET status = 'rejected', "
+                    "reject_reason = '审批人驳回', rejected_by = :rid, rejected_at = NOW() "
+                    "WHERE id = :sid AND status = 'pending'"
+                ),
+                {"rid": reviewer_id, "sid": suggestion_id},
+            )
+            conn.commit()
+
+        engine.dispose()
+
+        # C-08: 若 assignment 已被其他线程处理（rowcount=0），跳过卡片更新
+        if assignment_updated == 0:
+            logger.warning(
+                f"建议驳回跳过（assignment 已被处理或状态非 pending）: "
+                f"assignment={assignment_id}, suggestion={suggestion_id}, current_status={assign_status}",
+                extra={
+                    "action": "suggestion.reject",
+                    "assignment_id": assignment_id,
+                    "suggestion_id": suggestion_id,
+                    "current_status": assign_status,
+                    "skipped": True,
+                },
+            )
+            return
+
+        logger.info(
+            f"建议已驳回: suggestion={suggestion_id}, assignment={assignment_id}",
+            extra={"action": "suggestion.reject", "suggestion_id": suggestion_id, "assignment_id": assignment_id},
+        )
+
+        # I-09: 更新原卡片为"已驳回"（直接同步调用，移除 asyncio.run）
+        card_msg_id = assign_msg_id or open_message_id
+        if card_msg_id:
+            try:
+                _sync_update_to_rejected(card_msg_id, "审批人驳回")
+            except Exception as e:
+                logger.error(
+                    f"更新驳回卡片失败: msg_id={card_msg_id}, error={e}",
+                    extra={"action": "suggestion.update", "message_id": card_msg_id, "error": str(e)},
+                )
+
+    except Exception as e:
+        logger.error(
+            f"处理建议驳回失败: assignment={assignment_id}, error={e}",
+            extra={"action": "suggestion.reject", "assignment_id": assignment_id, "error": str(e)},
+        )
+
+
+def _handle_suggestion_archive(
+    suggestion_id: str, market_result: str, open_message_id: str | None, operator_open_id: str | None
+) -> None:
+    """处理建议存档: 更新状态 + 更新市场部卡片。
+
+    C-07/C-08 修复：UPDATE 加 WHERE status='approved' 前置条件 + rowcount 检查，
+    仅当 rowcount=1（即本次成功转换状态）时才更新市场部卡片，避免并发存档重复更新。
+    I-24 修复：market_result 截断到 2000 字符，避免超长文本导致卡片渲染异常。
+    I-09 修复：移除 asyncio.run()，直接同步调用飞书 service。
+    """
+    from sqlalchemy import text
+
+    # I-24: market_result 截断到 2000 字符
+    if market_result and len(market_result) > 2000:
+        original_len = len(market_result)
+        market_result = market_result[:2000]
+        logger.info(
+            f"market_result 已截断到 2000 字符: suggestion={suggestion_id}, original_len={original_len}",
+            extra={
+                "action": "suggestion.archive",
+                "suggestion_id": suggestion_id,
+                "original_len": original_len,
+                "truncated_to": 2000,
+            },
+        )
+
+    try:
+        engine = _get_sync_engine()
+        with engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT id, status FROM suggestions WHERE id = :sid"),
+                {"sid": int(suggestion_id)},
+            ).fetchone()
+
+            if not row:
+                logger.error(f"建议存档失败: suggestion={suggestion_id} 不存在")
+                engine.dispose()
+                return
+
+            current_status = row[1]
+
+            # 查询存档人 user_id
+            reviewer_id = None
+            if operator_open_id:
+                user_row = conn.execute(
+                    text("SELECT id FROM users WHERE feishu_open_id = :oid"),
+                    {"oid": operator_open_id},
+                ).fetchone()
+                if user_row:
+                    reviewer_id = user_row[0]
+
+            # C-07: 更新 suggestion 状态，加 WHERE status='approved' 前置条件
+            # C-08: 通过 rowcount 判断是否本次成功转换，避免并发存档重复更新卡片
+            archive_result = conn.execute(
+                text(
+                    "UPDATE suggestions SET status = 'archived', market_result = :result, "
+                    "market_reviewer_id = :rid, archived_at = NOW() "
+                    "WHERE id = :sid AND status = 'approved'"
+                ),
+                {"result": market_result, "rid": reviewer_id, "sid": int(suggestion_id)},
+            )
+            suggestion_updated = archive_result.rowcount
+            conn.commit()
+
+        engine.dispose()
+
+        # C-08: 若 suggestion 状态非 approved（已被处理），跳过卡片更新
+        if suggestion_updated == 0:
+            logger.warning(
+                f"建议存档跳过（suggestion 状态非 approved 或已被处理）: "
+                f"suggestion={suggestion_id}, current_status={current_status}",
+                extra={
+                    "action": "suggestion.archive",
+                    "suggestion_id": suggestion_id,
+                    "current_status": current_status,
+                    "skipped": True,
+                },
+            )
+            return
+
+        logger.info(
+            f"建议已存档: suggestion={suggestion_id}",
+            extra={"action": "suggestion.archive", "suggestion_id": suggestion_id},
+        )
+
+        # I-09: 更新市场部卡片为"已存档"（直接同步调用，移除 asyncio.run）
+        if open_message_id:
+            try:
+                _sync_update_to_archived(open_message_id, market_result)
+            except Exception as e:
+                logger.error(
+                    f"更新存档卡片失败: msg_id={open_message_id}, error={e}",
+                    extra={"action": "suggestion.update", "message_id": open_message_id, "error": str(e)},
+                )
+
+    except Exception as e:
+        logger.error(
+            f"处理建议存档失败: suggestion={suggestion_id}, error={e}",
+            extra={"action": "suggestion.archive", "suggestion_id": suggestion_id, "error": str(e)},
+        )
 
 
 def _run_crm_sync_sync(
@@ -623,7 +1084,6 @@ def _run_crm_sync_sync(
         )
         from app.services.crm.sync_service import (
             SYNC_TYPE_LABELS,
-            SYNC_TYPE_PATHS,
             get_crm_sync_service,
         )
 
@@ -642,7 +1102,7 @@ def _run_crm_sync_sync(
         if open_message_id:
             try:
                 logger.info(
-                    f"[CRM回调] 步骤1: 更新卡片为同步中状态",
+                    "[CRM回调] 步骤1: 更新卡片为同步中状态",
                     extra={
                         "action": "crm.sync.callback",
                         "step": "update_card_syncing",
@@ -651,7 +1111,7 @@ def _run_crm_sync_sync(
                 )
                 update_card_to_syncing_sync(open_message_id, sync_type)
                 logger.info(
-                    f"[CRM回调] 步骤1完成: 卡片已更新为同步中",
+                    "[CRM回调] 步骤1完成: 卡片已更新为同步中",
                     extra={
                         "action": "crm.sync.callback",
                         "step": "update_card_syncing_done",
@@ -671,7 +1131,7 @@ def _run_crm_sync_sync(
 
         # 2. 同步执行 CRM 调用
         logger.info(
-            f"[CRM回调] 步骤2: 获取 CRM 同步服务实例",
+            "[CRM回调] 步骤2: 获取 CRM 同步服务实例",
             extra={
                 "action": "crm.sync.callback",
                 "step": "get_service",
@@ -717,7 +1177,7 @@ def _run_crm_sync_sync(
         if open_message_id:
             try:
                 logger.info(
-                    f"[CRM回调] 步骤3: 更新卡片为最终结果",
+                    "[CRM回调] 步骤3: 更新卡片为最终结果",
                     extra={
                         "action": "crm.sync.callback",
                         "step": "update_card_result",
@@ -726,7 +1186,7 @@ def _run_crm_sync_sync(
                 )
                 update_card_to_sync_result_sync(open_message_id, sync_type, result)
                 logger.info(
-                    f"[CRM回调] 步骤3完成: 卡片已更新为最终结果",
+                    "[CRM回调] 步骤3完成: 卡片已更新为最终结果",
                     extra={
                         "action": "crm.sync.callback",
                         "step": "update_card_result_done",
@@ -1031,7 +1491,11 @@ def _get_alert_id_by_open_message_id(open_message_id: str) -> str | None:
         with engine.connect() as conn:
             result = conn.execute(
                 text(
-                    "SELECT alertname, labels->>'instance' as instance FROM alert_history WHERE feishu_open_message_id = :open_message_id AND status = 'firing' ORDER BY id DESC LIMIT 1"
+                    "SELECT ah.alertname, ah.labels->>'instance' as instance "
+                    "FROM alert_card_messages acm "
+                    "JOIN alert_history ah ON ah.id = acm.alert_history_id "
+                    "WHERE acm.open_message_id = :open_message_id AND ah.status = 'firing' "
+                    "ORDER BY ah.id DESC LIMIT 1"
                 ),
                 {"open_message_id": open_message_id},
             )
@@ -1074,7 +1538,11 @@ def _acknowledge_alert(alert_id: str, open_message_id: str | None) -> None:
             if open_message_id:
                 result = conn.execute(
                     text(
-                        "SELECT id, alertname, severity, labels->>'instance' as instance FROM alert_history WHERE feishu_open_message_id = :msg_id AND status = 'firing' ORDER BY id DESC LIMIT 1"
+                        "SELECT ah.id, ah.alertname, ah.severity, ah.labels->>'instance' as instance "
+                        "FROM alert_card_messages acm "
+                        "JOIN alert_history ah ON ah.id = acm.alert_history_id "
+                        "WHERE acm.open_message_id = :msg_id AND ah.status = 'firing' "
+                        "ORDER BY ah.id DESC LIMIT 1"
                     ),
                     {"msg_id": open_message_id},
                 )
@@ -1209,7 +1677,11 @@ def _transfer_alert_to_it(alert_id: str, open_message_id: str | None) -> None:
             if open_message_id:
                 result = conn.execute(
                     text(
-                        "SELECT id, alertname, severity, labels->>'instance' as instance FROM alert_history WHERE feishu_open_message_id = :msg_id AND status = 'firing' ORDER BY id DESC LIMIT 1"
+                        "SELECT ah.id, ah.alertname, ah.severity, ah.labels->>'instance' as instance "
+                        "FROM alert_card_messages acm "
+                        "JOIN alert_history ah ON ah.id = acm.alert_history_id "
+                        "WHERE acm.open_message_id = :msg_id AND ah.status = 'firing' "
+                        "ORDER BY ah.id DESC LIMIT 1"
                     ),
                     {"msg_id": open_message_id},
                 )
@@ -1256,7 +1728,11 @@ def _transfer_alert_to_it(alert_id: str, open_message_id: str | None) -> None:
 
 
 def _resolve_alert_sync(alert_id: str, notes: str, open_message_id: str | None = None) -> None:
-    """Mark alert as resolved with notes using sync database operations."""
+    """Mark alert as resolved with notes using sync database operations.
+
+    通过 open_message_id 反查 alert_history_id，再查所有 firing 卡片逐一更新。
+    保证所有 N 张卡片状态同步（一致性不变式）。
+    """
     from sqlalchemy import create_engine, text
 
     from app.config import settings
@@ -1267,10 +1743,20 @@ def _resolve_alert_sync(alert_id: str, notes: str, open_message_id: str | None =
         engine = create_engine(sync_db_url, pool_pre_ping=True)
 
         with engine.connect() as conn:
+            history_id = None
+            alertname = ""
+            instance = ""
+            severity = "warning"
+
             if open_message_id:
+                # 通过 alert_card_messages 反查 alert_history
                 result = conn.execute(
                     text(
-                        "SELECT id, alertname, labels->>'instance' as instance, feishu_open_message_id, severity FROM alert_history WHERE feishu_open_message_id = :msg_id AND status = 'firing' ORDER BY id DESC LIMIT 1"
+                        "SELECT ah.id, ah.alertname, ah.labels->>'instance' as instance, ah.severity "
+                        "FROM alert_card_messages acm "
+                        "JOIN alert_history ah ON ah.id = acm.alert_history_id "
+                        "WHERE acm.open_message_id = :msg_id AND ah.status = 'firing' "
+                        "ORDER BY ah.id DESC LIMIT 1"
                     ),
                     {"msg_id": open_message_id},
                 )
@@ -1279,11 +1765,7 @@ def _resolve_alert_sync(alert_id: str, notes: str, open_message_id: str | None =
                     history_id = row[0]
                     alertname = row[1] or ""
                     instance = row[2] or ""
-                    feishu_open_message_id = row[3]
-                    severity = row[4] or "warning"
-                else:
-                    alertname, instance, feishu_open_message_id, severity = "", "", None, "warning"
-                    history_id = None
+                    severity = row[3] or "warning"
             else:
                 parts = alert_id.rsplit("_", 1)
                 if len(parts) == 2:
@@ -1291,50 +1773,82 @@ def _resolve_alert_sync(alert_id: str, notes: str, open_message_id: str | None =
                     instance = instance_part.replace("_", ".")
                     result = conn.execute(
                         text(
-                            "SELECT id, feishu_open_message_id, severity FROM alert_history WHERE alertname = :name AND labels->>'instance' = :instance AND status = 'firing' ORDER BY id DESC LIMIT 1"
+                            "SELECT id, severity FROM alert_history "
+                            "WHERE alertname = :name AND labels->>'instance' = :instance "
+                            "AND status = 'firing' ORDER BY id DESC LIMIT 1"
                         ),
                         {"name": alertname_part, "instance": instance},
                     )
                     row = result.fetchone()
                     if row:
                         history_id = row[0]
-                        feishu_open_message_id = row[1]
-                        severity = row[2] or "warning"
+                        severity = row[1] or "warning"
                         alertname = alertname_part
-                    else:
-                        history_id = None
-                        feishu_open_message_id = None
                 else:
                     logger.warning(
                         f"无效的alert_id格式: {alert_id}",
                         extra={"action": "feishu.callback", "alert_id": alert_id},
                     )
-                    history_id = None
-                    feishu_open_message_id = None
-                    alertname, instance, severity = "", "", "warning"
 
             if history_id:
-                conn.execute(
-                    text("UPDATE alert_history SET status = 'resolved' WHERE id = :id"),
-                    {"id": history_id},
+                # 1. 查询所有 firing 卡片
+                card_result = conn.execute(
+                    text(
+                        "SELECT id, open_message_id FROM alert_card_messages "
+                        "WHERE alert_history_id = :hid AND card_status = 'firing'"
+                    ),
+                    {"hid": history_id},
                 )
-                conn.commit()
-                logger.info(
-                    f"告警 {alert_id} 已解决",
-                    extra={"action": "feishu.callback", "alert_id": alert_id, "notes": notes},
-                )
+                card_rows = card_result.fetchall()
 
-                if feishu_open_message_id:
+                # 2. 逐一更新飞书卡片
+                updated_card_count = 0
+                if card_rows:
                     feishu_svc = get_feishu_notification_service()
                     resolved_card = feishu_svc.build_resolved_card(
                         alertname=alertname,
                         severity=severity,
                         instance=instance,
                     )
-                    feishu_svc.update_card_message(
-                        open_message_id=feishu_open_message_id,
-                        card_content=resolved_card,
-                    )
+                    updated_card_ids = []
+                    for card_row in card_rows:
+                        cm_id, card_msg_id = card_row[0], card_row[1]
+                        try:
+                            update_result = feishu_svc.update_card_message(
+                                open_message_id=card_msg_id,
+                                card_content=resolved_card,
+                            )
+                            if update_result.get("success"):
+                                updated_card_ids.append(cm_id)
+                            else:
+                                logger.error(
+                                    f"手动解决-更新卡片失败: cm_id={cm_id}, error={update_result.get('message')}",
+                                    extra={"action": "feishu.callback", "alert_id": alert_id},
+                                )
+                        except Exception as exc:
+                            logger.error(
+                                f"手动解决-更新卡片异常: cm_id={cm_id}, error={exc}",
+                                extra={"action": "feishu.callback", "alert_id": alert_id},
+                            )
+
+                    # 3. 批量更新 alert_card_messages 状态
+                    for cm_id in updated_card_ids:
+                        conn.execute(
+                            text("UPDATE alert_card_messages SET card_status = 'resolved' WHERE id = :id"),
+                            {"id": cm_id},
+                        )
+                    updated_card_count = len(updated_card_ids)
+
+                # 4. 更新 alert_history 状态
+                conn.execute(
+                    text("UPDATE alert_history SET status = 'resolved' WHERE id = :id"),
+                    {"id": history_id},
+                )
+                conn.commit()
+                logger.info(
+                    f"告警 {alert_id} 已手动解决, 更新卡片数: {updated_card_count}",
+                    extra={"action": "feishu.callback", "alert_id": alert_id, "notes": notes},
+                )
             else:
                 logger.warning(
                     f"未找到firing状态的告警: {alert_id}",
@@ -1417,15 +1931,21 @@ def stop_feishu_callback_client() -> None:
 
 def _do_bot_p2p_chat_entered(data: Any) -> None:
     """Handle bot entered p2p chat event."""
-    lark = _get_lark_module()
-    logger.info(f"机器人进入单聊: {lark.JSON.marshal(data)}", extra={"action": "feishu.callback"})
-
+    # P2 修复（第二轮审查）：不再记录完整 data 序列化（含敏感字段），
+    # 改为字段级日志 + open_id 截断。
     try:
         open_id = None
         if hasattr(data.event, "operator") and data.event.operator:
             operator_id = getattr(data.event.operator, "operator_id", None)
             if operator_id:
                 open_id = getattr(operator_id, "open_id", None)
+        logger.info(
+            "机器人进入单聊",
+            extra={
+                "action": "feishu.callback",
+                "operator_open_id": open_id[:8] + "..." if open_id else None,
+            },
+        )
         _record_interaction(
             direction="inbound",
             interaction_type="chat_entered",
@@ -1441,8 +1961,6 @@ def _do_bot_p2p_chat_entered(data: Any) -> None:
 
 def _do_im_message_reaction_created_v1(data: Any) -> None:
     """Handle im.message.reaction.created_v1 event."""
-    lark = _get_lark_module()
-
     # 过滤应用自身触发的表情回应事件
     operator_type = getattr(data.event, "operator_type", None)
     if operator_type == "app":
@@ -1452,8 +1970,8 @@ def _do_im_message_reaction_created_v1(data: Any) -> None:
         )
         return None
 
-    logger.info(f"表情回应创建: {lark.JSON.marshal(data)}", extra={"action": "feishu.callback"})
-
+    # P2 修复（第二轮审查）：不再记录完整 data 序列化，
+    # 字段提取后再 log（与下方 _record_interaction 共用同一份数据，避免重复遍历）
     try:
         open_id = None
         emoji_type = None
@@ -1468,6 +1986,15 @@ def _do_im_message_reaction_created_v1(data: Any) -> None:
             if emoji:
                 emoji_type = getattr(emoji, "emoji_type", None)
             message_id = getattr(reaction, "message_id", None)
+        logger.info(
+            "表情回应创建",
+            extra={
+                "action": "feishu.callback",
+                "operator_open_id": open_id[:8] + "..." if open_id else None,
+                "emoji_type": emoji_type,
+                "message_id": message_id,
+            },
+        )
         _record_interaction(
             direction="inbound",
             interaction_type="reaction",
@@ -1485,9 +2012,7 @@ def _do_im_message_reaction_created_v1(data: Any) -> None:
 
 def _do_im_message_message_read_v1(data: Any) -> None:
     """Handle im.message.message_read_v1 event."""
-    lark = _get_lark_module()
-    logger.info(f"消息已读事件: {lark.JSON.marshal(data)}", extra={"action": "feishu.callback"})
-
+    # P2 修复（第二轮审查）：不再记录完整 data 序列化，字段级日志 + open_id 截断
     try:
         open_id = None
         message_id_list = None
@@ -1497,6 +2022,14 @@ def _do_im_message_message_read_v1(data: Any) -> None:
             if reader_id:
                 open_id = getattr(reader_id, "open_id", None)
             message_id_list = getattr(reader, "message_id_list", None)
+        logger.info(
+            "消息已读事件",
+            extra={
+                "action": "feishu.callback",
+                "reader_open_id": open_id[:8] + "..." if open_id else None,
+                "message_id_count": len(message_id_list) if message_id_list else 0,
+            },
+        )
         _record_interaction(
             direction="inbound",
             interaction_type="message_read",

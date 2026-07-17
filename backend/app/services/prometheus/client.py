@@ -131,6 +131,309 @@ class PrometheusClient:
 
         return nodes
 
+    async def get_targets(self) -> list[dict[str, Any]]:
+        """
+        获取 Prometheus active targets
+
+        Windows 节点的 instance 标签多为中文主机名（非 IP），
+        通过 discoveredLabels.__address__ 解析真实抓取地址。
+
+        Returns:
+            target 列表，包含 instance/job/address/health
+
+        Raises:
+            httpx.HTTPError: 网络/超时错误时抛出，由调用方决定降级策略
+                （I-17 修复：原先 catch+return [] 静默吞异常，导致调用方
+                 误以为"无 targets"而非"查询失败"，Windows 节点 IP 解析
+                 静默失败。现改为抛出，调用方按需 try/except 降级。）
+        """
+        url = f"{self.base_url}/api/v1/targets"
+        response = await self.client.get(url)
+        response.raise_for_status()
+        data = response.json()
+        if data.get("status") != "success":
+            logger.error("targets 查询失败", extra={"action": "prometheus.targets"})
+            return []
+        targets = []
+        for t in data.get("data", {}).get("activeTargets", []):
+            labels = t.get("labels", {})
+            discovered = t.get("discoveredLabels", {}) or {}
+            address = discovered.get("__address__", "") or t.get("scrapeUrl", "")
+            targets.append(
+                {
+                    "instance": labels.get("instance", ""),
+                    "job": labels.get("job", ""),
+                    "address": address,
+                    "health": t.get("health", "unknown"),
+                }
+            )
+        return targets
+
+    async def get_all_windows_nodes(self) -> list[dict[str, Any]]:
+        """
+        获取 Windows 服务器节点（基于 windows_exporter）
+
+        Windows 服务器使用 windows_exporter，指标前缀为 windows_*，
+        不在 node_uname_info 中，需单独采集。
+        instance 标签多为中文主机名，真实 IP 通过 /api/v1/targets 解析。
+
+        Returns:
+            节点列表，字段与 get_all_nodes() 兼容，额外含 ip_address、is_windows
+        """
+        data = await self.query("windows_exporter_build_info")
+        if data.get("status") != "success":
+            return []
+
+        # 构建 instance -> 真实 IP 映射
+        # I-17 修复：get_targets 现在抛出异常而非静默返回 []，
+        # 调用方按需降级：targets 查询失败时记 WARNING 并继续
+        # （Windows 节点 IP 字段为空，不影响节点发现本身）
+        addr_map: dict[str, str] = {}
+        try:
+            targets = await self.get_targets()
+            for t in targets:
+                job = t.get("job", "")
+                if "windows" not in job.lower():
+                    continue
+                address = t.get("address", "")
+                ip = self._extract_ip(address)
+                if ip and t.get("instance"):
+                    addr_map[t["instance"]] = ip
+        except Exception as e:
+            logger.warning(
+                f"get_targets 失败，Windows 节点 IP 解析降级为空: {e}",
+                extra={"action": "prometheus.windows_nodes", "error": str(e)},
+            )
+
+        nodes = []
+        for result in data.get("data", {}).get("result", []):
+            metric = result.get("metric", {})
+            instance = metric.get("instance", "")
+            ip = addr_map.get(instance, "")
+            nodes.append(
+                {
+                    "instance": instance,  # Prometheus 标签（中文主机名），用于查询指标
+                    "ip_address": ip,  # 真实 IP，用于入库
+                    "nodename": instance,
+                    "sysname": "Windows",
+                    "release": metric.get("version", ""),
+                    "machine": metric.get("goarch", ""),
+                    "job": metric.get("job", ""),
+                    "env": metric.get("env", ""),
+                    "is_windows": True,
+                }
+            )
+
+        logger.info(
+            "Windows 节点发现完成",
+            extra={"action": "prometheus.windows_nodes", "count": len(nodes)},
+        )
+        return nodes
+
+    @staticmethod
+    def _extract_ip(address: str) -> str:
+        """从 address 字符串中提取 IP（支持 IP:port / http://IP:port/path 格式）
+
+        I-18 修复：原先直接字符串拆分，不校验 IP 格式，主机名/异常输入
+        会被当作 IP 返回（如 "localhost" / "windows-host-01"），污染
+        addr_map 和资产 ip_address 字段。现使用 ipaddress.ip_address()
+        严格校验，非法返回 "" 并记 WARNING。
+        """
+        if not address:
+            return ""
+        import ipaddress
+
+        cleaned = address.replace("http://", "").replace("https://", "")
+        cleaned = cleaned.split("/")[0]
+        if ":" in cleaned:
+            cleaned = cleaned.split(":")[0]
+        # 校验是否为合法 IPv4/IPv6 地址
+        try:
+            ipaddress.ip_address(cleaned)
+            return cleaned
+        except ValueError:
+            logger.warning(
+                f"_extract_ip: 非法 IP 格式，已丢弃: address={address}, extracted={cleaned}",
+                extra={"action": "prometheus.extract_ip", "address": address, "extracted": cleaned},
+            )
+            return ""
+
+    async def get_windows_node_metrics(self, instance: str) -> dict[str, Any]:
+        """
+        获取 Windows 节点指标（基于 windows_exporter）
+
+        Args:
+            instance: Prometheus instance 标签（中文主机名）
+
+        Returns:
+            指标字典，包含 cpu_cores、memory_gb、disk_gb、
+            memory_usage_percent、disk_usage_percent
+        """
+        metrics: dict[str, Any] = {}
+
+        queries = {
+            "cpu_cores": f'windows_cs_logical_processors{{instance="{instance}"}}',
+            "memory_gb": f'windows_cs_physical_memory_bytes{{instance="{instance}"}} / 1024 / 1024 / 1024',
+            "disk_gb": f'sum(windows_logical_disk_size_bytes{{instance="{instance}"}}) / 1024 / 1024 / 1024',
+            "memory_usage_percent": (
+                f'100 * (1 - (windows_os_physical_memory_free_bytes{{instance="{instance}"}} '
+                f'/ windows_cs_physical_memory_bytes{{instance="{instance}"}}))'
+            ),
+            "disk_usage_percent": (
+                f'100 * (1 - (sum(windows_logical_disk_free_bytes{{instance="{instance}"}}) '
+                f'/ sum(windows_logical_disk_size_bytes{{instance="{instance}"}})))'
+            ),
+        }
+
+        results = await asyncio.gather(
+            *[self.query(q) for q in queries.values()], return_exceptions=True
+        )
+
+        for (key, _), data in zip(queries.items(), results, strict=True):
+            if isinstance(data, Exception):
+                logger.error(
+                    f"Windows 指标查询失败: {instance} {key}: {data}",
+                    extra={"action": "prometheus.query", "instance": instance},
+                )
+                continue
+            if data.get("status") == "success":
+                result_list = data.get("data", {}).get("result", [])
+                if result_list:
+                    value = result_list[0].get("value", [])
+                    if len(value) >= 2:
+                        try:
+                            raw = float(value[1])
+                            metrics[key] = int(raw) if key == "cpu_cores" else round(raw, 2)
+                        except (ValueError, TypeError):
+                            continue
+
+        return metrics
+
+    async def get_all_windows_nodes_health_check(self) -> list[dict[str, Any]]:
+        """
+        批量获取所有 Windows 服务器节点的健康检查数据
+
+        基于 windows_exporter 指标，与 get_all_nodes_health_check() 输出结构对齐。
+        Windows 无 load 概念，load1/5/15 置 None；
+        CPU 使用率通过 windows_cpu_time_total{mode="idle"} 计算。
+
+        Returns:
+            节点健康检查列表（字段与 Linux 版兼容，额外含 is_windows 标识）
+        """
+        queries = {
+            "build_info": "windows_exporter_build_info",
+            "up": 'up{job=~".*windows.*|.*Windows.*"}',
+            "cpu_usage": '100 - (avg by (instance) (irate(windows_cpu_time_total{mode="idle"}[5m])) * 100)',
+            "memory_usage": "100 * (1 - (windows_os_physical_memory_free_bytes / windows_cs_physical_memory_bytes))",
+            "memory_total": "windows_cs_physical_memory_bytes / 1024 / 1024",
+            "disk_usage": "100 * (1 - (sum by (instance) (windows_logical_disk_free_bytes) / sum by (instance) (windows_logical_disk_size_bytes)))",
+            "disk_total": "sum by (instance) (windows_logical_disk_size_bytes) / 1024 / 1024 / 1024",
+            "cpu_cores": "windows_cs_logical_processors",
+        }
+
+        results = await asyncio.gather(
+            *[self.query(q) for q in queries.values()], return_exceptions=True
+        )
+
+        query_results: dict[str, list[dict[str, Any]]] = {}
+        for key, data in zip(queries.keys(), results, strict=True):
+            if isinstance(data, Exception):
+                logger.error(
+                    f"Windows 批量查询失败: {key}: {data}",
+                    extra={"action": "prometheus.query"},
+                )
+                query_results[key] = []
+                continue
+            if data.get("status") == "success":
+                query_results[key] = data.get("data", {}).get("result", [])
+            else:
+                query_results[key] = []
+
+        # 构建 instance -> 真实 IP 映射（Windows 节点 instance 多为中文主机名）
+        # I-17 修复：get_targets 现在抛出异常而非静默返回 []，
+        # 调用方按需降级：targets 查询失败时记 WARNING 并继续
+        addr_map: dict[str, str] = {}
+        try:
+            targets = await self.get_targets()
+            for t in targets:
+                job = t.get("job", "")
+                if "windows" not in job.lower():
+                    continue
+                address = t.get("address", "")
+                ip = self._extract_ip(address)
+                if ip and t.get("instance"):
+                    addr_map[t["instance"]] = ip
+        except Exception as e:
+            logger.warning(
+                f"get_targets 失败，Windows 健康检查 IP 解析降级为空: {e}",
+                extra={"action": "prometheus.windows_health_check", "error": str(e)},
+            )
+
+        nodes_by_instance: dict[str, dict[str, Any]] = {}
+        for result in query_results.get("build_info", []):
+            metric = result.get("metric", {})
+            inst = metric.get("instance", "")
+            if not inst:
+                continue
+            # 用真实 IP 作为 instance 展示，便于前端识别
+            display_instance = addr_map.get(inst, inst)
+            nodes_by_instance[inst] = {
+                "instance": display_instance,
+                "nodename": inst,
+                "sysname": "Windows",
+                "release": metric.get("version", ""),
+                "machine": metric.get("goarch", ""),
+                "job": metric.get("job", ""),
+                "env": metric.get("env", ""),
+                "is_windows": True,
+            }
+
+        def build_value_map(results_list: list[dict[str, Any]]) -> dict[str, float]:
+            value_map: dict[str, float] = {}
+            for r in results_list:
+                metric = r.get("metric", {})
+                inst = metric.get("instance", "")
+                value = r.get("value", [])
+                if inst and len(value) >= 2:
+                    with contextlib.suppress(ValueError, TypeError):
+                        value_map[inst] = float(value[1])
+            return value_map
+
+        up_map: dict[str, bool] = {}
+        for r in query_results.get("up", []):
+            metric = r.get("metric", {})
+            inst = metric.get("instance", "")
+            value = r.get("value", [])
+            if inst and len(value) >= 2:
+                up_map[inst] = value[1] == "1"
+
+        cpu_usage_map = build_value_map(query_results.get("cpu_usage", []))
+        memory_usage_map = build_value_map(query_results.get("memory_usage", []))
+        memory_total_map = build_value_map(query_results.get("memory_total", []))
+        disk_usage_map = build_value_map(query_results.get("disk_usage", []))
+        disk_total_map = build_value_map(query_results.get("disk_total", []))
+        cpu_cores_map = build_value_map(query_results.get("cpu_cores", []))
+
+        health_check_list: list[dict[str, Any]] = []
+        for inst, node in nodes_by_instance.items():
+            node["is_online"] = up_map.get(inst, False)
+            node["cpu_usage_percent"] = round(cpu_usage_map.get(inst, 0.0), 2)
+            node["cpu_cores"] = int(cpu_cores_map.get(inst, 0))
+            node["load1"] = None
+            node["load5"] = None
+            node["load15"] = None
+            node["memory_usage_percent"] = round(memory_usage_map.get(inst, 0.0), 2)
+            node["memory_total_mb"] = round(memory_total_map.get(inst, 0.0), 2)
+            node["disk_usage_percent"] = round(disk_usage_map.get(inst, 0.0), 2)
+            node["disk_total_gb"] = round(disk_total_map.get(inst, 0.0), 2)
+            health_check_list.append(node)
+
+        logger.info(
+            "Windows 健康检查数据采集完成",
+            extra={"action": "prometheus.windows_health_check", "count": len(health_check_list)},
+        )
+        return health_check_list
+
     async def get_node_status(self, instance: str) -> str:
         """
         获取节点在线状态

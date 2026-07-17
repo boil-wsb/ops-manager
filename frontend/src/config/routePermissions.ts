@@ -17,6 +17,10 @@ export const routePermissions: Record<string, string | string[]> = {
   '/alerts/alertmanager/silences': 'alert:manage_silence',
   '/alerts/alertmanager/templates': 'alert:manage_template',
   '/alerts/alertmanager/history': 'alert:read',
+  '/suggestions/submit': 'suggestion:submit',
+  '/suggestions/manage': 'suggestion:read',
+  '/suggestions/manage/*': 'suggestion:read',
+  '/suggestions/track': 'suggestion:submit',
 };
 
 export function getRoutePermission(path: string): string | string[] | undefined {
@@ -129,6 +133,15 @@ export const PERMISSION_MODULES = [
       { code: 'notification_group:create', name: '创建通知组' },
       { code: 'notification_group:update', name: '编辑通知组' },
       { code: 'notification_group:delete', name: '删除通知组' },
+    ],
+  },
+  {
+    module: 'suggestion',
+    moduleName: '建议中心',
+    permissions: [
+      { code: 'suggestion:submit', name: '提交建议' },
+      { code: 'suggestion:read', name: '查看建议列表' },
+      { code: 'suggestion:archive', name: '市场部存档' },
     ],
   },
 ];

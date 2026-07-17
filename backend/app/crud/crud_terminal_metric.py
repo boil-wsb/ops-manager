@@ -6,10 +6,14 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import get_logger
 from app.crud.base import CRUDBase
 from app.models.terminal_metric import TerminalMetric
+
+logger = get_logger(__name__)
 
 
 class CRUDBerminalMetric(CRUDBase[TerminalMetric, Any, Any]):
@@ -99,74 +103,71 @@ class CRUDBerminalMetric(CRUDBase[TerminalMetric, Any, Any]):
         alert_severity: str | None = None,
         monitor_name: str | None = None,
     ) -> TerminalMetric:
-        """Insert or update a terminal metric."""
-        query = select(TerminalMetric).where(TerminalMetric.asset_id == asset_id)
-        result = await db.execute(query)
-        metric = result.scalar_one_or_none()
+        """Insert or update a terminal metric.
 
+        C-09 修复：改用 PostgreSQL INSERT ... ON CONFLICT (asset_id) DO UPDATE，
+        原子性保证，彻底消除 SELECT-then-UPDATE 的 TOCTOU 竞态和并发累积重复行问题。
+        依赖 terminal_metrics.asset_id 的 UNIQUE 约束（迁移 20260717_0004）。
+        """
         now = datetime.now(UTC)
 
-        if metric:
-            metric.owner_username = owner_username
-            metric.hostname = hostname
-            metric.ip_address = ip_address
-            metric.cpu_usage = cpu_usage
-            metric.memory_usage = memory_usage
-            metric.memory_total_gb = memory_total_gb
-            metric.disk_usage = disk_usage
-            metric.disk_total_gb = disk_total_gb
-            metric.network_in = network_in
-            metric.network_out = network_out
-            metric.uptime_hours = uptime_hours
-            metric.last_heartbeat = last_heartbeat
-            metric.current_status = current_status
-            metric.alert_count = alert_count
-            metric.alert_severity = alert_severity
-            metric.monitor_name = monitor_name
-            metric.metrics_timestamp = now
-            metric.updated_at = now
-        else:
-            metric = TerminalMetric(
-                asset_id=asset_id,
-                hostname=hostname,
-                owner_username=owner_username,
-                ip_address=ip_address,
-                cpu_usage=cpu_usage,
-                memory_usage=memory_usage,
-                memory_total_gb=memory_total_gb,
-                disk_usage=disk_usage,
-                disk_total_gb=disk_total_gb,
-                network_in=network_in,
-                network_out=network_out,
-                uptime_hours=uptime_hours,
-                last_heartbeat=last_heartbeat,
-                current_status=current_status,
-                alert_count=alert_count,
-                alert_severity=alert_severity,
-                monitor_name=monitor_name,
-                metrics_timestamp=now,
-                created_at=now,
-                updated_at=now,
-            )
-            db.add(metric)
+        values = {
+            "asset_id": asset_id,
+            "hostname": hostname,
+            "owner_username": owner_username,
+            "ip_address": ip_address,
+            "cpu_usage": cpu_usage,
+            "memory_usage": memory_usage,
+            "memory_total_gb": memory_total_gb,
+            "disk_usage": disk_usage,
+            "disk_total_gb": disk_total_gb,
+            "network_in": network_in,
+            "network_out": network_out,
+            "uptime_hours": uptime_hours,
+            "last_heartbeat": last_heartbeat,
+            "current_status": current_status,
+            "alert_count": alert_count,
+            "alert_severity": alert_severity,
+            "monitor_name": monitor_name,
+            "metrics_timestamp": now,
+            "created_at": now,
+            "updated_at": now,
+        }
 
+        update_set = {
+            "owner_username": owner_username,
+            "hostname": hostname,
+            "ip_address": ip_address,
+            "cpu_usage": cpu_usage,
+            "memory_usage": memory_usage,
+            "memory_total_gb": memory_total_gb,
+            "disk_usage": disk_usage,
+            "disk_total_gb": disk_total_gb,
+            "network_in": network_in,
+            "network_out": network_out,
+            "uptime_hours": uptime_hours,
+            "last_heartbeat": last_heartbeat,
+            "current_status": current_status,
+            "alert_count": alert_count,
+            "alert_severity": alert_severity,
+            "monitor_name": monitor_name,
+            "metrics_timestamp": now,
+            "updated_at": now,
+        }
+
+        stmt = pg_insert(TerminalMetric).values(**values)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["asset_id"],
+            set_=update_set,
+        )
+        await db.execute(stmt)
         await db.flush()
-        return metric
 
-    async def bulk_upsert_metrics(
-        self,
-        db: AsyncSession,
-        metrics_data: list[dict[str, Any]],
-    ) -> int:
-        """Bulk insert or update terminal metrics."""
-        created_count = 0
-
-        for data in metrics_data:
-            await self.upsert_metric(db, **data)
-            created_count += 1
-
-        await db.commit()
-        return created_count
+        # ON CONFLICT 后查询返回 ORM 对象（UNIQUE 约束保证仅 1 行）
+        result = await db.execute(
+            select(TerminalMetric).where(TerminalMetric.asset_id == asset_id)
+        )
+        return result.scalar_one()
 
     async def get_last_sync_time(
         self,

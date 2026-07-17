@@ -1,8 +1,8 @@
 """
 Tests for alert card status sync feature.
 """
-import pytest
-from unittest.mock import patch, MagicMock
+from datetime import UTC
+from unittest.mock import MagicMock
 
 
 class TestFeishuNotificationServiceSendP2P:
@@ -165,28 +165,30 @@ class TestAlertHistoryModelHasFeishuField:
 
     def test_alert_history_has_feishu_open_message_id_field(self):
         """AlertHistory should have feishu_open_message_id attribute."""
+        from datetime import datetime
+
         from app.models.alert import AlertHistory
-        from datetime import datetime, timezone
 
         history = AlertHistory(
             alertname="TestAlert",
             status="firing",
             severity="critical",
-            starts_at=datetime.now(timezone.utc),
+            starts_at=datetime.now(UTC),
         )
 
         assert hasattr(history, "feishu_open_message_id")
 
     def test_alert_history_feishu_open_message_id_default_is_none(self):
         """AlertHistory feishu_open_message_id default should be None."""
+        from datetime import datetime
+
         from app.models.alert import AlertHistory
-        from datetime import datetime, timezone
 
         history = AlertHistory(
             alertname="TestAlert",
             status="firing",
             severity="critical",
-            starts_at=datetime.now(timezone.utc),
+            starts_at=datetime.now(UTC),
         )
 
         assert history.feishu_open_message_id is None

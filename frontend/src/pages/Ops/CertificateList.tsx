@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Table, Button, Select, Tag, Space, Card, App } from 'antd';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { ReloadOutlined, SyncOutlined } from '@ant-design/icons';
 import { opsApi } from '../../services/ops';
 import { fuzzyFilterOption } from '../../utils/selectFilter';
@@ -18,21 +18,25 @@ const CertificateList = () => {
     pageSize: 10,
   });
 
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ['certificates', filter, pagination],
+  // I-19 修复：原全量拉取前端分页，现改为服务端分页 + keepPreviousData
+  // 翻页时保留上一页数据避免闪烁，queryKey 包含 page/pageSize 触发重新请求
+  const { data, isLoading, isFetching, refetch } = useQuery({
+    queryKey: ['certificates', filter, pagination.current, pagination.pageSize],
     queryFn: async () => {
-    const result = await opsApi.getCertificates({
-      skip: (pagination.current - 1) * pagination.pageSize,
-      limit: pagination.pageSize,
-      status: filter.status,
-      expiring_soon: filter.expiringSoon,
-    });
-    return {
-      items: Array.isArray(result) ? result : [],
-      total: Array.isArray(result) ? result.length : 0,
-    };
-  },
+      const result = await opsApi.getCertificates({
+        status: filter.status,
+        expiring_soon: filter.expiringSoon,
+        page: pagination.current,
+        page_size: pagination.pageSize,
+      });
+      // 兼容服务端分页响应结构 {total, items, ...}
+      return result;
+    },
+    placeholderData: keepPreviousData,
   });
+
+  const total = data?.total ?? 0;
+  const pagedItems = data?.items ?? [];
 
   const syncMutation = useMutation({
     mutationFn: opsApi.syncCertificates,
@@ -123,7 +127,10 @@ const CertificateList = () => {
           <Select
             placeholder="状态"
             value={filter.status}
-            onChange={(value) => setFilter({ ...filter, status: value })}
+            onChange={(value) => {
+              setFilter({ ...filter, status: value });
+              setPagination((p) => ({ ...p, current: 1 }));
+            }}
             style={{ width: 120 }}
             allowClear
             showSearch
@@ -136,7 +143,10 @@ const CertificateList = () => {
           <Select
             placeholder="即将过期"
             value={filter.expiringSoon}
-            onChange={(value) => setFilter({ ...filter, expiringSoon: value })}
+            onChange={(value) => {
+              setFilter({ ...filter, expiringSoon: value });
+              setPagination((p) => ({ ...p, current: 1 }));
+            }}
             style={{ width: 120 }}
             allowClear
             showSearch
@@ -161,14 +171,15 @@ const CertificateList = () => {
 
       <Table
         columns={columns}
-        dataSource={data?.items || []}
+        dataSource={pagedItems}
         rowKey="id"
-        loading={isLoading}
+        loading={isLoading || isFetching}
         pagination={{
           current: pagination.current,
           pageSize: pagination.pageSize,
-          total: data?.total || 0,
+          total,
           showSizeChanger: true,
+          pageSizeOptions: ['10', '20', '50', '100'],
           showTotal: (total: number) => `共 ${total} 条`,
           onChange: (page: number, pageSize: number) => setPagination({ current: page, pageSize }),
         }}

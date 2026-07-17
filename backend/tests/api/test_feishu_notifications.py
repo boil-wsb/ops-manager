@@ -1,8 +1,9 @@
 """
 Tests for Feishu Notifications API.
 """
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 from httpx import AsyncClient
 
 

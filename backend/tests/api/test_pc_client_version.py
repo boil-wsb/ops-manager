@@ -1,10 +1,8 @@
 """
 Tests for PC Client Version API - Download functionality.
 """
-import json
+
 import pytest
-from unittest.mock import patch, MagicMock
-from pathlib import Path
 from httpx import AsyncClient
 
 

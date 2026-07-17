@@ -6,7 +6,7 @@ import ipaddress
 from collections import defaultdict
 from typing import Any
 
-from sqlalchemy import and_, delete, func, select
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -243,7 +243,7 @@ class CRUDAssetRelation(CRUDBase[AssetRelation, AssetRelationCreate, dict[str, A
                 if host and host not in detail_by_instance:
                     detail_by_instance[host.lower()] = d
 
-        for asset, node in zip(assets, nodes):
+        for asset, node in zip(assets, nodes, strict=False):
             detail = self._match_detail(asset, detail_by_instance)
             if detail:
                 node["metrics"] = {
@@ -312,7 +312,7 @@ class CRUDAssetRelation(CRUDBase[AssetRelation, AssetRelationCreate, dict[str, A
                 if k:
                     terminal_by_key.setdefault(k.lower(), m)
 
-        for asset, node in zip(assets, nodes):
+        for asset, node in zip(assets, nodes, strict=False):
             m = None
             if asset.asset_type.value in ("SERVER", "VM", "NETWORK", "STORAGE"):
                 m = self._lookup_metric(asset, server_by_key)

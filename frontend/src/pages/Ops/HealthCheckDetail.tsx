@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import {
-  Button, Space, App, Dropdown, Tabs, Tag, Progress, Row, Col, Spin,
+  Button, Space, App, Dropdown, Tabs, Tag, Progress, Row, Col, Spin, Segmented,
 } from 'antd';
 import {
   ArrowLeftOutlined, ExportOutlined,
@@ -93,6 +93,7 @@ const HostCard = ({ detail, thresholds, dark }: { detail: HealthCheckDetail; thr
   const statusLabel = detail.hostStatus === 'critical' ? '严重' : detail.hostStatus === 'warning' ? '警告' : '正常';
   const isServer = detail.assetType?.toLowerCase().includes('server') || detail.assetType?.toLowerCase().includes('服务器');
   const isTerminal = detail.assetType?.toLowerCase().includes('terminal') || detail.assetType?.toLowerCase().includes('终端');
+  const isWindows = detail.osInfo?.toLowerCase().includes('windows') ?? false;
 
   const cardStyle: React.CSSProperties = dark ? {
     background: c.bgCard,
@@ -145,6 +146,11 @@ const HostCard = ({ detail, thresholds, dark }: { detail: HealthCheckDetail; thr
           <Tag color={isServer ? 'blue' : isTerminal ? 'purple' : 'default'} style={{ margin: 0, fontSize: 11 }}>
             {detail.assetType}
           </Tag>
+          {isWindows && (
+            <Tag color="cyan" style={{ margin: 0, fontSize: 11, fontWeight: 600 }}>
+              Windows
+            </Tag>
+          )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{
@@ -196,24 +202,34 @@ const HostCard = ({ detail, thresholds, dark }: { detail: HealthCheckDetail; thr
 
       {isServer && (detail.load1 !== null || detail.cpuCount !== null) && (
         <div style={{ marginTop: 8, fontSize: 11, color: c.textSecondary, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <span>
-            负载{' '}
-            <span style={{ color: c.textPrimary, fontFamily: 'monospace' }}>
-              {detail.load1 !== null ? detail.load1.toFixed(2) : '-'}
-            </span>
-            <span style={{ color: c.textMuted }}> / </span>
-            <span style={{ color: c.textPrimary, fontFamily: 'monospace' }}>
-              {detail.load5 !== null ? detail.load5.toFixed(2) : '-'}
-            </span>
-            <span style={{ color: c.textMuted }}> / </span>
-            <span style={{ color: c.textPrimary, fontFamily: 'monospace' }}>
-              {detail.load15 !== null ? detail.load15.toFixed(2) : '-'}
-            </span>
-          </span>
-          {detail.cpuCount !== null && (
+          {detail.load1 !== null ? (
+            <>
+              <span>
+                负载{' '}
+                <span style={{ color: c.textPrimary, fontFamily: 'monospace' }}>{detail.load1.toFixed(2)}</span>
+                <span style={{ color: c.textMuted }}> / </span>
+                <span style={{ color: c.textPrimary, fontFamily: 'monospace' }}>
+                  {detail.load5 !== null ? detail.load5.toFixed(2) : '-'}
+                </span>
+                <span style={{ color: c.textMuted }}> / </span>
+                <span style={{ color: c.textPrimary, fontFamily: 'monospace' }}>
+                  {detail.load15 !== null ? detail.load15.toFixed(2) : '-'}
+                </span>
+              </span>
+              {detail.cpuCount !== null && (
+                <span>
+                  CPU <span style={{ color: c.textPrimary, fontFamily: 'monospace' }}>{detail.cpuCount}</span>
+                  <span style={{ color: c.textMuted }}> cores</span>
+                </span>
+              )}
+            </>
+          ) : (
             <span>
               CPU <span style={{ color: c.textPrimary, fontFamily: 'monospace' }}>{detail.cpuCount}</span>
               <span style={{ color: c.textMuted }}> cores</span>
+              {detail.cpuUsage !== null && (
+                <span style={{ color: c.textMuted }}> | {detail.cpuUsage}%</span>
+              )}
             </span>
           )}
         </div>
@@ -269,6 +285,7 @@ const HealthCheckDetailPage = () => {
   const reportId = Number(id);
 
   const [activeTab, setActiveTab] = useState('server');
+  const [serverFilter, setServerFilter] = useState<'all' | 'linux' | 'windows'>('all');
 
   const { data: report, isLoading } = useQuery({
     queryKey: ['healthCheckReport', reportId],
@@ -330,14 +347,24 @@ const HealthCheckDetailPage = () => {
     switch (activeTab) {
       case 'abnormal':
         return details.filter((d) => d.hostStatus === 'warning' || d.hostStatus === 'critical');
-      case 'server':
-        return details.filter((d) => d.assetType?.toLowerCase().includes('server') || d.assetType?.toLowerCase().includes('服务器'));
+      case 'server': {
+        const servers = details.filter(
+          (d) => d.assetType?.toLowerCase().includes('server') || d.assetType?.toLowerCase().includes('服务器')
+        );
+        if (serverFilter === 'windows') {
+          return servers.filter((d) => (d.osInfo?.toLowerCase().includes('windows') ?? false));
+        }
+        if (serverFilter === 'linux') {
+          return servers.filter((d) => !(d.osInfo?.toLowerCase().includes('windows') ?? false));
+        }
+        return servers;
+      }
       case 'terminal':
         return details.filter((d) => d.assetType?.toLowerCase().includes('terminal') || d.assetType?.toLowerCase().includes('终端'));
       default:
         return details;
     }
-  }, [report, activeTab]);
+  }, [report, activeTab, serverFilter]);
 
   const overviewCards = report ? [
     { label: '正常', value: report.okCount, icon: <CheckCircleOutlined />, color: c.accentGreen },
@@ -576,6 +603,25 @@ const HealthCheckDetailPage = () => {
           ]}
           style={{ marginBottom: 16 }}
         />
+
+        {activeTab === 'server' && (
+          <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 12, color: c.textSecondary }}>系统分组:</span>
+            <Segmented
+              value={serverFilter}
+              onChange={(v) => setServerFilter(v as 'all' | 'linux' | 'windows')}
+              options={[
+                { label: '全部', value: 'all' },
+                { label: 'Linux', value: 'linux' },
+                { label: 'Windows', value: 'windows' },
+              ]}
+              size="small"
+            />
+            <span style={{ fontSize: 12, color: c.textMuted }}>
+              共 {filteredDetails.length} 台
+            </span>
+          </div>
+        )}
 
         <Row gutter={[16, 16]}>
           {filteredDetails.length === 0 ? (

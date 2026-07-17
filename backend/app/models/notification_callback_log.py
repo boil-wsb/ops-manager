@@ -1,9 +1,6 @@
-from datetime import datetime
-
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.tz import now_shanghai
 from app.models.base import BaseModel
 
 
@@ -19,6 +16,4 @@ class NotificationCallbackLog(BaseModel):
     response_body: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=now_shanghai
-    )
+    # created_at 继承自 BaseModel，统一使用 DB 时钟 (server_default=func.now())

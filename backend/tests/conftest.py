@@ -6,16 +6,16 @@ import os
 
 os.environ.setdefault("DISABLE_RATE_LIMIT", "true")
 
-import pytest
-from typing import AsyncGenerator
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from httpx import AsyncClient, ASGITransport
+from collections.abc import AsyncGenerator
 
-from app.main import app
-from app.db.base_class import Base
+import pytest
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
 from app.config import settings
 from app.core.rate_limit import limiter
-
+from app.db.base_class import Base
+from app.main import app
 
 TEST_DATABASE_URL = os.environ.get("DATABASE_URL", settings.async_database_url)
 

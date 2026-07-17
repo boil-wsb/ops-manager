@@ -23,6 +23,7 @@ from app.models.ops import (
 from app.models.user import User
 from app.schemas.ops import (
     CertificateCreate,
+    CertificateListResponse,
     CertificateResponse,
     CertificateSyncResponse,
     CertificateUpdate,
@@ -240,16 +241,22 @@ async def get_inspection_report(
     return report
 
 
-@router.get("/certificates", response_model=list[CertificateResponse])
+@router.get("/certificates", response_model=CertificateListResponse)
 async def list_certificates(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
     status: str | None = Query(None),
     expiring_soon: bool | None = Query(None),
+    page: int = Query(1, ge=1, description="页码，从 1 开始"),
+    page_size: int = Query(20, ge=1, le=500, description="每页数量，上限 500"),
     db: AsyncSession = Depends(get_db),
     current_user: None = Depends(require_permissions(["ops:read"])),
 ):
-    """List all certificates."""
+    """List certificates with server-side pagination.
+
+    I-19 修复：原接口全量返回 list 由前端分页，证书数量增长时单次
+    响应过大。现改为服务端分页（上限 500），返回 {total, items,
+    page, pageSize, totalPages}。前端使用 React Query keepPreviousData
+    优化翻页体验。
+    """
     query = select(Certificate)
 
     if status:
@@ -260,10 +267,25 @@ async def list_certificates(
     elif expiring_soon is False:
         query = query.where(Certificate.days_until_expiry > Certificate.alert_threshold_days)
 
-    query = query.offset(skip).limit(limit).order_by(Certificate.valid_until.asc())
+    # 总数
+    count_query = select(func.count()).select_from(query.subquery())
+    total = (await db.execute(count_query)).scalar() or 0
+
+    # 分页查询
+    skip = (page - 1) * page_size
+    query = query.order_by(Certificate.valid_until.asc()).offset(skip).limit(page_size)
     result = await db.execute(query)
     certificates = result.scalars().all()
-    return certificates
+
+    total_pages = (total + page_size - 1) // page_size if total > 0 else 0
+
+    return {
+        "total": total,
+        "items": certificates,
+        "page": page,
+        "pageSize": page_size,
+        "totalPages": total_pages,
+    }
 
 
 @router.post(

@@ -2,12 +2,9 @@
 Notification Record model for tracking Feishu notification history.
 """
 
-from datetime import datetime
-
-from sqlalchemy import JSON, Boolean, DateTime, String
+from sqlalchemy import JSON, Boolean, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.tz import now_shanghai
 from app.models.base import BaseModel
 
 
@@ -28,9 +25,9 @@ class NotificationRecord(BaseModel):
     message_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     success: Mapped[bool] = mapped_column(Boolean, default=False)
     error: Mapped[str | None] = mapped_column(String(1000), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=now_shanghai
-    )
+    # created_at 和 updated_at 均继承自 BaseModel，统一使用 DB 时钟 (server_default=func.now())
+    # 历史 bug: created_at 用 Python now_shanghai()，updated_at 用 DB func.now()，
+    # 两个时钟源导致 updated_at < created_at 的不可能时序。
 
     def __repr__(self) -> str:
         return f"<NotificationRecord {self.id}: user={self.user}, success={self.success}>"

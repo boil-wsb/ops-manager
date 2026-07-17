@@ -23,6 +23,9 @@ logger = get_logger(__name__)
 DEFAULT_THRESHOLDS = {
     "cpu_load_per_core_warning": 0.8,
     "cpu_load_per_core_critical": 1.5,
+    # Windows 无 load 概念，改用 CPU 使用率（百分比）
+    "cpu_usage_percent_warning": 80,
+    "cpu_usage_percent_critical": 95,
     "memory_usage_warning": 80,
     "memory_usage_critical": 95,
     "disk_usage_warning": 80,
@@ -47,17 +50,29 @@ class HealthCheckService:
             except (json.JSONDecodeError, TypeError):
                 logger.warning("解析阈值配置失败，使用默认值", extra={"action": "health_check.run"})
 
-        # 2. Collect server metrics
+        # 2. Collect server metrics (Linux + Windows)
         client = get_prometheus_client()
         server_metrics = []
         try:
             server_metrics = await client.get_all_nodes_health_check()
             logger.info(
-                f"采集服务器指标: {len(server_metrics)} 台",
-                extra={"action": "health_check.run", "server_count": len(server_metrics)},
+                f"采集Linux服务器指标: {len(server_metrics)} 台",
+                extra={"action": "health_check.run", "linux_server_count": len(server_metrics)},
             )
         except Exception as e:
-            logger.error(f"采集服务器指标失败: {e}", extra={"action": "health_check.run"})
+            logger.error(f"采集Linux服务器指标失败: {e}", extra={"action": "health_check.run"})
+
+        windows_server_metrics = []
+        try:
+            windows_server_metrics = await client.get_all_windows_nodes_health_check()
+            logger.info(
+                f"采集Windows服务器指标: {len(windows_server_metrics)} 台",
+                extra={"action": "health_check.run", "windows_server_count": len(windows_server_metrics)},
+            )
+        except Exception as e:
+            logger.error(f"采集Windows服务器指标失败: {e}", extra={"action": "health_check.run"})
+
+        server_metrics.extend(windows_server_metrics)
 
         # 3. Collect terminal metrics
         terminal_metrics = []
@@ -151,40 +166,77 @@ class HealthCheckService:
                     }
                 )
 
-            # Check CPU load per core
-            load_per_core = load1 / cpu_count if cpu_count > 0 else 0
-            cpu_critical = thresholds.get("cpu_load_per_core_critical", 1.5)
-            cpu_warning = thresholds.get("cpu_load_per_core_warning", 0.8)
-            if load_per_core > cpu_critical:
-                check_details.append(
-                    {
-                        "name": "CPU负载",
-                        "status": "critical",
-                        "value": f"{load_per_core:.2f}",
-                        "threshold": f">{cpu_critical}",
-                    }
-                )
-                host_status = "critical"
-            elif load_per_core > cpu_warning:
-                check_details.append(
-                    {
-                        "name": "CPU负载",
-                        "status": "warning",
-                        "value": f"{load_per_core:.2f}",
-                        "threshold": f">{cpu_warning}",
-                    }
-                )
-                if host_status != "critical":
-                    host_status = "warning"
+            # CPU 检查：Windows 使用 CPU 使用率（无 load 概念），Linux 使用负载（load_per_core）
+            if metrics.get("is_windows"):
+                # Windows 无 load 概念，改用 CPU 使用率（百分比）
+                cpu_val = metrics.get("cpu_usage_percent", 0.0) or 0.0
+                cpu_critical = thresholds.get("cpu_usage_percent_critical", 95)
+                cpu_warning = thresholds.get("cpu_usage_percent_warning", 80)
+                if cpu_val > cpu_critical:
+                    check_details.append(
+                        {
+                            "name": "CPU使用率",
+                            "status": "critical",
+                            "value": f"{cpu_val:.1f}%",
+                            "threshold": f">{cpu_critical}%",
+                        }
+                    )
+                    host_status = "critical"
+                elif cpu_val > cpu_warning:
+                    check_details.append(
+                        {
+                            "name": "CPU使用率",
+                            "status": "warning",
+                            "value": f"{cpu_val:.1f}%",
+                            "threshold": f">{cpu_warning}%",
+                        }
+                    )
+                    if host_status != "critical":
+                        host_status = "warning"
+                else:
+                    check_details.append(
+                        {
+                            "name": "CPU使用率",
+                            "status": "ok",
+                            "value": f"{cpu_val:.1f}%",
+                            "threshold": f">{cpu_warning}%",
+                        }
+                    )
             else:
-                check_details.append(
-                    {
-                        "name": "CPU负载",
-                        "status": "ok",
-                        "value": f"{load_per_core:.2f}",
-                        "threshold": f">{cpu_warning}",
-                    }
-                )
+                # Linux: 检查 CPU 负载（load_per_core）
+                load_per_core = load1 / cpu_count if cpu_count > 0 else 0
+                cpu_critical = thresholds.get("cpu_load_per_core_critical", 1.5)
+                cpu_warning = thresholds.get("cpu_load_per_core_warning", 0.8)
+                if load_per_core > cpu_critical:
+                    check_details.append(
+                        {
+                            "name": "CPU负载",
+                            "status": "critical",
+                            "value": f"{load_per_core:.2f}",
+                            "threshold": f">{cpu_critical}",
+                        }
+                    )
+                    host_status = "critical"
+                elif load_per_core > cpu_warning:
+                    check_details.append(
+                        {
+                            "name": "CPU负载",
+                            "status": "warning",
+                            "value": f"{load_per_core:.2f}",
+                            "threshold": f">{cpu_warning}",
+                        }
+                    )
+                    if host_status != "critical":
+                        host_status = "warning"
+                else:
+                    check_details.append(
+                        {
+                            "name": "CPU负载",
+                            "status": "ok",
+                            "value": f"{load_per_core:.2f}",
+                            "threshold": f">{cpu_warning}",
+                        }
+                    )
 
             # Check memory usage
             mem_critical = thresholds.get("memory_usage_critical", 95)
@@ -292,9 +344,8 @@ class HealthCheckService:
             disk_warning = thresholds.get("disk_usage_warning", 80)
 
             # Check CPU usage
-            cpu_critical = thresholds.get("memory_usage_critical", 95)
-            cpu_warning = thresholds.get("memory_usage_warning", 80)
-            # For terminals, use the same warning/critical thresholds for CPU
+            cpu_critical = thresholds.get("cpu_usage_percent_critical", 95)
+            cpu_warning = thresholds.get("cpu_usage_percent_warning", 80)
             if cpu_usage > cpu_critical:
                 check_details.append(
                     {

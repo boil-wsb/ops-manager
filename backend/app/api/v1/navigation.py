@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_current_user_optional, get_db
 from app.core.audit import audit_log
-from app.core.cache import cache_delete_pattern, cache_get_or_set
+from app.core.cache import cache_delete_pattern
 from app.core.logging import get_logger
 from app.core.permissions import require_permissions
 from app.core.tz import now_shanghai
@@ -40,7 +40,6 @@ async def get_public_navigation_links(
     """Get active navigation links grouped by category, filtered by user roles."""
     if current_user and not current_user.is_superuser:
         user_role_ids = {role.id for role in current_user.roles}
-        cache_key = f"nav:public:user:{','.join(str(rid) for rid in sorted(user_role_ids))}"
 
         grouped = await navigation_link.get_grouped_links_for_user(db, user_role_ids)
     else:

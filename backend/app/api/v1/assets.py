@@ -109,15 +109,34 @@ async def trigger_asset_sync(
     """手动触发从 Prometheus 同步资产"""
     import asyncio
 
-    from app.services.prometheus.asset_sync import sync_assets_from_prometheus
+    from app.services.prometheus.asset_sync_optimized import OptimizedAssetSyncService
 
     async def _run_sync():
         """使用独立数据库会话运行同步任务，避免请求作用域会话被提前关闭"""
         from app.db.session import db_operation_with_retry
 
-        await db_operation_with_retry(sync_assets_from_prometheus, max_retries=3, retry_delay=2.0)
+        async def _sync_op(db):
+            service = OptimizedAssetSyncService(db)
+            return await service.sync_all_assets()
 
-    asyncio.create_task(_run_sync())
+        await db_operation_with_retry(_sync_op, max_retries=3, retry_delay=2.0)
+
+    # I-16 修复：asyncio.create_task 必须添加异常回调，否则任务内异常
+    # 会被静默吞掉（Python 仅在 GC 回收 Task 时打印警告），导致同步失败
+    # 但调用方误以为已触发。回调内记录 ERROR 日志含 traceback。
+    task = asyncio.create_task(_run_sync())
+
+    def _log_task_exception(t: asyncio.Task) -> None:
+        if t.cancelled():
+            return
+        exc = t.exception()
+        if exc is not None:
+            logger.exception(
+                f"Asset sync background task failed: {exc}",
+                extra={"action": "asset.sync", "error": str(exc)},
+            )
+
+    task.add_done_callback(_log_task_exception)
 
     return {
         "message": "Asset sync task triggered successfully",

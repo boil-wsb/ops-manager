@@ -6,15 +6,16 @@ Revises: 0003_add_prometheus_sync_fields
 Create Date: 2026-03-16
 """
 import os
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
+
 revision: str = '0004_create_navigation_links'
-down_revision: Union[str, None] = '0003_add_prometheus_sync_fields'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = '0003_add_prometheus_sync_fields'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -33,9 +34,9 @@ def upgrade() -> None:
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), onupdate=sa.func.now(), nullable=False),
         sa.PrimaryKeyConstraint('id'),
     )
-    
+
     op.create_index('ix_navigation_links_category', 'navigation_links', ['category'])
-    
+
     op.create_table(
         'navigation_link_roles',
         sa.Column('navigation_link_id', sa.Integer(), nullable=False),
@@ -45,12 +46,12 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(['role_id'], ['roles.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('navigation_link_id', 'role_id'),
     )
-    
+
     prometheus_url = os.environ.get("PROMETHEUS_URL", "http://localhost:9090")
     pushgateway_url = prometheus_url.rsplit(":", 1)[0] + ":9091"
     op.execute(f"""
         INSERT INTO navigation_links (category, name, url, icon, description, sort_order, is_active)
-        VALUES 
+        VALUES
             ('监控', '监控目标', '{prometheus_url}/targets', 'MonitorOutlined', 'Prometheus监控目标页面', 1, true),
             ('监控', 'Pushgateway', '{pushgateway_url}/#', 'CloudUploadOutlined', 'Prometheus Pushgateway', 2, true)
     """)

@@ -520,10 +520,10 @@ async def _init_thread_db():
     to the event loop that created them.
     """
     from app.db.session import (
-        _scheduler_thread_local,
-        create_scheduler_engine,
-        async_sessionmaker,
         AsyncSession,
+        _scheduler_thread_local,
+        async_sessionmaker,
+        create_scheduler_engine,
     )
 
     engine = create_scheduler_engine()

@@ -6,35 +6,14 @@ from logging.config import fileConfig
 
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
 # Import application models and config
 from app.config import settings
-from app.models.base import BaseModel
 
 # Import all models to ensure they are registered with SQLAlchemy
-from app.models import (
-    User, user_roles,
-    Department,
-    Permission, Role, role_permissions,
-    Asset, Label, asset_labels,
-    AuditLog,
-    NavigationLink, navigation_link_roles,
-    ITFeedback,
-    FeishuInteraction,
-    Deployment, InspectionTask, InspectionReport, Certificate, DNSRecord,
-    NotificationGroup, notification_group_members,
-    NotificationRecord,
-    NotificationCallbackLog,
-    AlertHistory, AlertSilence, AlertTemplate,
-    TerminalMetric,
-    ScheduledTask, TaskExecutionLog,
-    HealthCheckReport, HealthCheckDetail,
-    SystemConfig,
-    PCClientVersion,
-)
+from app.models.base import BaseModel
 
 # this is the Alembic Config object
 config = context.config
@@ -92,7 +71,7 @@ async def run_async_migrations() -> None:
     and associate a connection with the context.
     """
     from sqlalchemy.ext.asyncio import create_async_engine
-    
+
     # Create async engine using the asyncpg URL from settings
     connectable = create_async_engine(
         settings.database_url,

@@ -376,6 +376,9 @@ const NotificationGroupList = () => {
             style={{ width: '100%' }}
             value={selectedUserIds}
             onChange={setSelectedUserIds}
+            showSearch
+            optionFilterProp="label"
+            filterOption={fuzzyFilterOption}
             options={allUsers.map((user) => ({
               value: user.id,
               label: `${user.fullName || user.username}${user.feishuOpenId ? ' ✓' : ' (无飞书)'}`,

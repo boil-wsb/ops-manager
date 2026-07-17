@@ -82,6 +82,7 @@ build/
 *.bak
 *.tmp
 *.temp
+_tmp_*
 
 # Virtuos
 Virtuos/

@@ -478,7 +478,6 @@ async def sync_departments(db) -> dict:
         d.feishu_department_id: d for d in existing_departments
     }
 
-    feishu_dept_ids = {d.open_department_id for d in feishu_departments}
     created = 0
     updated = 0
     errors = []

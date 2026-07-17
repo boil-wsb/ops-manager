@@ -2,9 +2,11 @@
 Department management API routes.
 """
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_db, require_permissions
 from app.core.logging import get_logger
@@ -14,6 +16,14 @@ from app.models.user import User
 
 router = APIRouter(prefix="/departments", tags=["部门"])
 logger = get_logger(__name__)
+
+
+class DepartmentLeaderUpdate(BaseModel):
+    """Schema for updating department leader."""
+
+    leader_id: int | None = None  # None 表示清除负责人
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 def _build_department_tree(
@@ -32,9 +42,6 @@ def _build_department_tree(
     Returns:
         List of root department tree nodes.
     """
-    # Build id -> department mapping
-    dept_by_id: dict[int, Department] = {d.id: d for d in departments}
-
     # Build parent_id -> list of child departments mapping
     children_map: dict[int | None, list[Department]] = {}
     for dept in departments:
@@ -50,6 +57,9 @@ def _build_department_tree(
             "feishu_department_id": dept.feishu_department_id,
             "member_count": dept.member_count,
             "is_root": dept.is_root,
+            "leader_id": dept.leader_id,
+            "leader_username": dept.leader.username if dept.leader else None,
+            "leader_full_name": dept.leader.full_name if dept.leader else None,
             "children": children,
             "users": dept_users,
         }
@@ -65,8 +75,10 @@ async def get_department_tree(
     current_user: User = Depends(require_permissions(["user:read"])),
 ):
     """Get the department tree with users under each department."""
-    # Load all departments (flat list)
-    result = await db.execute(select(Department))
+    # Load all departments (flat list) with leader preloaded
+    result = await db.execute(
+        select(Department).options(selectinload(Department.leader))
+    )
     departments = list(result.scalars().all())
 
     # Load all users
@@ -108,7 +120,7 @@ async def _sync_departments_and_users():
 @router.post("/sync")
 async def sync_departments_from_feishu(
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(require_permissions(["user:write"])),
+    current_user: User = Depends(require_permissions(["user:update"])),
 ):
     """Trigger department + user sync from Feishu.
 
@@ -120,4 +132,67 @@ async def sync_departments_from_feishu(
     return {
         "message": "部门及用户同步已在后台启动",
         "status": "pending",
+    }
+
+
+@router.put("/{dept_id}/leader")
+async def set_department_leader(
+    dept_id: int,
+    payload: DepartmentLeaderUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permissions(["user:update"])),
+):
+    """Set or clear the leader of a department.
+
+    - leader_id=None clears the leader.
+    - The target user must be active and have a feishu_open_id (required for
+      receiving Feishu suggestion cards).
+    - Cross-department assignment is allowed (some departments have zero users).
+    """
+    result = await db.execute(
+        select(Department).options(selectinload(Department.leader)).where(Department.id == dept_id)
+    )
+    dept = result.scalar_one_or_none()
+    if not dept:
+        raise HTTPException(status_code=404, detail="部门不存在")
+
+    leader_id = payload.leader_id
+
+    if leader_id is not None:
+        user_result = await db.execute(select(User).where(User.id == leader_id))
+        leader = user_result.scalar_one_or_none()
+        if not leader or not leader.is_active:
+            raise HTTPException(status_code=400, detail="用户不存在或已禁用")
+        if not leader.feishu_open_id:
+            raise HTTPException(
+                status_code=400,
+                detail="该用户未绑定飞书账号，无法接收建议卡片",
+            )
+
+    dept.leader_id = leader_id
+    await db.commit()
+    # commit 后 relationship 可能失效，重新查询确保返回最新 leader
+    # 根因：db.refresh(dept, attribute_names=["leader"]) 在 commit 后不可靠
+    result = await db.execute(
+        select(Department).options(selectinload(Department.leader)).where(Department.id == dept_id)
+    )
+    dept = result.scalar_one()
+
+    logger.info(
+        "部门负责人已更新",
+        extra={
+            "action": "department.set_leader",
+            "dept_id": dept.id,
+            "dept_name": dept.name,
+            "leader_id": leader_id,
+            "operator_id": current_user.id,
+        },
+    )
+
+    return {
+        "id": dept.id,
+        "name": dept.name,
+        "leader_id": dept.leader_id,
+        "leader_username": dept.leader.username if dept.leader else None,
+        "leader_full_name": dept.leader.full_name if dept.leader else None,
     }

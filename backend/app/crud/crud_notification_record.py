@@ -86,6 +86,10 @@ class CRUDNotificationRecord(CRUDBase):
         if "success" in update_data and update_data["success"] is None:
             del update_data["success"]
 
+        # 显式设置 updated_at: Core update() 语句不触发 ORM 的 onupdate=func.now()
+        # 不显式设置的话 updated_at 永远不变，无法反映实际更新时间
+        update_data["updated_at"] = func.now()
+
         stmt = (
             update(NotificationRecord)
             .where(NotificationRecord.id == record_id)

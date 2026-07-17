@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Table, Button, Input, Select, Tag, Space, Card, App, Popconfirm, Modal, Tooltip, Tree, Segmented } from 'antd';
+import { Table, Button, Input, Select, Tag, Space, Card, App, Popconfirm, Modal, Tooltip, Tree, Segmented, Empty } from 'antd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, SendOutlined, SyncOutlined, UserOutlined, ApartmentOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, SendOutlined, SyncOutlined, UserOutlined, ApartmentOutlined, CrownOutlined } from '@ant-design/icons';
 import { userApi } from '../../services/users';
 import { departmentApi, type DepartmentNode } from '../../services/departments';
 import { fuzzyFilterOption } from '../../utils/selectFilter';
@@ -34,6 +34,9 @@ const UserList = () => {
   const [messageUser, setMessageUser] = useState<User | null>(null);
   const [messageContent, setMessageContent] = useState('');
   const [viewMode, setViewMode] = useState<'list' | 'tree'>('list');
+  const [leaderModalOpen, setLeaderModalOpen] = useState(false);
+  const [editingDept, setEditingDept] = useState<DepartmentNode | null>(null);
+  const [selectedLeaderId, setSelectedLeaderId] = useState<number | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['users', searchParams],
@@ -88,6 +91,22 @@ const UserList = () => {
     },
   });
 
+  const setLeaderMutation = useMutation({
+    mutationFn: ({ deptId, leaderId }: { deptId: number; leaderId: number | null }) =>
+      departmentApi.setLeader(deptId, leaderId),
+    onSuccess: () => {
+      message.success('部门负责人设置成功');
+      setLeaderModalOpen(false);
+      setEditingDept(null);
+      setSelectedLeaderId(null);
+      refetchTree();
+    },
+    onError: (error: unknown) => {
+      const errorMsg = error instanceof Error ? error.message : '部门负责人设置失败';
+      message.error(errorMsg);
+    },
+  });
+
   const handleAddUser = () => {
     setEditingUser(null);
     setModalOpen(true);
@@ -112,6 +131,23 @@ const UserList = () => {
   const handleSendMessageConfirm = () => {
     if (!messageUser || !messageContent.trim()) return;
     sendMessageMutation.mutate({ id: messageUser.id, msg: messageContent.trim() });
+  };
+
+  const handleSetLeader = (dept: DepartmentNode) => {
+    setEditingDept(dept);
+    setSelectedLeaderId(dept.leaderId ?? null);
+    setLeaderModalOpen(true);
+  };
+
+  const handleLeaderModalConfirm = () => {
+    if (!editingDept) return;
+    setLeaderMutation.mutate({ deptId: editingDept.id, leaderId: selectedLeaderId });
+  };
+
+  // 获取部门下可作为负责人的候选用户（活跃且有飞书open_id）
+  const getLeaderCandidates = (dept: DepartmentNode | null) => {
+    if (!dept) return [];
+    return dept.users.filter((u) => u.isActive && u.feishuOpenId);
   };
 
   const columns = [
@@ -228,6 +264,28 @@ const UserList = () => {
           <ApartmentOutlined style={{ marginRight: 4 }} />
           {node.name}
           <Tag color="blue" style={{ marginLeft: 8, fontSize: 11 }}>{countAllUsers(node)}人</Tag>
+          {node.leaderFullName ? (
+            <Tag color="green" style={{ marginLeft: 4, fontSize: 11 }}>
+              <CrownOutlined style={{ marginRight: 2 }} />
+              负责人：{node.leaderFullName}
+            </Tag>
+          ) : (
+            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>未配置负责人</Tag>
+          )}
+          <PermissionGuard permissions="user:update">
+            <Button
+              type="link"
+              size="small"
+              icon={<CrownOutlined />}
+              style={{ marginLeft: 4, padding: 0 }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSetLeader(node);
+              }}
+            >
+              设置负责人
+            </Button>
+          </PermissionGuard>
         </span>
       ),
       children: [
@@ -390,6 +448,48 @@ const UserList = () => {
           maxLength={4000}
           showCount
         />
+      </Modal>
+
+      <Modal
+        title={`设置部门负责人 - ${editingDept?.name || ''}`}
+        open={leaderModalOpen}
+        onOk={handleLeaderModalConfirm}
+        onCancel={() => {
+          setLeaderModalOpen(false);
+          setEditingDept(null);
+          setSelectedLeaderId(null);
+        }}
+        okText="确定"
+        cancelText="取消"
+        confirmLoading={setLeaderMutation.isPending}
+      >
+        {getLeaderCandidates(editingDept).length > 0 ? (
+          <>
+            <p style={{ marginBottom: 8, color: '#666' }}>
+              选择本部门下已绑定飞书账号的活跃成员作为负责人（可清空以移除负责人）：
+            </p>
+            <Select
+              style={{ width: '100%' }}
+              placeholder="请选择负责人"
+              value={selectedLeaderId}
+              onChange={(value: number | null) => setSelectedLeaderId(value ?? null)}
+              allowClear
+              showSearch
+              filterOption={fuzzyFilterOption}
+            >
+              {getLeaderCandidates(editingDept).map((user) => (
+                <Option key={user.id} value={user.id}>
+                  {user.fullName || user.username}
+                </Option>
+              ))}
+            </Select>
+          </>
+        ) : (
+          <Empty
+            description="该部门暂无可用成员（需有飞书账号），请先同步或添加成员"
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+          />
+        )}
       </Modal>
     </div>
   );

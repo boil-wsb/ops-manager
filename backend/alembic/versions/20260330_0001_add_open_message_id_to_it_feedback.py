@@ -4,8 +4,9 @@ Revision ID: add_open_msg_id
 Revises: 20260325_0001
 Create Date: 2026-03-30
 """
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = 'add_open_msg_id'
 down_revision = '20260325_0001'

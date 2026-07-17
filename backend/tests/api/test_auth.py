@@ -208,7 +208,7 @@ async def test_refresh_token_wrong_type(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_invalid_login_attempts(client: AsyncClient):
     """Test multiple invalid login attempts."""
-    for i in range(5):
+    for _ in range(5):
         response = await client.post(
             "/api/v1/auth/login",
             json={
@@ -223,6 +223,7 @@ async def test_invalid_login_attempts(client: AsyncClient):
 async def test_token_expiry(client: AsyncClient):
     """Test token expiry scenario."""
     from datetime import timedelta
+
     from app.core.security import create_access_token
 
     expired_token = create_access_token(

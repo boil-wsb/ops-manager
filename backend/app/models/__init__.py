@@ -2,7 +2,7 @@
 Models package.
 """
 
-from app.models.alert import AlertHistory, AlertSilence, AlertTemplate
+from app.models.alert import AlertCardMessage, AlertHistory, AlertSilence, AlertTemplate
 from app.models.asset import Asset, Label, asset_labels
 from app.models.asset_relation import AssetRelation, RelationType
 from app.models.audit_log import AuditLog
@@ -19,6 +19,7 @@ from app.models.ops import Certificate, Deployment, DNSRecord, InspectionReport,
 from app.models.pc_client_version import PCClientVersion
 from app.models.permission import Permission, Role, role_permissions
 from app.models.scheduled_task import ScheduledTask, TaskExecutionLog
+from app.models.suggestion import Suggestion, SuggestionAssignment, SuggestionStatus
 from app.models.system_config import SystemConfig
 from app.models.terminal_metric import TerminalMetric
 from app.models.user import User, user_roles
@@ -49,12 +50,16 @@ __all__ = [
     "AlertSilence",
     "AlertTemplate",
     "AlertHistory",
+    "AlertCardMessage",
     "TerminalMetric",
     "ScheduledTask",
     "TaskExecutionLog",
     "HealthCheckReport",
     "HealthCheckDetail",
     "SystemConfig",
+    "Suggestion",
+    "SuggestionAssignment",
+    "SuggestionStatus",
     "user_roles",
     "role_permissions",
     "asset_labels",

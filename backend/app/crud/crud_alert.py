@@ -5,8 +5,10 @@ Alert CRUD operations.
 from datetime import datetime
 
 from sqlalchemy import and_, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import get_logger
 from app.core.tz import now_shanghai
 from app.crud.base import CRUDBase
 from app.models.alert import AlertHistory, AlertSilence, AlertTemplate
@@ -16,6 +18,8 @@ from app.schemas.alert import (
     AlertTemplateCreate,
     AlertTemplateUpdate,
 )
+
+logger = get_logger(__name__)
 
 
 class CRUDAlertSilence(CRUDBase[AlertSilence, AlertSilenceCreate, AlertSilenceUpdate]):
@@ -144,7 +148,13 @@ class CRUDAlertHistory(CRUDBase):
         is_suppressed: bool = False,
         silence_id: int | None = None,
     ) -> AlertHistory:
-        """Create alert history from Alertmanager webhook payload."""
+        """Create alert history from Alertmanager webhook payload.
+
+        C-04 修复: 捕获 IntegrityError（部分唯一索引冲突）后重新 SELECT 已存在记录。
+        并发场景: 两个 webhook 同时 SELECT 返回 None，都走 INSERT 路径，
+        第二个 INSERT 触发 ix_alert_history_firing_unique 唯一约束冲突，
+        此处回退为 SELECT 已存在记录并返回，由调用方走 UPDATE 路径。
+        """
         db_obj = AlertHistory(
             alertname=alertname,
             status=status,
@@ -158,7 +168,56 @@ class CRUDAlertHistory(CRUDBase):
             notification_sent=False,
         )
         db.add(db_obj)
-        await db.commit()
+        try:
+            await db.commit()
+        except IntegrityError as exc:
+            # C-04: 部分唯一索引冲突，说明并发 webhook 已插入相同 (alertname, instance, starts_at) 的 firing 记录
+            await db.rollback()
+            logger.warning(
+                f"IntegrityError on INSERT (concurrent webhook detected): "
+                f"alertname={alertname}, instance={labels.get('instance', '')}, "
+                f"starts_at={starts_at}, error={exc.orig}",
+                extra={
+                    "action": "alert.receive",
+                    "alertname": alertname,
+                    "instance": labels.get("instance", ""),
+                },
+            )
+            # 重新 SELECT 已存在记录（走 with_for_update 锁定）
+            instance = labels.get("instance", "")
+            if instance:
+                # ND-1 修复（第二轮审查）：重试 SELECT 加 status='firing' 过滤，
+                # 避免命中已 resolved 的记录并加锁（会把已 resolved 记录改回 firing，
+                # 与 I-01 修复意图冲突）。IntegrityError 由部分唯一索引
+                # WHERE status='firing' 触发，故重试 SELECT 也应只查 firing。
+                existing_query = (
+                    select(AlertHistory)
+                    .where(
+                        and_(
+                            AlertHistory.alertname == alertname,
+                            AlertHistory.labels.op("->>")("instance") == instance,
+                            AlertHistory.starts_at == starts_at,
+                            AlertHistory.status == "firing",
+                        )
+                    )
+                    .order_by(AlertHistory.id.desc())
+                    .limit(1)
+                    .with_for_update()
+                )
+                result = await db.execute(existing_query)
+                existing = result.scalar_one_or_none()
+                if existing:
+                    logger.info(
+                        f"Recovered from IntegrityError: found existing record id={existing.id}",
+                        extra={
+                            "action": "alert.receive",
+                            "alertname": alertname,
+                            "history_id": existing.id,
+                        },
+                    )
+                    return existing
+            # 找不到已存在记录（不该发生），重新抛出
+            raise
         await db.refresh(db_obj)
         return db_obj
 

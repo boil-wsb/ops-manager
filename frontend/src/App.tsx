@@ -32,6 +32,10 @@ import AlertManager from './pages/Alerts/AlertManager';
 import AlertSilenceList from './pages/Alerts/AlertSilenceList';
 import AlertTemplateList from './pages/Alerts/AlertTemplateList';
 import AlertHistory from './pages/Alerts/AlertHistory';
+import SuggestionSubmit from './pages/Suggestions/SuggestionSubmit';
+import SuggestionList from './pages/Suggestions/SuggestionList';
+import SuggestionDetail from './pages/Suggestions/SuggestionDetail';
+import SuggestionTrack from './pages/Suggestions/SuggestionTrack';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -118,6 +122,10 @@ function App() {
                 <Route path="alerts/alertmanager/silences" element={<AlertSilenceList />} />
                 <Route path="alerts/alertmanager/templates" element={<AlertTemplateList />} />
                 <Route path="alerts/alertmanager/history" element={<AlertHistory />} />
+                <Route path="suggestions/submit" element={<SuggestionSubmit />} />
+                <Route path="suggestions/manage" element={<SuggestionList />} />
+                <Route path="suggestions/manage/:id" element={<SuggestionDetail />} />
+                <Route path="suggestions/track" element={<SuggestionTrack />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

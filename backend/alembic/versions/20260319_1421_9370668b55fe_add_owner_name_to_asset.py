@@ -8,16 +8,12 @@ Create Date: 2026-03-19 14:21:37.717780
 This file is kept for history but upgrade() does nothing.
 
 """
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-
+from collections.abc import Sequence
 
 revision: str = '9370668b55fe'
-down_revision: Union[str, None] = 'bf7b8f22ad21'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = 'bf7b8f22ad21'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

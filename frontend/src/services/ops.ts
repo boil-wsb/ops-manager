@@ -10,10 +10,18 @@ export interface DeploymentListParams {
 }
 
 export interface CertificateListParams {
-  skip?: number;
-  limit?: number;
   status?: string;
   expiring_soon?: boolean;
+  page?: number;
+  page_size?: number;
+}
+
+export interface CertificateListResponse {
+  total: number;
+  items: Certificate[];
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
 export const opsApi = {
@@ -39,7 +47,8 @@ export const opsApi = {
   },
 
   // Certificates
-  getCertificates: async (params: CertificateListParams = {}) => {
+  // I-19 修复：原全量返回 list，现改为服务端分页返回 {total, items, ...}
+  getCertificates: async (params: CertificateListParams = {}): Promise<CertificateListResponse> => {
     const response = await api.get('/ops/certificates', { params });
     return response.data;
   },

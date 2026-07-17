@@ -134,7 +134,7 @@ async def test_create_and_delete_label(client: AsyncClient):
     response = await client.get("/api/v1/labels", headers=headers)
     assert response.status_code == 200
     labels = response.json()
-    label_ids = [l["id"] for l in labels]
+    label_ids = [item["id"] for item in labels]
     assert label_id in label_ids
 
     # Delete the label
@@ -145,7 +145,7 @@ async def test_create_and_delete_label(client: AsyncClient):
     response = await client.get("/api/v1/labels", headers=headers)
     assert response.status_code == 200
     labels = response.json()
-    label_ids = [l["id"] for l in labels]
+    label_ids = [item["id"] for item in labels]
     assert label_id not in label_ids
 
 
@@ -167,7 +167,12 @@ async def test_asset_permissions_unauthorized(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_create_asset(client: AsyncClient):
-    """Test creating a new asset."""
+    """Test creating a new asset.
+
+    NC-1 回归断言：创建成功时返回 201 且 id 不为 None。
+    NC-1 根因：crud_asset.create_with_labels 在构造 AssetHistory 前缺少 db.flush()，
+    导致 AssetHistory.asset_id=db_obj.id 为 None，触发 NOT NULL 约束违反返回 500。
+    """
     headers = await get_auth_headers(client)
 
     label_data = {"name": "server-label", "color": "#00ff00"}
@@ -199,6 +204,10 @@ async def test_create_asset(client: AsyncClient):
         asset = response.json()
         assert asset["assetId"] == asset_data["asset_id"]
         assert asset["name"] == asset_data["name"]
+        # ★ NC-1 回归断言: id 不为 None（如果 flush 缺失，会返回 500 而非 201）
+        assert asset.get("id") is not None, (
+            "NC-1: 资产创建后 id 必须非 None（flush 缺失会导致 AssetHistory 约束违反）"
+        )
     elif response.status_code == 403:
         pytest.skip("User lacks permission to create assets")
 

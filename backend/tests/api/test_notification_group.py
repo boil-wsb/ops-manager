@@ -2,6 +2,7 @@
 Tests for notification groups API.
 """
 import uuid
+
 import pytest
 from httpx import AsyncClient
 

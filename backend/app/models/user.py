@@ -49,7 +49,7 @@ class User(BaseModel):
         "Role", secondary=user_roles, back_populates="users", lazy="selectin"
     )
     department: Mapped["Department | None"] = relationship(
-        "Department", back_populates="users", lazy="selectin"
+        "Department", back_populates="users", foreign_keys=[department_id], lazy="selectin"
     )
 
     def __repr__(self) -> str:

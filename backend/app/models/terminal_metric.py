@@ -4,7 +4,7 @@ Terminal Metric models - aggregated metrics for terminal assets.
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String
+from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
@@ -15,6 +15,8 @@ class TerminalMetric(BaseModel):
 
     __tablename__ = "terminal_metrics"
     __table_args__ = (
+        # C-09: asset_id 唯一约束，防止并发 upsert 累积重复行
+        UniqueConstraint("asset_id", name="uq_terminal_metric_asset_id"),
         Index("idx_owner_username", "owner_username"),
         Index("idx_asset_id", "asset_id"),
         Index("idx_current_status", "current_status"),

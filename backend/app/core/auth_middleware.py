@@ -10,14 +10,12 @@ import contextlib
 import ipaddress
 from collections.abc import Callable
 
-from fastapi import Request, status
-from fastapi.responses import JSONResponse
+from fastapi import status
 from fastapi.security import HTTPBearer
 
 from app.config import settings
 from app.core.logging import get_logger
 from app.core.security import verify_token
-from app.crud.crud_user import crud_user
 
 logger = get_logger(__name__)
 
@@ -185,7 +183,7 @@ class PureASGIAuthMiddleware:
             user_active = False
             import asyncio
 
-            from sqlalchemy import select, text
+            from sqlalchemy import select
 
             from app.db.session import get_session_maker
             from app.models.user import User

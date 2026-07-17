@@ -2,6 +2,7 @@
 Tests for roles API.
 """
 import uuid
+
 import pytest
 from httpx import AsyncClient
 

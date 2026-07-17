@@ -14,6 +14,7 @@ import {
   SunOutlined,
   MoonOutlined,
   AlertOutlined,
+  BulbOutlined,
 } from '@ant-design/icons';
 import { useState, useMemo } from 'react';
 import { useAuthStore } from '../stores/authStore';
@@ -74,6 +75,16 @@ const Layout = () => {
           { key: '/ops/domains', label: '域名管理', permission: 'certificate:read' },
           { key: '/ops/scheduled-tasks', label: '定时任务', permission: 'ops:read' },
           { key: '/ops/health-check', label: '每日巡检', permission: 'health-check:read' },
+        ],
+      },
+      {
+        key: '/suggestions',
+        icon: <BulbOutlined />,
+        label: '建议中心',
+        children: [
+          { key: '/suggestions/submit', label: '匿名建议填写' },
+          { key: '/suggestions/manage', label: '建议管理', permission: 'suggestion:read' },
+          { key: '/suggestions/track', label: '进度查询' },
         ],
       },
       {

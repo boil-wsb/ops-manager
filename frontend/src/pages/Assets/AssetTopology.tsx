@@ -53,8 +53,8 @@ import { useThemeStore } from '../../stores/themeStore';
 
 // ====== Types ======
 
-interface FlowNode extends Node<AssetNodeData> {}
-interface FlowEdge extends Edge<AssetEdgeData> {}
+type FlowNode = Node<AssetNodeData>;
+type FlowEdge = Edge<AssetEdgeData>;
 
 // ====== Layout config ======
 

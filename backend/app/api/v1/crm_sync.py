@@ -137,7 +137,7 @@ async def _run_sync_and_update_card(
     2. 执行 CRM 同步调用
     3. 根据结果更新卡片为"成功"或"失败"状态
     """
-    from app.services.crm.card_updater import update_card_to_syncing, update_card_to_sync_result
+    from app.services.crm.card_updater import update_card_to_sync_result, update_card_to_syncing
 
     label = SYNC_TYPE_LABELS.get(sync_type, sync_type)
 

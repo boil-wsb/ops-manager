@@ -4,8 +4,9 @@ Revision ID: fix_notification_type_column
 Revises: 20260331_0001
 Create Date: 2026-03-31
 """
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = 'fix_notification_type_column'
 down_revision = '20260331_0001'

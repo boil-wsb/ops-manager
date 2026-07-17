@@ -93,7 +93,7 @@ def _build_success_card(sync_type: str, result: dict[str, Any]) -> dict:
             "tag": "div",
             "text": {
                 "tag": "lark_md",
-                "content": f"***当前状态***：<font color='green'>成功</font>",
+                "content": "***当前状态***：<font color='green'>成功</font>",
             },
             "icon": {
                 "tag": "standard_icon",

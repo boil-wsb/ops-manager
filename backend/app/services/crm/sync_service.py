@@ -6,8 +6,6 @@
 - 全量同步: POST {CRM_SYNC_URL}/api/v1/sync/full
 """
 
-import asyncio
-from datetime import datetime
 from typing import Any
 
 import httpx
