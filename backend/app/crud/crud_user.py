@@ -105,6 +105,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         mobile: str | None,
         hashed_password: str,
         role_ids: list[int] | None = None,
+        employee_no: str | None = None,
     ) -> User:
         """Create a new user synced from Feishu."""
         db_obj = User(
@@ -114,6 +115,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             hashed_password=hashed_password,
             feishu_open_id=feishu_open_id,
             feishu_union_id=feishu_union_id,
+            employee_id=employee_no,
             feishu_sync_at=now_shanghai(),
             is_feishu_user=True,
             is_active=True,
@@ -148,12 +150,18 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         full_name: str | None = None,
         email: str | None = None,
         mobile: str | None = None,
+        employee_no: str | None = None,
+        hashed_password: str | None = None,
     ) -> User:
         """Update a Feishu-synced user's info."""
         if full_name is not None:
             user.full_name = full_name
         if email is not None:
             user.email = email
+        if employee_no is not None and user.employee_id != employee_no:
+            user.employee_id = employee_no
+        if hashed_password is not None:
+            user.hashed_password = hashed_password
         user.feishu_sync_at = now_shanghai()
 
         await db.commit()

@@ -78,6 +78,16 @@
 - 处理状态流转（待处理 → 处理中 → 已解决）
 - 处理方式记录与反馈
 
+### 7. 匿名建议
+
+- 员工匿名提交意见（通过 6 位 `query_code` 查询进度，对提交者隐藏身份）
+- 飞书卡片流转：待审批（橙）→ 已审批（蓝）→ 市场部待执行（蓝）→ 已存档（绿） / 已驳回（灰）
+- 部门负责人 / 指派人通过飞书卡片按钮审批通过或驳回
+- 市场部通知组接收执行卡片，填写执行结果后存档
+- 并发幂等：基于 `UPDATE ... WHERE status='pending'` + `rowcount` 校验，防止重复发卡
+- 重试机制：飞书卡片发送/更新 3 次指数退避（1s→2s→4s）；query_code 冲突自动重试
+- 详细业务逻辑流程图见 [匿名建议业务逻辑流程图](./docs/anonymous-suggestion-flow.md)
+
 ## 定时任务
 
 系统内置以下定时任务，通过 APScheduler 调度，支持在前端"运维管理 - 定时任务"页面统一管理：
@@ -253,6 +263,17 @@ ops-manager/
 
 飞书通知 API 详见 [feishu-notify-api.md](./feishu-notify-api.md)
 
+## 业务流程图
+
+各核心业务模块的详细流程图（状态机、业务流程、并发幂等、数据模型、时序图等）维护在 `docs/` 目录下，按业务模块组织：
+
+| 业务模块 | 文档 | 主要内容 |
+|---|---|---|
+| 告警处理 | [docs/alert-processing-flow.md](./docs/alert-processing-flow.md) | Alertmanager webhook → 三阶段通知架构（prepare/execute/save）、第一性原理审查（13 个违反点）、并发安全（部分唯一索引 + ON CONFLICT）、多收件人 1:N 卡片一致性、闭环验证 |
+| 匿名建议 | [docs/anonymous-suggestion-flow.md](./docs/anonymous-suggestion-flow.md) | 状态机、3 阶段完整业务流程、并发幂等时序图、重试机制、API 端点、ER 图、飞书卡片流转 |
+
+> 新增业务模块时，请在此表追加一行，并将流程图文档统一放置于 `docs/` 目录。
+
 ## 数据库模型
 
 ### 核心表
@@ -282,6 +303,13 @@ ops-manager/
 
 - `scheduled_tasks` - 定时任务表（任务定义、触发配置、执行状态）
 - `task_execution_logs` - 任务执行日志表（执行时间、耗时、结果、错误信息）
+
+### 匿名建议
+
+- `suggestions` - 匿名建议主表（content / status / query_code / submitter_id / market_result / reject_reason）
+- `suggestion_assignments` - 建议指派关系表（department_id / assignee_open_id / open_message_id / status）
+
+> 业务流转详见 [匿名建议业务逻辑流程图](./docs/anonymous-suggestion-flow.md)
 
 ### 其他
 

@@ -49,6 +49,7 @@ class FeishuUser:
     email: str | None
     mobile: str | None
     department_ids: list[str] = field(default_factory=list)
+    employee_no: str | None = None
 
 
 @dataclass
@@ -175,6 +176,7 @@ def fetch_all_users() -> list[FeishuUser]:
                     email=getattr(user, "email", None),
                     mobile=getattr(user, "mobile", None),
                     department_ids=getattr(user, "department_ids", []) or [],
+                    employee_no=getattr(user, "employee_no", None),
                 )
                 users.append(feishu_user)
         except Exception as e:
@@ -352,6 +354,7 @@ async def sync_users(db, crud_user) -> dict:
                 existing_user = existing_map[feishu_user.open_id]
 
                 need_update = False
+                new_hashed_password = None
                 if feishu_user.name and existing_user.full_name != feishu_user.name:
                     existing_user.full_name = feishu_user.name
                     need_update = True
@@ -364,6 +367,14 @@ async def sync_users(db, crud_user) -> dict:
                 if existing_user.department_id != user_department_id:
                     existing_user.department_id = user_department_id
                     need_update = True
+                if (
+                    feishu_user.employee_no
+                    and existing_user.employee_id != feishu_user.employee_no
+                ):
+                    existing_user.employee_id = feishu_user.employee_no
+                    # Reset password to employee_no when it changes
+                    new_hashed_password = get_password_hash(feishu_user.employee_no)
+                    need_update = True
 
                 if need_update:
                     await crud_user.update_feishu_user(
@@ -372,6 +383,8 @@ async def sync_users(db, crud_user) -> dict:
                         full_name=feishu_user.name,
                         email=feishu_user.enterprise_email,
                         mobile=feishu_user.mobile,
+                        employee_no=feishu_user.employee_no,
+                        hashed_password=new_hashed_password,
                     )
                     updated += 1
             else:
@@ -393,6 +406,10 @@ async def sync_users(db, crud_user) -> dict:
                     )
                     username = feishu_user.open_id
 
+                # Use employee_no as password if available, fallback to default
+                init_password = (
+                    feishu_user.employee_no if feishu_user.employee_no else DEFAULT_PASSWORD
+                )
                 new_user = await crud_user.create_feishu_user(
                     db,
                     feishu_open_id=feishu_user.open_id,
@@ -401,7 +418,8 @@ async def sync_users(db, crud_user) -> dict:
                     full_name=feishu_user.name,
                     email=feishu_user.enterprise_email if feishu_user.enterprise_email else None,
                     mobile=feishu_user.mobile,
-                    hashed_password=get_password_hash(DEFAULT_PASSWORD),
+                    hashed_password=get_password_hash(init_password),
+                    employee_no=feishu_user.employee_no,
                 )
                 # Set department_id for newly created user
                 if user_department_id and new_user.department_id != user_department_id:

@@ -1,5 +1,5 @@
 import api from './api';
-import type { ApiResponse, PaginationData, User } from '../types';
+import type { ApiResponse, IpBindingListResponse, PaginationData, User } from '../types';
 
 export interface UserListParams {
   page?: number;
@@ -44,5 +44,15 @@ export const userApi = {
   sendMessage: async (id: number, message: string): Promise<{ success: boolean; message_id?: string }> => {
     const response = await api.post<ApiResponse<{ success: boolean; message_id?: string }>>(`/users/${id}/send-message`, { message });
     return response.data.data;
+  },
+
+  getIpBindings: async (): Promise<IpBindingListResponse> => {
+    const response = await api.get<IpBindingListResponse>('/users/ip-bindings');
+    return response.data;
+  },
+
+  unbindIp: async (userId: number): Promise<{ message: string; userId: number }> => {
+    const response = await api.delete<{ message: string; userId: number }>(`/users/${userId}/ip-binding`);
+    return response.data;
   },
 };

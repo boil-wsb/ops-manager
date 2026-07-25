@@ -14,12 +14,14 @@ from app.core.rate_limit import limiter
 from app.core.security import (
     create_access_token,
     create_refresh_token,
+    get_client_ip,
     get_password_hash,
     verify_password,
     verify_token,
 )
 from app.core.tz import now_shanghai
 from app.crud.crud_user import crud_user
+from app.crud.crud_user_ip_binding import crud_user_ip_binding
 from app.models.user import User
 from app.schemas.user import ChangePassword, TokenResponse, UserLogin, UserResponse
 
@@ -147,6 +149,62 @@ async def login(
             detail="用户名或密码错误",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    # IP binding check: only for Feishu-synced non-superuser users
+    if user.is_feishu_user and not user.is_superuser:
+        client_ip = get_client_ip(request)
+        if client_ip:
+            existing_binding = await crud_user_ip_binding.get_by_user_id(
+                db, user_id=user.id
+            )
+            if existing_binding:
+                if existing_binding.ip_address != client_ip:
+                    logger.warning(
+                        f"用户 '{credentials.username}' IP不匹配: "
+                        f"绑定IP={existing_binding.ip_address}, 当前IP={client_ip}",
+                        extra={
+                            "action": "user.login",
+                            "username": credentials.username,
+                            "bound_ip": existing_binding.ip_address,
+                            "current_ip": client_ip,
+                        },
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"该账号已绑定IP {existing_binding.ip_address}，"
+                        f"无法从当前IP({client_ip})登录",
+                    )
+            else:
+                # User not bound yet, check if IP is already taken
+                ip_binding = await crud_user_ip_binding.get_by_ip(
+                    db, ip_address=client_ip
+                )
+                if ip_binding:
+                    logger.warning(
+                        f"IP {client_ip} 已绑定其他用户(id={ip_binding.user_id})",
+                        extra={
+                            "action": "user.login",
+                            "username": credentials.username,
+                            "ip": client_ip,
+                            "bound_user_id": ip_binding.user_id,
+                        },
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="该IP已绑定其他账号，无法登录",
+                    )
+                # Create binding
+                await crud_user_ip_binding.create_binding(
+                    db, user_id=user.id, ip_address=client_ip
+                )
+                logger.info(
+                    f"用户 '{credentials.username}' 首次登录，绑定IP: {client_ip}",
+                    extra={
+                        "action": "user.login",
+                        "username": credentials.username,
+                        "ip": client_ip,
+                    },
+                )
 
     user.last_login = now_shanghai()
     await db.commit()

@@ -13,12 +13,18 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from app.core.logging import get_logger
+from app.core.tz import now_shanghai
 from app.db.session import db_operation_with_retry
 from app.integrations.feishu.service import get_feishu_service
+from app.models.alert import AlertSilence
 from app.models.health_check import HealthCheckDetail, HealthCheckReport
 from app.services.prometheus.client import get_prometheus_client
 
 logger = get_logger(__name__)
+
+# 抑制规则来源标记：match_labels["source"] == HEALTH_CHECK_SILENCE_SOURCE
+# 用于区分健康巡检抑制规则与 Alertmanager webhook 抑制规则
+HEALTH_CHECK_SILENCE_SOURCE = "health_check"
 
 DEFAULT_THRESHOLDS = {
     "cpu_load_per_core_warning": 0.8,
@@ -546,6 +552,11 @@ class HealthCheckService:
             )
             return
 
+        # 查询当前生效的健康巡检抑制规则，过滤被抑制主机
+        silenced_instances = await db_operation_with_retry(
+            self._get_silenced_instances_db, max_retries=2, retry_delay=1.0
+        )
+
         # Determine overall status and template color
         if report.critical_count > 0:
             overall_status = "严重"
@@ -564,6 +575,8 @@ class HealthCheckService:
             f"警告 {report.warning_count} | "
             f"严重 {report.critical_count}"
         )
+        if silenced_instances:
+            summary_line += f" | 已抑制 {len(silenced_instances)} 台"
 
         # Build conclusion
         conclusion = f"**巡检结论**：{overall_status} — "
@@ -578,9 +591,14 @@ class HealthCheckService:
         elements.append({"tag": "markdown", "content": summary_line})
         elements.append({"tag": "markdown", "content": conclusion})
 
-        # List abnormal hosts with their failed checks
+        # List abnormal hosts with their failed checks (过滤被抑制主机)
         if report.details:
-            abnormal_hosts = [d for d in report.details if d.host_status in ("warning", "critical")]
+            abnormal_hosts = [
+                d
+                for d in report.details
+                if d.host_status in ("warning", "critical")
+                and d.instance not in silenced_instances
+            ]
             abnormal_hosts.sort(key=lambda d: 0 if d.host_status == "critical" else 1)
             abnormal_hosts = abnormal_hosts[:3]
             if abnormal_hosts:
@@ -606,7 +624,13 @@ class HealthCheckService:
                     if check_lines:
                         host_line += "\n" + "\n".join(check_lines)
                     elements.append({"tag": "markdown", "content": host_line})
-                total_abnormal = report.warning_count + report.critical_count
+                # 异常主机总数也需排除被抑制主机
+                total_abnormal = sum(
+                    1
+                    for d in report.details
+                    if d.host_status in ("warning", "critical")
+                    and d.instance not in silenced_instances
+                )
                 if total_abnormal > 3:
                     elements.append(
                         {
@@ -614,6 +638,30 @@ class HealthCheckService:
                             "content": f"... 共 {total_abnormal} 台异常主机，查看详情了解全部",
                         }
                     )
+
+        # 若所有异常主机都被抑制，则跳过通知发送
+        total_unsilenced_abnormal = sum(
+            1
+            for d in report.details
+            if d.host_status in ("warning", "critical")
+            and d.instance not in silenced_instances
+        )
+        if total_unsilenced_abnormal == 0 and report.warning_count + report.critical_count > 0:
+            logger.info(
+                f"所有异常主机均被抑制，跳过飞书通知: report_id={report.id}",
+                extra={
+                    "action": "health_check.notify",
+                    "report_id": report.id,
+                    "silenced_count": len(silenced_instances),
+                },
+            )
+            # 仍然标记通知已发送（因为不需要再重试）
+            await db_operation_with_retry(
+                lambda db: self._mark_notification_sent(db, report.id),
+                max_retries=3,
+                retry_delay=2.0,
+            )
+            return
 
         # Inspection time
         report_time_str = ""
@@ -683,6 +731,141 @@ class HealthCheckService:
         if not chat_id:
             chat_id = getattr(settings, "itreporter_chat_id", "")
         return chat_id
+
+    # ===== 抑制规则管理 =====
+
+    async def _get_silenced_instances_db(self, db) -> set[str]:
+        """查询当前生效的健康巡检抑制主机 instance 集合。
+
+        抑制规则存储在 alert_silences 表中，通过 match_labels["source"]
+        == "health_check" 标记来源，match_labels["instance"] 标记主机。
+        """
+        now = now_shanghai()
+        result = await db.execute(
+            select(AlertSilence).where(
+                AlertSilence.is_active,
+                AlertSilence.starts_at <= now,
+                AlertSilence.ends_at >= now,
+            )
+        )
+        silences = list(result.scalars().all())
+        silenced: set[str] = set()
+        for silence in silences:
+            labels = silence.match_labels or {}
+            if labels.get("source") != HEALTH_CHECK_SILENCE_SOURCE:
+                continue
+            instance = labels.get("instance")
+            if instance:
+                silenced.add(instance)
+        return silenced
+
+    async def get_silenced_instances(self) -> set[str]:
+        """获取当前被抑制的主机 instance 集合（供 API 序列化使用）。"""
+        return await db_operation_with_retry(
+            self._get_silenced_instances_db, max_retries=2, retry_delay=1.0
+        )
+
+    async def _get_silences_db(self, db, only_active: bool = False):
+        """查询所有健康巡检抑制规则。"""
+        query = select(AlertSilence)
+        if only_active:
+            now = now_shanghai()
+            query = query.where(
+                AlertSilence.is_active,
+                AlertSilence.starts_at <= now,
+                AlertSilence.ends_at >= now,
+            )
+        query = query.order_by(AlertSilence.created_at.desc())
+        result = await db.execute(query)
+        silences = list(result.scalars().all())
+        # 仅返回 source == health_check 的规则
+        return [
+            s
+            for s in silences
+            if (s.match_labels or {}).get("source") == HEALTH_CHECK_SILENCE_SOURCE
+        ]
+
+    async def get_silences(self, only_active: bool = False) -> list[AlertSilence]:
+        """获取健康巡检抑制规则列表。"""
+        return await db_operation_with_retry(
+            lambda db: self._get_silences_db(db, only_active=only_active),
+            max_retries=2,
+            retry_delay=1.0,
+        )
+
+    async def _create_silence_db(self, db, instance: str, reason: str, duration_hours: int | None, created_by: int | None):
+        """在数据库中创建抑制规则。"""
+        now = now_shanghai()
+        if duration_hours is None or duration_hours <= 0:
+            # 永久抑制：使用 100 年后作为结束时间
+            ends_at = now.replace(year=now.year + 100)
+        else:
+            ends_at = now + timedelta(hours=duration_hours)
+
+        # name 携带 instance 和 reason，便于审计
+        safe_reason = reason.strip()[:100] if reason else "无"
+        name = f"health_check_silence_{instance}_{safe_reason}"
+
+        silence = AlertSilence(
+            name=name,
+            match_labels={
+                "instance": instance,
+                "source": HEALTH_CHECK_SILENCE_SOURCE,
+            },
+            match_pattern=None,
+            starts_at=now,
+            ends_at=ends_at,
+            is_active=True,
+            created_by=created_by,
+        )
+        db.add(silence)
+        await db.commit()
+        await db.refresh(silence)
+        return silence
+
+    async def create_silence(
+        self,
+        instance: str,
+        reason: str = "",
+        duration_hours: int | None = None,
+        created_by: int | None = None,
+    ) -> AlertSilence:
+        """为指定主机创建抑制规则。
+
+        Args:
+            instance: 主机 IP / 实例标识
+            reason: 抑制原因（可选）
+            duration_hours: 持续小时数；None 或 <=0 表示永久
+            created_by: 创建人 user_id
+        """
+        return await db_operation_with_retry(
+            lambda db: self._create_silence_db(db, instance, reason, duration_hours, created_by),
+            max_retries=3,
+            retry_delay=2.0,
+        )
+
+    async def _delete_silence_db(self, db, silence_id: int) -> bool:
+        """删除指定的抑制规则。"""
+        result = await db.execute(
+            select(AlertSilence).where(AlertSilence.id == silence_id)
+        )
+        silence = result.scalar_one_or_none()
+        if not silence:
+            return False
+        # 仅允许删除健康巡检来源的抑制规则
+        if (silence.match_labels or {}).get("source") != HEALTH_CHECK_SILENCE_SOURCE:
+            return False
+        await db.delete(silence)
+        await db.commit()
+        return True
+
+    async def delete_silence(self, silence_id: int) -> bool:
+        """删除抑制规则，返回是否删除成功。"""
+        return await db_operation_with_retry(
+            lambda db: self._delete_silence_db(db, silence_id),
+            max_retries=3,
+            retry_delay=2.0,
+        )
 
     async def _mark_notification_sent(self, db, report_id):
         result = await db.execute(

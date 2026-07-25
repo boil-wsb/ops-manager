@@ -1,18 +1,21 @@
 import { useState, useMemo, useCallback } from 'react';
 import {
   Button, Space, App, Dropdown, Tabs, Tag, Progress, Row, Col, Spin, Segmented,
+  Modal, Input, Radio,
 } from 'antd';
 import {
   ArrowLeftOutlined, ExportOutlined,
   CheckCircleOutlined, WarningOutlined, CloseCircleOutlined,
   DesktopOutlined, CloudServerOutlined,
   ArrowUpOutlined, ArrowDownOutlined, MinusOutlined,
+  StopOutlined, RestOutlined,
 } from '@ant-design/icons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useThemeStore } from '../../stores/themeStore';
 import { healthCheckApi } from '../../services/healthCheck';
+import { PermissionGuard } from '../../components/PermissionGuard';
 import type { HealthCheckDetail, HealthCheckThresholds } from '../../types/healthCheck';
 
 const darkColors = {
@@ -87,13 +90,25 @@ const RingChart = ({ value, total, color, dark }: { value: number; total: number
   );
 };
 
-const HostCard = ({ detail, thresholds, dark }: { detail: HealthCheckDetail; thresholds?: HealthCheckThresholds; dark: boolean }) => {
+interface HostCardProps {
+  detail: HealthCheckDetail;
+  thresholds?: HealthCheckThresholds;
+  dark: boolean;
+  canManage?: boolean;
+  onCreateSilence?: (instance: string) => void;
+  onCancelSilence?: (silenceId: number, instance: string) => void;
+  activeSilenceId?: number;
+}
+
+const HostCard = ({ detail, thresholds, dark, canManage, onCreateSilence, onCancelSilence, activeSilenceId }: HostCardProps) => {
   const c = dark ? darkColors : lightColors;
   const statusColor = detail.hostStatus === 'critical' ? c.accentRed : detail.hostStatus === 'warning' ? c.accentOrange : c.accentGreen;
   const statusLabel = detail.hostStatus === 'critical' ? '严重' : detail.hostStatus === 'warning' ? '警告' : '正常';
   const isServer = detail.assetType?.toLowerCase().includes('server') || detail.assetType?.toLowerCase().includes('服务器');
   const isTerminal = detail.assetType?.toLowerCase().includes('terminal') || detail.assetType?.toLowerCase().includes('终端');
   const isWindows = detail.osInfo?.toLowerCase().includes('windows') ?? false;
+  const isAbnormal = detail.hostStatus === 'warning' || detail.hostStatus === 'critical';
+  const isSilenced = !!detail.isSilenced && !!activeSilenceId;
 
   const cardStyle: React.CSSProperties = dark ? {
     background: c.bgCard,
@@ -139,7 +154,7 @@ const HostCard = ({ detail, thresholds, dark }: { detail: HealthCheckDetail; thr
     <div style={cardStyle} className="host-card-hover">
       {dark && <div style={glowOverlay} />}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 15, fontWeight: 600, color: c.textPrimary, fontFamily: 'monospace' }}>
             {detail.instance}
           </span>
@@ -149,6 +164,12 @@ const HostCard = ({ detail, thresholds, dark }: { detail: HealthCheckDetail; thr
           {isWindows && (
             <Tag color="cyan" style={{ margin: 0, fontSize: 11, fontWeight: 600 }}>
               Windows
+            </Tag>
+          )}
+          {isSilenced && (
+            <Tag color="default" style={{ margin: 0, fontSize: 11, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+              <StopOutlined style={{ fontSize: 10 }} />
+              已抑制
             </Tag>
           )}
         </div>
@@ -271,12 +292,39 @@ const HostCard = ({ detail, thresholds, dark }: { detail: HealthCheckDetail; thr
           ))}
         </div>
       )}
+
+      {/* 一键抑制 / 取消抑制 按钮 */}
+      {canManage && isAbnormal && (
+        <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+          {isSilenced ? (
+            <Button
+              size="small"
+              icon={<RestOutlined />}
+              onClick={() => onCancelSilence?.(activeSilenceId!, detail.instance)}
+              danger
+              type="text"
+            >
+              取消抑制
+            </Button>
+          ) : (
+            <Button
+              size="small"
+              icon={<StopOutlined />}
+              onClick={() => onCreateSilence?.(detail.instance)}
+              type="text"
+            >
+              抑制告警
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 };
 
 const HealthCheckDetailPage = () => {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
+  const queryClient = useQueryClient();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { mode } = useThemeStore();
@@ -286,6 +334,12 @@ const HealthCheckDetailPage = () => {
 
   const [activeTab, setActiveTab] = useState('server');
   const [serverFilter, setServerFilter] = useState<'all' | 'linux' | 'windows'>('all');
+
+  // 抑制弹窗状态
+  const [silenceModalOpen, setSilenceModalOpen] = useState(false);
+  const [silenceInstance, setSilenceInstance] = useState<string>('');
+  const [silenceReason, setSilenceReason] = useState('');
+  const [silenceDuration, setSilenceDuration] = useState<number | null>(4);
 
   const { data: report, isLoading } = useQuery({
     queryKey: ['healthCheckReport', reportId],
@@ -297,6 +351,75 @@ const HealthCheckDetailPage = () => {
     queryKey: ['healthCheckThresholds'],
     queryFn: healthCheckApi.getThresholds,
   });
+
+  // 当前生效的抑制规则列表（用于 HostCard 展示「已抑制」状态 + 取消抑制按钮）
+  const { data: silences = [] } = useQuery({
+    queryKey: ['healthCheckSilences'],
+    queryFn: () => healthCheckApi.getSilences(true),
+  });
+
+  // instance -> silenceId 映射，便于 HostCard 显示取消抑制按钮
+  const silenceMap = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const s of silences) {
+      if (s.instance) m.set(s.instance, s.id);
+    }
+    return m;
+  }, [silences]);
+
+  const createSilenceMutation = useMutation({
+    mutationFn: (payload: { instance: string; reason: string; durationHours: number | null }) =>
+      healthCheckApi.createSilence(payload),
+    onSuccess: (_data, variables) => {
+      message.success(`已抑制主机 ${variables.instance} 的告警`);
+      queryClient.invalidateQueries({ queryKey: ['healthCheckSilences'] });
+      queryClient.invalidateQueries({ queryKey: ['healthCheckReport', reportId] });
+      setSilenceModalOpen(false);
+      setSilenceReason('');
+      setSilenceDuration(4);
+    },
+    onError: () => {
+      message.error('抑制规则创建失败');
+    },
+  });
+
+  const deleteSilenceMutation = useMutation({
+    mutationFn: (silenceId: number) => healthCheckApi.deleteSilence(silenceId),
+    onSuccess: (_data, silenceId) => {
+      message.success(`已取消抑制 (ID: ${silenceId})`);
+      queryClient.invalidateQueries({ queryKey: ['healthCheckSilences'] });
+      queryClient.invalidateQueries({ queryKey: ['healthCheckReport', reportId] });
+    },
+    onError: () => {
+      message.error('取消抑制失败');
+    },
+  });
+
+  const handleOpenSilenceModal = (instance: string) => {
+    setSilenceInstance(instance);
+    setSilenceReason('');
+    setSilenceDuration(4);
+    setSilenceModalOpen(true);
+  };
+
+  const handleConfirmCreateSilence = () => {
+    createSilenceMutation.mutate({
+      instance: silenceInstance,
+      reason: silenceReason.trim(),
+      durationHours: silenceDuration,
+    });
+  };
+
+  const handleCancelSilence = (silenceId: number, instance: string) => {
+    modal.confirm({
+      title: '取消抑制确认',
+      content: `确定要恢复主机 ${instance} 的告警通知吗？`,
+      okText: '取消抑制',
+      okButtonProps: { danger: true },
+      cancelText: '保留',
+      onOk: () => deleteSilenceMutation.mutate(silenceId),
+    });
+  };
 
   const { data: prevHistoryData } = useQuery({
     queryKey: ['healthCheckPrevReport', reportId],
@@ -634,12 +757,76 @@ const HealthCheckDetailPage = () => {
           ) : (
             filteredDetails.map((detail) => (
               <Col xs={24} sm={12} md={8} key={detail.id}>
-                <HostCard detail={detail} thresholds={thresholds} dark={dark} />
+                <PermissionGuard permissions="health-check:write" fallback={
+                  <HostCard detail={detail} thresholds={thresholds} dark={dark} />
+                }>
+                  <HostCard
+                    detail={detail}
+                    thresholds={thresholds}
+                    dark={dark}
+                    canManage
+                    onCreateSilence={handleOpenSilenceModal}
+                    onCancelSilence={handleCancelSilence}
+                    activeSilenceId={silenceMap.get(detail.instance)}
+                  />
+                </PermissionGuard>
               </Col>
             ))
           )}
         </Row>
       </div>
+
+      {/* 一键抑制告警弹窗 */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <StopOutlined style={{ color: c.accentOrange }} />
+            <span>抑制主机告警</span>
+          </div>
+        }
+        open={silenceModalOpen}
+        onCancel={() => setSilenceModalOpen(false)}
+        onOk={handleConfirmCreateSilence}
+        okText="确认抑制"
+        cancelText="取消"
+        confirmLoading={createSilenceMutation.isPending}
+        okButtonProps={{ danger: true }}
+      >
+        <div style={{ marginBottom: 16, padding: '10px 12px', background: dark ? 'rgba(255,159,28,0.08)' : '#fff8e1', borderRadius: 6, border: `1px solid ${c.accentOrange}33` }}>
+          <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 4 }}>主机实例</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: c.textPrimary, fontFamily: 'monospace' }}>
+            {silenceInstance}
+          </div>
+          <div style={{ fontSize: 11, color: c.textMuted, marginTop: 4 }}>
+            抑制后该主机的健康巡检异常将不再触发飞书通知（仅在告警卡片中过滤）
+          </div>
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 500, color: c.textPrimary, marginBottom: 8 }}>抑制时长</div>
+          <Radio.Group
+            value={silenceDuration}
+            onChange={(e) => setSilenceDuration(e.target.value)}
+            optionType="button"
+            buttonStyle="solid"
+          >
+            <Radio.Button value={4}>4 小时</Radio.Button>
+            <Radio.Button value={24}>24 小时</Radio.Button>
+            <Radio.Button value={168}>7 天</Radio.Button>
+            <Radio.Button value={null}>永久</Radio.Button>
+          </Radio.Group>
+        </div>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 500, color: c.textPrimary, marginBottom: 8 }}>抑制原因（可选）</div>
+          <Input.TextArea
+            value={silenceReason}
+            onChange={(e) => setSilenceReason(e.target.value)}
+            placeholder="例如：磁盘占用为业务正常使用，无需告警"
+            rows={3}
+            maxLength={200}
+            showCount
+          />
+        </div>
+      </Modal>
     </div>
   );
 };

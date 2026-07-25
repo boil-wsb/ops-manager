@@ -15,6 +15,7 @@ class UserBase(BaseModel):
     email: str | None = None
     full_name: str | None = Field(None, max_length=100)
     is_active: bool = True
+    employee_id: str | None = Field(None, max_length=64)
 
     @field_validator("email")
     @classmethod
@@ -43,6 +44,7 @@ class UserUpdate(BaseModel):
     is_superuser: bool | None = None
     password: str | None = Field(None, min_length=8, max_length=100)
     role_ids: list[int] | None = None
+    employee_id: str | None = Field(None, max_length=64)
 
     @field_validator("email")
     @classmethod

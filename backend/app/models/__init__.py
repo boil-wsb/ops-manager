@@ -23,10 +23,12 @@ from app.models.suggestion import Suggestion, SuggestionAssignment, SuggestionSt
 from app.models.system_config import SystemConfig
 from app.models.terminal_metric import TerminalMetric
 from app.models.user import User, user_roles
+from app.models.user_ip_binding import UserIpBinding
 
 __all__ = [
     "BaseModel",
     "User",
+    "UserIpBinding",
     "Department",
     "Role",
     "Permission",

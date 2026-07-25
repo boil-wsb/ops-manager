@@ -7,6 +7,7 @@ from datetime import timedelta
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from jose import JWTError, jwt
+from starlette.requests import Request
 
 from app.config import settings
 from app.core.tz import now_utc
@@ -85,3 +86,19 @@ def verify_token(token: str) -> dict | None:
     This is an alias for decode_token for backward compatibility.
     """
     return decode_token(token)
+
+
+def get_client_ip(request: Request) -> str | None:
+    """Extract client IP from a FastAPI Request.
+
+    Priority: X-Forwarded-For > X-Real-IP > request.client.host
+    """
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
+    if request.client:
+        return request.client.host
+    return None

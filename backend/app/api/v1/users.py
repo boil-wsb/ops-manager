@@ -13,6 +13,7 @@ from app.core.audit import audit_log
 from app.core.cache import cache_delete_pattern, cache_get_or_set
 from app.core.logging import get_logger
 from app.crud.crud_user import crud_user
+from app.crud.crud_user_ip_binding import crud_user_ip_binding
 from app.models.permission import Role
 from app.models.user import User
 from app.schemas.user import UserCreate, UserResponse, UserUpdate
@@ -82,6 +83,30 @@ async def list_users(
         }
 
     return await cache_get_or_set(cache_key, _fetch_users, ttl=30)
+
+
+@router.get("/ip-bindings")
+async def list_ip_bindings(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permissions(["user:read"])),
+):
+    """获取所有用户 IP 绑定列表（管理员）。"""
+    bindings = await crud_user_ip_binding.get_all(db, skip=0, limit=500)
+
+    # Enrich with user info
+    result = []
+    for b in bindings:
+        user = await crud_user.get(db, id=b.user_id)
+        result.append({
+            "id": b.id,
+            "user_id": b.user_id,
+            "username": user.username if user else None,
+            "full_name": user.full_name if user else None,
+            "ip_address": b.ip_address,
+            "bound_at": b.bound_at,
+        })
+
+    return {"items": result, "total": len(result)}
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -388,3 +413,34 @@ async def send_message_to_user(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"消息发送失败: {str(e)}",
         ) from e
+
+
+@router.delete("/{user_id}/ip-binding", status_code=status.HTTP_200_OK)
+@audit_log(operation_type="DELETE", module="user", object_type="UserIpBinding")
+async def unbind_user_ip(
+    request: Request,
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permissions(["user:write"])),
+):
+    """解绑指定用户的 IP 绑定（管理员）。"""
+    user = await crud_user.get(db, id=user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="用户不存在",
+        )
+
+    deleted = await crud_user_ip_binding.delete_binding(db, user_id=user_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="该用户没有 IP 绑定记录",
+        )
+
+    logger.info(
+        f"管理员解绑用户 {user.username}(id={user_id}) 的 IP 绑定",
+        extra={"action": "user.unbind_ip", "user_id": user_id, "operator": current_user.username},
+    )
+
+    return {"message": "IP 绑定已解绑", "user_id": user_id}

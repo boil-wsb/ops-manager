@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { Table, Button, Input, Select, Tag, Space, Card, App, Popconfirm, Modal, Tooltip, Tree, Segmented, Empty } from 'antd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, SendOutlined, SyncOutlined, UserOutlined, ApartmentOutlined, CrownOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, SendOutlined, SyncOutlined, UserOutlined, ApartmentOutlined, CrownOutlined, DisconnectOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import { userApi } from '../../services/users';
 import { departmentApi, type DepartmentNode } from '../../services/departments';
 import { fuzzyFilterOption } from '../../utils/selectFilter';
 import { PermissionGuard } from '../../components/PermissionGuard';
 import StatusTag from '../../components/StatusTag';
 import UserFormModal from './UserFormModal';
-import type { User } from '../../types';
+import type { User, UserIpBinding } from '../../types';
 
 const { Option } = Select;
 
@@ -37,6 +37,7 @@ const UserList = () => {
   const [leaderModalOpen, setLeaderModalOpen] = useState(false);
   const [editingDept, setEditingDept] = useState<DepartmentNode | null>(null);
   const [selectedLeaderId, setSelectedLeaderId] = useState<number | null>(null);
+  const [ipBindingsModalOpen, setIpBindingsModalOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['users', searchParams],
@@ -53,6 +54,18 @@ const UserList = () => {
     queryKey: ['departments', 'tree'],
     queryFn: departmentApi.getTree,
     enabled: viewMode === 'tree',
+  });
+
+  const { data: ipBindingsData, refetch: refetchIpBindings } = useQuery({
+    queryKey: ['users', 'ip-bindings'],
+    queryFn: userApi.getIpBindings,
+    enabled: viewMode === 'list',
+  });
+
+  // 构建 userId -> IP 绑定 的映射
+  const ipBindingMap = new Map<number, UserIpBinding>();
+  (ipBindingsData?.items || []).forEach((b) => {
+    ipBindingMap.set(b.userId, b);
   });
 
   const syncMutation = useMutation({
@@ -103,6 +116,18 @@ const UserList = () => {
     },
     onError: (error: unknown) => {
       const errorMsg = error instanceof Error ? error.message : '部门负责人设置失败';
+      message.error(errorMsg);
+    },
+  });
+
+  const unbindIpMutation = useMutation({
+    mutationFn: userApi.unbindIp,
+    onSuccess: () => {
+      message.success('IP 绑定已解绑');
+      queryClient.invalidateQueries({ queryKey: ['users', 'ip-bindings'] });
+    },
+    onError: (error: unknown) => {
+      const errorMsg = error instanceof Error ? error.message : 'IP 解绑失败';
       message.error(errorMsg);
     },
   });
@@ -206,12 +231,30 @@ const UserList = () => {
       },
     },
     {
+      title: 'IP 绑定',
+      key: 'ipBinding',
+      render: (_: unknown, record: User) => {
+        const binding = ipBindingMap.get(record.id);
+        if (!binding) {
+          return <Tag color="default">未绑定</Tag>;
+        }
+        return (
+          <Tooltip
+            title={`绑定时间：${new Date(binding.boundAt).toLocaleString('zh-CN')}`}
+          >
+            <Tag color="blue">{binding.ipAddress}</Tag>
+          </Tooltip>
+        );
+      },
+    },
+    {
       title: '操作',
       key: 'action',
       render: (_: unknown, record: User) => {
         const hasFeishuOpenId = !!(record as unknown as Record<string, unknown>).feishuOpenId;
+        const binding = ipBindingMap.get(record.id);
         return (
-          <Space size="small">
+          <Space size="small" wrap>
             <PermissionGuard permissions="user:write">
               <Button
                 type="link"
@@ -232,6 +275,24 @@ const UserList = () => {
                   发送消息
                 </Button>
               </Tooltip>
+            </PermissionGuard>
+            <PermissionGuard permissions="user:write">
+              <Popconfirm
+                title={`确定要解绑该用户的 IP ${binding?.ipAddress || ''} 吗？`}
+                description="解绑后用户下次登录将重新绑定当前 IP。"
+                onConfirm={() => unbindIpMutation.mutate(record.id)}
+                okText="确定"
+                cancelText="取消"
+                disabled={!binding}
+              >
+                <Button
+                  type="link"
+                  icon={<DisconnectOutlined />}
+                  disabled={!binding}
+                >
+                  解绑 IP
+                </Button>
+              </Popconfirm>
             </PermissionGuard>
             <PermissionGuard permissions="user:delete">
               <Popconfirm
@@ -382,6 +443,19 @@ const UserList = () => {
               </Button>
             </PermissionGuard>
           )}
+          {viewMode === 'list' && (
+            <PermissionGuard permissions="user:read">
+              <Button
+                icon={<SafetyCertificateOutlined />}
+                onClick={() => {
+                  refetchIpBindings();
+                  setIpBindingsModalOpen(true);
+                }}
+              >
+                IP 绑定管理
+              </Button>
+            </PermissionGuard>
+          )}
         </Space>
       </Card>
 
@@ -490,6 +564,54 @@ const UserList = () => {
             image={Empty.PRESENTED_IMAGE_SIMPLE}
           />
         )}
+      </Modal>
+
+      <Modal
+        title="IP 绑定管理"
+        open={ipBindingsModalOpen}
+        onCancel={() => setIpBindingsModalOpen(false)}
+        footer={null}
+        width={720}
+      >
+        <p style={{ marginBottom: 12, color: '#666' }}>
+          共 {ipBindingsData?.total || 0} 条 IP 绑定记录。解绑后用户下次登录将重新绑定当前 IP。
+        </p>
+        <Table
+          size="small"
+          rowKey="id"
+          dataSource={ipBindingsData?.items || []}
+          loading={!ipBindingsData}
+          pagination={{ pageSize: 10, showSizeChanger: false }}
+          columns={[
+            { title: '用户名', dataIndex: 'username', key: 'username' },
+            { title: '姓名', dataIndex: 'fullName', key: 'fullName', render: (v: string) => v || '-' },
+            { title: 'IP 地址', dataIndex: 'ipAddress', key: 'ipAddress' },
+            {
+              title: '绑定时间',
+              dataIndex: 'boundAt',
+              key: 'boundAt',
+              render: (v: string) => (v ? new Date(v).toLocaleString('zh-CN') : '-'),
+            },
+            {
+              title: '操作',
+              key: 'action',
+              render: (_: unknown, record: UserIpBinding) => (
+                <PermissionGuard permissions="user:write">
+                  <Popconfirm
+                    title={`确定要解绑 ${record.fullName || record.username} 的 IP ${record.ipAddress} 吗？`}
+                    onConfirm={() => unbindIpMutation.mutate(record.userId)}
+                    okText="确定"
+                    cancelText="取消"
+                  >
+                    <Button type="link" danger icon={<DisconnectOutlined />}>
+                      解绑
+                    </Button>
+                  </Popconfirm>
+                </PermissionGuard>
+              ),
+            },
+          ]}
+        />
       </Modal>
     </div>
   );

@@ -37,6 +37,9 @@ class User(BaseModel):
         String(64), unique=True, index=True, nullable=True
     )
     feishu_union_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    employee_id: Mapped[str | None] = mapped_column(
+        String(64), unique=True, index=True, nullable=True, comment="工号"
+    )
     feishu_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_feishu_user: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 

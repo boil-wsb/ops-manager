@@ -1,5 +1,11 @@
 import api from './api';
-import type { HealthCheckReport, HealthCheckThresholds, HealthCheckHistoryParams } from '../types/healthCheck';
+import type {
+  HealthCheckReport,
+  HealthCheckThresholds,
+  HealthCheckHistoryParams,
+  HealthCheckSilence,
+  HealthCheckSilenceCreatePayload,
+} from '../types/healthCheck';
 
 export const healthCheckApi = {
   runHealthCheck: async (): Promise<HealthCheckReport> => {
@@ -40,5 +46,21 @@ export const healthCheckApi = {
   updateThresholds: async (thresholds: Partial<HealthCheckThresholds>): Promise<HealthCheckThresholds> => {
     const response = await api.put('/health-check/thresholds', thresholds);
     return response.data;
+  },
+
+  // ===== 抑制规则 =====
+
+  getSilences: async (onlyActive = false): Promise<HealthCheckSilence[]> => {
+    const response = await api.get('/health-check/silences', { params: { only_active: onlyActive } });
+    return response.data;
+  },
+
+  createSilence: async (payload: HealthCheckSilenceCreatePayload): Promise<HealthCheckSilence> => {
+    const response = await api.post('/health-check/silences', payload);
+    return response.data;
+  },
+
+  deleteSilence: async (silenceId: number): Promise<void> => {
+    await api.delete(`/health-check/silences/${silenceId}`);
   },
 };

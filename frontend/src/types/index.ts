@@ -28,6 +28,20 @@ export interface User {
   roles?: { id: number; name: string }[];
 }
 
+export interface UserIpBinding {
+  id: number;
+  userId: number;
+  username?: string;
+  fullName?: string;
+  ipAddress: string;
+  boundAt: string;
+}
+
+export interface IpBindingListResponse {
+  items: UserIpBinding[];
+  total: number;
+}
+
 export interface LoginCredentials {
   username: string;
   password: string;
