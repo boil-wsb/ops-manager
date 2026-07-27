@@ -72,6 +72,7 @@ async def list_users(
                     "feishu_open_id": u.feishu_open_id,
                     "department_id": u.department_id,
                     "department_name": u.department.name if u.department else None,
+                    "org_name": u.department.org_name if u.department else None,
                     "permissions": [],
                     "roles": [{"id": r.id, "name": r.name} for r in u.roles],
                 }

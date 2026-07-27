@@ -26,6 +26,9 @@ export interface User {
   updatedAt: string;
   permissions?: string[];
   roles?: { id: number; name: string }[];
+  departmentId?: number | null;
+  departmentName?: string | null;
+  orgName?: string | null;
 }
 
 export interface UserIpBinding {

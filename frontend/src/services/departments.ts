@@ -13,6 +13,7 @@ export interface DepartmentNode {
   id: number;
   name: string;
   feishuDepartmentId: string;
+  orgName?: string | null;
   memberCount: number;
   isRoot: boolean;
   leaderId?: number | null;

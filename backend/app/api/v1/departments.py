@@ -55,6 +55,7 @@ def _build_department_tree(
             "id": dept.id,
             "name": dept.name,
             "feishu_department_id": dept.feishu_department_id,
+            "org_name": dept.org_name,
             "member_count": dept.member_count,
             "is_root": dept.is_root,
             "leader_id": dept.leader_id,

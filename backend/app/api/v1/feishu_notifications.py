@@ -507,19 +507,29 @@ async def update_feishu_card_by_open_message_id(
     1:N 场景: 同一 open_message_id 可能已发送到多个群/用户（如 pipeline_5010
     发送到 2 个群），每张卡片有独立的 message_id，必须分别更新。
 
+    项目维度隔离（修复跨项目 pipeline_iid 冲突 bug）:
+    - 若调用方传入 `callback_id`，则将其作为 WHERE 过滤条件，仅更新 callback_id 匹配的记录。
+    - 不传 `callback_id` 时维持原行为（更新所有 open_message_id 匹配的记录），向后兼容。
+    - 推荐调用方（如 devops-webhook）传入 `callback_id={project_key}_{pipeline_iid}`，
+      避免不同项目相同 pipeline_iid 的卡片互相覆盖。
+
     Returns:
         - success=True 仅当所有目标都更新成功
         - details 字段包含每个目标的独立结果
     """
+    # 构建查询条件: open_message_id + success + message_id 必有
+    conditions = [
+        NotificationRecord.open_message_id == open_message_id,
+        NotificationRecord.success.is_(True),
+        NotificationRecord.message_id.isnot(None),
+    ]
+    # 方案4: 若传入 callback_id，作为过滤条件（项目维度隔离），而非整体校验
+    if request.callback_id:
+        conditions.append(NotificationRecord.callback_id == request.callback_id)
+
     try:
         result = await db.execute(
-            select(NotificationRecord)
-            .where(
-                NotificationRecord.open_message_id == open_message_id,
-                NotificationRecord.success.is_(True),
-                NotificationRecord.message_id.isnot(None),
-            )
-            .order_by(NotificationRecord.id.asc())
+            select(NotificationRecord).where(*conditions).order_by(NotificationRecord.id.asc())
         )
         records = result.scalars().all()
     except Exception as e:
@@ -530,16 +540,10 @@ async def update_feishu_card_by_open_message_id(
         raise HTTPException(status_code=500, detail="Database query failed") from e
 
     if not records:
-        raise HTTPException(
-            status_code=404,
-            detail="No successful notification records found by open_message_id",
-        )
-
-    # 校验 callback_id（所有记录的 callback_id 必须一致）
-    if request.callback_id:
-        for r in records:
-            if r.callback_id and r.callback_id != request.callback_id:
-                raise HTTPException(status_code=403, detail="callback_id does not match")
+        detail_msg = "No successful notification records found by open_message_id"
+        if request.callback_id:
+            detail_msg += f" with callback_id={request.callback_id}"
+        raise HTTPException(status_code=404, detail=detail_msg)
 
     feishu_service = get_feishu_service()
     details: list[FeishuCardUpdateTargetResult] = []

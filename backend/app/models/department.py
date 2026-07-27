@@ -19,6 +19,9 @@ class Department(BaseModel):
     feishu_department_id: Mapped[str] = mapped_column(
         String(100), unique=True, index=True, nullable=False, comment="飞书部门ID"
     )
+    org_name: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, index=True, comment="所属公司名称（根组织名）"
+    )
     parent_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("departments.id", ondelete="SET NULL"), nullable=True, comment="父部门ID"
     )

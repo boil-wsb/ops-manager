@@ -61,6 +61,7 @@ class FeishuDepartment:
     parent_department_id: str | None = None
     is_root: bool = False
     member_count: int = 0
+    org_name: str | None = None
 
 
 def fetch_all_users() -> list[FeishuUser]:
@@ -226,12 +227,35 @@ def fetch_all_departments() -> list[FeishuDepartment]:
 
     # Step 2: Recursively discover all departments, tracking parent-child relationships
     # Map: child_open_department_id -> parent_open_department_id
+    # Map: dept_id -> root_org_name (company name)
     parent_map: dict[str, str | None] = {}
+    org_map: dict[str, str] = {}
     all_department_ids: list[str] = []
 
+    # Get root department names first (used as org_name for all descendants)
+    root_names: dict[str, str] = {}
     for root_id in root_dept_ids:
         parent_map[root_id] = None  # Root departments have no parent
         all_department_ids.append(root_id)
+        try:
+            req = (
+                GetDepartmentRequest.builder()
+                .department_id(root_id)
+                .department_id_type("open_department_id")
+                .build()
+            )
+            resp = client.contact.v3.department.get(req)
+            if resp.success() and resp.data and resp.data.department:
+                root_names[root_id] = getattr(resp.data.department, "name", "") or "Unknown"
+            else:
+                root_names[root_id] = "Unknown"
+        except Exception as e:
+            logger.error(
+                f"获取根部门名称失败: {root_id}",
+                extra={"action": "feishu.sync_dept", "dept_id": root_id, "error": str(e)},
+            )
+            root_names[root_id] = "Unknown"
+        org_map[root_id] = root_names[root_id]
 
     def get_department_children(parent_dept_id: str) -> list[str]:
         children = []
@@ -264,6 +288,7 @@ def fetch_all_departments() -> list[FeishuDepartment]:
         for child_id in children:
             if child_id not in parent_map:
                 parent_map[child_id] = dept_id
+                org_map[child_id] = org_map.get(dept_id, "Unknown")
                 all_department_ids.append(child_id)
                 queue.append(child_id)
 
@@ -292,6 +317,7 @@ def fetch_all_departments() -> list[FeishuDepartment]:
                     parent_department_id=parent_map.get(dept_id),
                     is_root=parent_map.get(dept_id) is None,
                     member_count=getattr(dept, "member_count", 0) or 0,
+                    org_name=org_map.get(dept_id),
                 )
                 departments.append(feishu_dept)
         except Exception as e:
@@ -519,6 +545,9 @@ async def sync_departments(db) -> dict:
                 if existing_dept.member_count != feishu_dept.member_count:
                     existing_dept.member_count = feishu_dept.member_count
                     need_update = True
+                if feishu_dept.org_name and existing_dept.org_name != feishu_dept.org_name:
+                    existing_dept.org_name = feishu_dept.org_name
+                    need_update = True
 
                 if need_update:
                     existing_dept.sync_at = now_shanghai()
@@ -531,6 +560,7 @@ async def sync_departments(db) -> dict:
                     feishu_parent_department_id=feishu_dept.parent_department_id,
                     is_root=feishu_dept.is_root,
                     member_count=feishu_dept.member_count,
+                    org_name=feishu_dept.org_name,
                     sync_at=now_shanghai(),
                 )
                 db.add(new_dept)

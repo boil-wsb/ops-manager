@@ -28,6 +28,7 @@ const UserList = () => {
     keyword: '',
     isActive: undefined as boolean | undefined,
   });
+  const [orgFilter, setOrgFilter] = useState<string | undefined>(undefined);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [messageModalOpen, setMessageModalOpen] = useState(false);
@@ -197,6 +198,32 @@ const UserList = () => {
       },
     },
     {
+      title: '公司',
+      key: 'orgName',
+      sorter: (a: User, b: User) => (a.orgName || '').localeCompare(b.orgName || ''),
+      render: (_: unknown, record: User) => {
+        const org = record.orgName;
+        if (!org) return <Tag color="default">未归属</Tag>;
+        const colorMap: Record<string, string> = {
+          '大连美恒': 'geekblue',
+          '深圳盈泰利华': 'volcano',
+          '上海递因': 'green',
+        };
+        return <Tag color={colorMap[org] || 'blue'}>{org}</Tag>;
+      },
+      filteredValue: orgFilter ? [orgFilter] : null,
+      onFilter: (value: React.Key | boolean, record: User) => {
+        const v = String(value);
+        return v === '__none__' ? !record.orgName : record.orgName === v;
+      },
+    },
+    {
+      title: '部门',
+      key: 'departmentName',
+      sorter: (a: User, b: User) => (a.departmentName || '').localeCompare(b.departmentName || ''),
+      render: (_: unknown, record: User) => record.departmentName || '-',
+    },
+    {
       title: '状态',
       dataIndex: 'isActive',
       key: 'isActive',
@@ -317,7 +344,110 @@ const UserList = () => {
     return node.users.length + node.children.reduce((sum, child) => sum + countAllUsers(child), 0);
   };
 
-  const buildTreeData = (nodes: DepartmentNode[]): TreeDataItem[] => {
+  // 公司颜色映射
+  const orgColorMap: Record<string, string> = {
+    '大连美恒': 'geekblue',
+    '深圳盈泰利华': 'volcano',
+    '上海递因': 'green',
+  };
+  const getOrgColor = (org: string | null | undefined) =>
+    (org && orgColorMap[org]) || 'blue';
+
+  // 计算一组部门节点下的总用户数
+  const countUsersInNodes = (nodes: DepartmentNode[]): number =>
+    nodes.reduce((sum, n) => sum + countAllUsers(n), 0);
+
+  // 顶层按公司分组：公司作为根节点，部门作为子节点
+  const buildTreeWithOrgs = (nodes: DepartmentNode[]): TreeDataItem[] => {
+    // 按 org_name 分组
+    const orgGroups: Record<string, DepartmentNode[]> = {};
+    nodes.forEach((n) => {
+      const org = n.orgName || '未归属';
+      if (!orgGroups[org]) orgGroups[org] = [];
+      orgGroups[org].push(n);
+    });
+
+    // 公司展示顺序
+    const orgOrder = ['大连美恒', '深圳盈泰利华', '上海递因', '未归属'];
+    return orgOrder
+      .filter((org) => orgGroups[org] && orgGroups[org].length > 0)
+      .map((org) => {
+        const orgNodes = orgGroups[org];
+        // 区分同名根部门（部门名与公司名相同，如"上海递因"公司下的"上海递因"部门）
+        // 这些部门本身不再显示，直接展开其子部门和用户到公司节点下，避免重复
+        const sameNameDepts = orgNodes.filter((n) => n.name === org);
+        const otherDepts = orgNodes.filter((n) => n.name !== org);
+
+        // 统计实际展示的部门数（同名根部门不计数，但其子部门计数）
+        const visibleDeptCount =
+          otherDepts.length +
+          sameNameDepts.reduce((sum, d) => sum + d.children.length, 0);
+
+        const children: TreeDataItem[] = [
+          ...buildDeptTreeData(otherDepts),
+          ...sameNameDepts.flatMap((dept) => [
+            // 同名根部门的直属用户直接挂到公司下
+            ...dept.users.map((user) => buildUserNode(user)),
+            // 同名根部门的子部门正常展示
+            ...buildDeptTreeData(dept.children),
+          ]),
+        ];
+
+        return {
+          key: `org-${org}`,
+          title: (
+            <span style={{ fontWeight: 600, fontSize: 14 }}>
+              <ApartmentOutlined style={{ marginRight: 6 }} />
+              {org}
+              <Tag color={getOrgColor(org === '未归属' ? null : org)} style={{ marginLeft: 10, fontSize: 12 }}>
+                {visibleDeptCount} 个部门
+              </Tag>
+              <Tag color="blue" style={{ marginLeft: 4, fontSize: 12 }}>
+                {countUsersInNodes(orgGroups[org])}人
+              </Tag>
+            </span>
+          ),
+          children,
+        };
+      });
+  };
+
+  // 构建用户节点
+  const buildUserNode = (user: DepartmentNode['users'][number]): TreeDataItem => ({
+    key: `user-${user.id}`,
+    title: (
+      <span>
+        <UserOutlined style={{ marginRight: 4, color: '#1890ff' }} />
+        {user.fullName || user.username}
+        {user.email && <span style={{ color: '#999', marginLeft: 8, fontSize: 12 }}>{user.email}</span>}
+        {!user.isActive && <Tag color="red" style={{ marginLeft: 4, fontSize: 11 }}>禁用</Tag>}
+        {user.feishuOpenId && (
+          <Tooltip title="发送飞书消息">
+            <Button
+              type="link"
+              size="small"
+              icon={<SendOutlined />}
+              style={{ marginLeft: 4, padding: 0 }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSendMessage({
+                  id: user.id,
+                  username: user.username,
+                  email: user.email,
+                  fullName: user.fullName,
+                  feishuOpenId: user.feishuOpenId,
+                } as unknown as User);
+              }}
+            />
+          </Tooltip>
+        )}
+      </span>
+    ),
+    isLeaf: true,
+  });
+
+  // 部门树构建（不再显示公司 Tag，公司已在顶层）
+  const buildDeptTreeData = (nodes: DepartmentNode[]): TreeDataItem[] => {
     return nodes.map((node) => ({
       key: `dept-${node.id}`,
       title: (
@@ -351,40 +481,9 @@ const UserList = () => {
       ),
       children: [
         // 部门下的用户作为子节点
-        ...node.users.map((user) => ({
-          key: `user-${user.id}`,
-          title: (
-            <span>
-              <UserOutlined style={{ marginRight: 4, color: '#1890ff' }} />
-              {user.fullName || user.username}
-              {user.email && <span style={{ color: '#999', marginLeft: 8, fontSize: 12 }}>{user.email}</span>}
-              {!user.isActive && <Tag color="red" style={{ marginLeft: 4, fontSize: 11 }}>禁用</Tag>}
-              {user.feishuOpenId && (
-                <Tooltip title="发送飞书消息">
-                  <Button
-                    type="link"
-                    size="small"
-                    icon={<SendOutlined />}
-                    style={{ marginLeft: 4, padding: 0 }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSendMessage({
-                        id: user.id,
-                        username: user.username,
-                        email: user.email,
-                        fullName: user.fullName,
-                        feishuOpenId: user.feishuOpenId,
-                      } as unknown as User);
-                    }}
-                  />
-                </Tooltip>
-              )}
-            </span>
-          ),
-          isLeaf: true,
-        })),
+        ...node.users.map((user) => buildUserNode(user)),
         // 递归子部门
-        ...buildTreeData(node.children),
+        ...buildDeptTreeData(node.children),
       ],
     }));
   };
@@ -422,6 +521,20 @@ const UserList = () => {
               >
                 <Option value={true}>启用</Option>
                 <Option value={false}>禁用</Option>
+              </Select>
+              <Select
+                placeholder="公司"
+                value={orgFilter}
+                onChange={(value) => setOrgFilter(value)}
+                style={{ width: 160 }}
+                allowClear
+                showSearch
+                filterOption={fuzzyFilterOption}
+              >
+                <Option value="大连美恒">大连美恒</Option>
+                <Option value="深圳盈泰利华">深圳盈泰利华</Option>
+                <Option value="上海递因">上海递因</Option>
+                <Option value="__none__">未归属</Option>
               </Select>
             </>
           )}
@@ -481,7 +594,7 @@ const UserList = () => {
         <Card loading={isTreeLoading}>
           {deptTree && deptTree.length > 0 ? (
             <Tree
-              treeData={buildTreeData(deptTree)}
+              treeData={buildTreeWithOrgs(deptTree)}
               defaultExpandAll
               showLine
               showIcon={false}
