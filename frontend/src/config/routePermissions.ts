@@ -84,6 +84,7 @@ export const PERMISSION_MODULES = [
       { code: 'alert:delete', name: '删除告警' },
       { code: 'alert:manage_silence', name: '管理抑制规则' },
       { code: 'alert:manage_template', name: '管理模板' },
+      { code: 'alert:manage_receiver', name: '管理接收配置' },
     ],
   },
   {
@@ -142,6 +143,43 @@ export const PERMISSION_MODULES = [
       { code: 'suggestion:submit', name: '提交建议' },
       { code: 'suggestion:read', name: '查看建议列表' },
       { code: 'suggestion:archive', name: '市场部存档' },
+    ],
+  },
+  {
+    module: 'it',
+    moduleName: 'IT管理',
+    permissions: [
+      { code: 'it:read', name: '查看IT管理' },
+      { code: 'it:resolve', name: '处理IT反馈' },
+      { code: 'it:delete', name: '删除IT反馈' },
+    ],
+  },
+  {
+    module: 'monitor',
+    moduleName: '监控管理',
+    permissions: [
+      { code: 'monitor:read', name: '查看监控' },
+      { code: 'monitor:create', name: '创建监控' },
+      { code: 'monitor:update', name: '编辑监控' },
+      { code: 'monitor:delete', name: '删除监控' },
+      { code: 'monitor:test', name: '测试监控' },
+    ],
+  },
+  {
+    module: 'ops',
+    moduleName: '运维管理',
+    permissions: [
+      { code: 'ops:read', name: '查看运维' },
+      { code: 'ops:write', name: '编辑运维' },
+      { code: 'ops:delete', name: '删除运维' },
+    ],
+  },
+  {
+    module: 'health-check',
+    moduleName: '每日巡检',
+    permissions: [
+      { code: 'health-check:read', name: '查看巡检' },
+      { code: 'health-check:write', name: '管理巡检' },
     ],
   },
 ];

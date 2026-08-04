@@ -78,6 +78,7 @@ async def _get_alert_stats(db: AsyncSession) -> dict:
     )
     recent_alerts_stmt = (
         select(
+            AlertHistory.id,
             AlertHistory.alertname,
             AlertHistory.severity,
             AlertHistory.status,
@@ -96,6 +97,7 @@ async def _get_alert_stats(db: AsyncSession) -> dict:
 
     recent_alerts = [
         {
+            "id": row.id,
             "alertname": row.alertname,
             "severity": row.severity,
             "status": row.status,

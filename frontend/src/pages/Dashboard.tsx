@@ -397,7 +397,7 @@ const Dashboard = () => {
             <Card title="最近告警" extra={<a href="/alerts/alertmanager">查看全部</a>}>
               <Table
                 dataSource={recentAlerts}
-                rowKey={(r: RecentAlert) => `${r.alertname}-${r.startsAt}`}
+                rowKey={(r: RecentAlert) => r.id}
                 loading={overviewLoading}
                 pagination={false}
                 size="small"

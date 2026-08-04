@@ -43,6 +43,7 @@ export interface AlertStats {
 }
 
 export interface RecentAlert {
+  id: number;
   alertname: string;
   severity: string;
   status: string;

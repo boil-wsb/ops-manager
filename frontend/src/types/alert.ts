@@ -102,7 +102,7 @@ export interface AlertTemplatePreview {
 
 // 告警历史
 export type AlertHistoryStatus = 'firing' | 'resolved' | 'suppressed';
-export type AlertHistorySeverity = 'info' | 'warning' | 'critical';
+export type AlertHistorySeverity = 'info' | 'warning' | 'critical' | 'high' | 'middle' | 'low';
 
 export interface AlertHistory {
   id: number;

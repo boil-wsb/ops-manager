@@ -33,8 +33,8 @@ export const menuPermissionConfig: MenuItemConfig[] = [
     permission: 'alert:read',
     children: [
       { key: '/alerts/alertmanager', label: '告警中心' },
-      { key: '/alerts/alertmanager/silences', label: '抑制规则' },
-      { key: '/alerts/alertmanager/templates', label: '模板配置' },
+      { key: '/alerts/alertmanager/silences', label: '抑制规则', permission: 'alert:manage_silence' },
+      { key: '/alerts/alertmanager/templates', label: '模板配置', permission: 'alert:manage_template' },
       { key: '/alerts/alertmanager/history', label: '告警历史' },
     ],
   },
@@ -48,6 +48,17 @@ export const menuPermissionConfig: MenuItemConfig[] = [
       { key: '/ops/it-management', label: 'IT管理', permission: 'it:read' },
       { key: '/ops/domains', label: '域名管理', permission: 'certificate:read' },
       { key: '/ops/scheduled-tasks', label: '定时任务', permission: 'ops:read' },
+      { key: '/ops/health-check', label: '每日巡检', permission: 'health-check:read' },
+    ],
+  },
+  {
+    key: '/suggestions',
+    label: '建议中心',
+    icon: 'BulbOutlined',
+    children: [
+      { key: '/suggestions/submit', label: '匿名建议填写' },
+      { key: '/suggestions/manage', label: '建议管理', permission: 'suggestion:read' },
+      { key: '/suggestions/track', label: '进度查询' },
     ],
   },
   {
@@ -61,16 +72,6 @@ export const menuPermissionConfig: MenuItemConfig[] = [
       { key: '/system/navigation', label: '导航管理', permission: 'navigation:read' },
       { key: '/system/notification-groups', label: '通知组管理', permission: 'notification_group:read' },
       { key: '/system/notification-records', label: '通知记录', permission: 'notification_group:read' },
-    ],
-  },
-  {
-    key: '/suggestions',
-    label: '建议中心',
-    icon: 'BulbOutlined',
-    children: [
-      { key: '/suggestions/submit', label: '匿名建议填写', permission: 'suggestion:submit' },
-      { key: '/suggestions/manage', label: '建议管理', permission: 'suggestion:read' },
-      { key: '/suggestions/track', label: '进度查询', permission: 'suggestion:submit' },
     ],
   },
 ];

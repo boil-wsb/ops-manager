@@ -20,8 +20,11 @@ const statusOptions = [
 
 const severityColorMap: Record<string, string> = {
   critical: 'red',
+  high: 'volcano',
   warning: 'orange',
+  middle: 'gold',
   info: 'blue',
+  low: 'default',
 };
 
 const AlertHistoryPage = () => {
@@ -256,14 +259,17 @@ const AlertHistoryPage = () => {
       key: 'severity',
       width: 80,
       sorter: (a: AlertHistoryType, b: AlertHistoryType) => {
-        const order: Record<string, number> = { critical: 0, warning: 1, info: 2 };
-        return (order[a.severity] ?? 3) - (order[b.severity] ?? 3);
+        const order: Record<string, number> = { critical: 0, high: 1, warning: 2, middle: 3, info: 4, low: 5 };
+        return (order[a.severity] ?? 6) - (order[b.severity] ?? 6);
       },
       render: (severity: string) => {
         const colorMap: Record<string, string> = {
           info: 'blue',
           warning: 'orange',
           critical: 'red',
+          high: 'volcano',
+          middle: 'gold',
+          low: 'default',
         };
         return <Tag color={colorMap[severity]}>{severity}</Tag>;
       },

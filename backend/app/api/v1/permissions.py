@@ -21,6 +21,13 @@ MODULE_NAMES = {
     "deployment": "发布部署",
     "certificate": "证书管理",
     "setting": "系统设置",
+    "alert": "告警中心",
+    "it": "IT管理",
+    "navigation": "导航管理",
+    "notification_group": "通知组管理",
+    "ops": "运维管理",
+    "suggestion": "建议中心",
+    "health-check": "每日巡检",
 }
 
 

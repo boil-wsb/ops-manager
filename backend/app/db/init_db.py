@@ -293,6 +293,20 @@ DEFAULT_PERMISSIONS = [
         "action": "delete",
         "description": "删除通知组",
     },
+    {
+        "code": "health-check:read",
+        "name": "查看巡检",
+        "module": "health-check",
+        "action": "read",
+        "description": "查看每日巡检报告",
+    },
+    {
+        "code": "health-check:write",
+        "name": "管理巡检",
+        "module": "health-check",
+        "action": "write",
+        "description": "管理巡检静默规则和阈值",
+    },
 ]
 
 
