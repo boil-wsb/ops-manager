@@ -164,7 +164,9 @@ class GitRepoService:
         clean = [p.strip() for p in paths if p and p.strip()]
         if not clean:
             raise AppException(422, detail="paths 不能为空")
-        self.run_git(["sparse-checkout", "set", *clean], cwd=str(self.repo_dir))
+        # 部分克隆（--filter=blob:none）下，set 需要从 promisor remote 按需拉取 blob，
+        # 必须注入认证，否则会提示输入 Username（容器内无凭据缓存，直接失败）
+        self.run_git(["sparse-checkout", "set", *clean], cwd=str(self.repo_dir), auth=True)
         self.sparse_paths = clean
         return {"paths": clean}
 
