@@ -18,7 +18,6 @@ import {
   SendOutlined,
   ReloadOutlined,
   EditOutlined,
-  DeleteOutlined,
   MinusCircleOutlined,
 } from '@ant-design/icons';
 import {
@@ -54,7 +53,6 @@ const MonitorConfig = () => {
   const { hasAnyPermission } = usePermission();
   const canCreate = hasAnyPermission(['monitor:create']);
   const canWrite = hasAnyPermission(['monitor:update']);
-  const canDelete = hasAnyPermission(['monitor:delete']);
   const canCommit = hasAnyPermission(['monitor:update']);
 
   const [filter, setFilter] = useState<'linux' | 'windows' | 'all'>('all');
@@ -120,20 +118,6 @@ const MonitorConfig = () => {
     onError: (e: Error) => message.error(`更新失败: ${e.message || '未知错误'}`),
   });
 
-  const deleteMutation = useMutation<
-    OperationResult,
-    Error,
-    { file: string; index: number }
-  >({
-    mutationFn: ({ file, index }) => monitorConfigApi.deleteHost({ file, index }),
-    onSuccess: (result) => {
-      message.success(result?.message || '删除已暂存');
-      refetch();
-      refetchPending();
-    },
-    onError: (e: Error) => message.error(`删除失败: ${e.message || '未知错误'}`),
-  });
-
   const commitMutation = useMutation<OperationResult, Error, string>({
     mutationFn: (msg) => monitorConfigApi.commit(msg),
     onSuccess: (result) => {
@@ -189,14 +173,6 @@ const MonitorConfig = () => {
       labels: extraLabels,
     });
     setEditOpen(true);
-  };
-
-  const handleDelete = (record: MonitorHost) => {
-    modal.confirm({
-      title: '确认删除',
-      content: `确定删除 ${fileLabel[record.file]} 主机 ${record.ip}:${record.port} 吗？`,
-      onOk: () => deleteMutation.mutate({ file: record.file, index: record.index }),
-    });
   };
 
   const handleSave = async () => {
@@ -291,7 +267,7 @@ const MonitorConfig = () => {
     {
       title: '操作',
       key: 'action',
-      width: 140,
+      width: 100,
       render: (_: unknown, record: MonitorHost) => (
         <Space>
           <Button
@@ -300,14 +276,6 @@ const MonitorConfig = () => {
             disabled={!canWrite}
             title={canWrite ? undefined : '无编辑权限'}
             onClick={() => handleEdit(record)}
-          />
-          <Button
-            size="small"
-            danger
-            icon={<DeleteOutlined />}
-            disabled={!canDelete}
-            title={canDelete ? undefined : '无删除权限'}
-            onClick={() => handleDelete(record)}
           />
         </Space>
       ),

@@ -26,7 +26,7 @@ class GitRepoService:
     def __init__(self) -> None:
         self.repo_url: str = settings.git_repo_url.rstrip("/")
         self.token: str = settings.git_private_token
-        self.repo_dir = Path(settings.git_repo_base_dir) / self._repo_name()
+        self.repo_dir = Path(settings.git_repo_base_dir_abs) / self._repo_name()
         self.sparse_paths: list[str] = list(settings.git_repo_sparse_path_list)
         self.timeout: int = settings.git_command_timeout
         # 串行化 pull/push/status 等目录变更操作，避免定时任务与前端并发写坏仓库
@@ -132,9 +132,14 @@ class GitRepoService:
         if not self.token:
             raise AppException(500, detail="未配置 GIT_PRIVATE_TOKEN，无法克隆私有仓库")
         with self._lock:
-            base_dir = Path(settings.git_repo_base_dir)
+            base_dir = Path(settings.git_repo_base_dir_abs)
             base_dir.mkdir(parents=True, exist_ok=True)
-            self.run_git(["clone", self.repo_url, str(self.repo_dir)], cwd=str(base_dir), auth=True)
+            # 稀疏 + 部分克隆：仅拉取 conf 子目录，避免下载整个项目
+            self.run_git(
+                ["clone", "--sparse", "--filter=blob:none", self.repo_url, str(self.repo_dir)],
+                cwd=str(base_dir),
+                auth=True,
+            )
             # 用无凭据 URL 重写 remote，避免 token 泄漏进 git remote -v
             self.run_git(["remote", "set-url", "origin", self.repo_url], cwd=str(self.repo_dir))
             self.init_sparse()

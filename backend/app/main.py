@@ -84,10 +84,38 @@ async def lifespan(app: FastAPI):
                 logger.info("无新PC客户端版本需同步", extra={"action": "app.startup"})
             return synced
 
+    async def _init_git_repo_task():
+        """确保 prometheus 监控配置仓库的 conf 目录存在，否则拉取项目代码。"""
+        from app.services.git_repo.git_repo_service import get_git_repo_service
+
+        svc = get_git_repo_service()
+        conf_dir = svc.repo_dir / "conf" / "prometheus"
+        if conf_dir.exists():
+            logger.info(
+                "监控配置目录已存在，跳过拉取",
+                extra={"action": "app.startup", "path": str(conf_dir)},
+            )
+            return "exists"
+        if not svc.is_cloned():
+            await asyncio.to_thread(svc.ensure_clone)
+            logger.info(
+                "监控配置仓库未克隆，已拉取项目代码",
+                extra={"action": "app.startup", "path": str(conf_dir)},
+            )
+        else:
+            # 已克隆但 conf 目录缺失（如稀疏检出未初始化）→ 按配置恢复路径
+            await asyncio.to_thread(svc.set_sparse, svc.sparse_paths)
+            logger.info(
+                "监控配置目录缺失，已通过稀疏检出恢复",
+                extra={"action": "app.startup", "path": str(conf_dir)},
+            )
+        return "ensured"
+
     results = await asyncio.gather(
         _run_task("Database initialization", _init_db_task()),
         _run_task("Redis initialization", _init_redis_task()),
         _run_task("PC versions sync", _sync_pc_versions_task()),
+        _run_task("Git repo ensure", _init_git_repo_task()),
     )
 
     for result in results:

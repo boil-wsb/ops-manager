@@ -176,6 +176,19 @@ class Settings(BaseSettings):
     def git_repo_sparse_path_list(self) -> list[str]:
         return self._parse_list(self.git_repo_sparse_paths)
 
+    @property
+    def git_repo_base_dir_abs(self) -> str:
+        """将 git 仓库本地目录解析为稳定绝对路径。
+
+        GIT_REPO_LOCAL_DIR 允许配置相对值（如 'git-repos'），生产/容器内为绝对路径
+        （'/app/git-repos'）。相对值会锚定到后端工程根（config.py 的上上级目录），
+        避免随进程 CWD 变化导致目录嵌套错位（如 git-repos/git-repos/prometheus）。"""
+        base = self.git_repo_base_dir
+        p = Path(base)
+        if p.is_absolute():
+            return str(p)
+        return str(Path(__file__).resolve().parent.parent / p)
+
     # PC Client Info Configuration
     pcinfo_pushgateway_url: str = Field(
         default="http://localhost:9091/metrics/job/pcinfo", alias="PCINFO_PUSHGATEWAY_URL"

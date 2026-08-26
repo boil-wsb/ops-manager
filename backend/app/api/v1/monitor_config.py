@@ -78,22 +78,6 @@ async def update_host(
     return api_response(result)
 
 
-@router.delete("/hosts")
-@audit_log(operation_type="DELETE", module="monitor_config", object_type="Host")
-async def delete_host(
-    request: Request,
-    body: dict,
-    _: None = Depends(require_permissions(["monitor:delete"])),
-    svc: MonitorConfigService = Depends(get_monitor_config_service),
-):
-    """删除主机（body: file, index）。"""
-    try:
-        result = await asyncio.to_thread(svc.delete_host, body)
-    except Exception as e:
-        return api_error(str(getattr(e, "detail", e)))
-    return api_response(result)
-
-
 @router.post("/commit")
 @audit_log(operation_type="UPDATE", module="monitor_config", object_type="GitRepo")
 async def commit_hosts(

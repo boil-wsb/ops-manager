@@ -73,13 +73,6 @@ export const monitorConfigApi = {
     return response.data.data;
   },
 
-  deleteHost: async (payload: { file: string; index: number }): Promise<OperationResult> => {
-    const response = await api.delete<{ data: OperationResult }>('/monitor-config/hosts', {
-      data: payload,
-    });
-    return response.data.data;
-  },
-
   commit: async (message?: string): Promise<OperationResult> => {
     const response = await api.post<{ data: OperationResult }>('/monitor-config/commit', {
       message: message || '',

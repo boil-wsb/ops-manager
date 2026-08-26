@@ -172,17 +172,10 @@ class MonitorConfigService:
             self._ops.append({"type": "update", "file": file, "addr": addr, "entry": dict(entry)})
         return {"file": file, "addr": addr, "message": f"已暂存更新 {addr}"}
 
-    def delete_host(self, entry: dict[str, Any]) -> dict[str, Any]:
-        file = self._get_file(entry)
-        addr = self._resolve_addr(file, entry)  # 用 index 定位删除目标
-        with self._lock:
-            self._ops.append({"type": "delete", "file": file, "addr": addr, "entry": {}})
-        return {"file": file, "addr": addr, "message": f"已暂存删除 {addr}（{file}）"}
-
     def _resolve_addr(self, file: str, entry: dict[str, Any]) -> str:
         """用 index 在当前视图定位目标主机的稳定地址。
 
-        更新/删除必须基于「index 对应的现有条目」，而不能用 entry 里可能变化后的
+        更新必须基于「index 对应的现有条目」，而不能用 entry 里可能变化后的
         新 ip:port 去定位（否则改 IP 时会错误找不到旧条目而误 append）。"""
         with self._lock:
             base: dict[str, list[dict[str, Any]]] = {f: self._load_file(f) for f in FILES}
@@ -234,8 +227,8 @@ class MonitorConfigService:
             except Exception:
                 # 提交失败：保留 op，允许用户修复后重试
                 raise
-            finally:
-                self._ops.clear()
+            # 提交成功后清空操作日志
+            self._ops.clear()
             return {"message": f"已提交并推送: {msg}", "committed": True, "commit_message": msg}
 
     def push_pending_commits(self) -> dict[str, Any]:
