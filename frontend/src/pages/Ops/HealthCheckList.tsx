@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   Button, Space, App, Dropdown, DatePicker, Drawer, Tabs,
   Form, Slider, Tag, Table, Progress, Row, Col, Spin, Segmented,
@@ -382,6 +382,31 @@ const HealthCheckList = () => {
 
   const currentReport = selectedReport || latestReport;
   const currentLoading = selectedDate ? selectedLoading : latestLoading;
+
+  // 当异常主机（警告/严重）存在记录时，默认显示「异常主机」Tab。
+  // 仅在报告变化时自动切换一次，避免覆盖用户在同报告内手动选择的 Tab。
+  const currentReportId = currentReport?.id;
+  const initialReportIdRef = useRef<number | null | undefined>(undefined);
+  useEffect(() => {
+    const hasAbnormal = (currentReport?.details ?? []).some(
+      (d) => d.hostStatus === 'warning' || d.hostStatus === 'critical',
+    );
+    // initialReportIdRef 用于区分「首次加载」与「报告数据变化」
+    if (initialReportIdRef.current === undefined) {
+      initialReportIdRef.current = currentReportId;
+      if (hasAbnormal && currentReportId != null) {
+        setActiveTab('abnormal');
+      }
+      return;
+    }
+    // 报告切换（含选择历史日期）时，若新报告存在异常则自动定位到异常主机
+    if (currentReportId != null && currentReportId !== initialReportIdRef.current) {
+      initialReportIdRef.current = currentReportId;
+      if (hasAbnormal) {
+        setActiveTab('abnormal');
+      }
+    }
+  }, [currentReport, currentReportId]);
 
   const trendData = useMemo(() => {
     if (!historyData?.items) return [];

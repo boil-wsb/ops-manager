@@ -9,9 +9,9 @@ sparse-checkout 只检出指定路径。认证 token 存于设置，仅按命令
 import base64
 import subprocess
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from app.config import settings
 from app.core.exceptions import AppException, ConflictError
@@ -58,7 +58,7 @@ class GitRepoService:
     def run_git(
         self,
         git_args: list[str],
-        cwd: Optional[str] = None,
+        cwd: str | None = None,
         auth: bool = False,
         check: bool = True,
     ) -> dict[str, str]:
@@ -186,7 +186,7 @@ class GitRepoService:
             run = self.run_git(["pull", "origin"], cwd=str(self.repo_dir), auth=True)
         return {"output": run["stdout"].strip() or run["stderr"].strip()}
 
-    def commit(self, message: str, paths: Optional[list[str]] = None) -> dict[str, Any]:
+    def commit(self, message: str, paths: list[str] | None = None) -> dict[str, Any]:
         """提交本地改动（指定 paths 或全部）。"""
         self._require_cloned()
         if not message or not message.strip():
@@ -333,7 +333,7 @@ class GitRepoService:
             "remote_newer": behind > 0,
             "is_synced": ahead == 0 and behind == 0 and not dirty,
             "dirty": dirty,
-            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "checked_at": datetime.now(UTC).isoformat(),
         }
 
     def get_remote(self) -> dict[str, str]:

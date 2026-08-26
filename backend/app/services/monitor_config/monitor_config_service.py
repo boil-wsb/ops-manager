@@ -214,7 +214,6 @@ class MonitorConfigService:
             view = self._apply_ops(base)
 
             # 4. 统一写盘（newline='\n'）
-            ops = list(self._ops)
             for f, arr in view.items():
                 if f in files:
                     self._write_file(f, arr)
@@ -305,9 +304,9 @@ class MonitorConfigService:
                 if v is None or str(v).strip() == "":
                     continue
                 k = str(k).strip()
-                if k:  # 避免空 key；env/job/instance 显式字段优先，不被自定义标签覆盖
-                    if k not in ("env", "job", "instance"):
-                        labels[k] = str(v).strip()
+                # 避免空 key；env/job/instance 显式字段优先，不被自定义标签覆盖
+                if k and k not in ("env", "job", "instance"):
+                    labels[k] = str(v).strip()
 
         # 固定字段顺序：targets 在前、labels 在后，与运维落盘的历史格式保持一致，
         # 减少因键序差异造成的不必要 git diff。额外自定义字段追加在末尾。
