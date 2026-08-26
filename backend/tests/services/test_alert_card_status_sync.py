@@ -1,6 +1,7 @@
 """
 Tests for alert card status sync feature.
 """
+
 from datetime import UTC
 from unittest.mock import MagicMock
 

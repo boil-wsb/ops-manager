@@ -1,15 +1,17 @@
 """
 Tests for audit logs API.
 """
+
 import pytest
 from httpx import AsyncClient
 
 
-async def get_auth_headers(client: AsyncClient, username: str = "admin", password: str = "admin123") -> dict:
+async def get_auth_headers(
+    client: AsyncClient, username: str = "admin", password: str = "admin123"
+) -> dict:
     """Helper function to get authentication headers via login."""
     response = await client.post(
-        "/api/v1/auth/login",
-        json={"username": username, "password": password}
+        "/api/v1/auth/login", json={"username": username, "password": password}
     )
     if response.status_code == 200:
         token = response.json()["access_token"]

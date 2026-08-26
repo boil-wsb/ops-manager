@@ -1,15 +1,17 @@
 """
 Tests for permissions API.
 """
+
 import pytest
 from httpx import AsyncClient
 
 
-async def get_auth_headers(client: AsyncClient, username: str = "admin", password: str = "admin123") -> dict:
+async def get_auth_headers(
+    client: AsyncClient, username: str = "admin", password: str = "admin123"
+) -> dict:
     """Helper function to get authentication headers via login."""
     response = await client.post(
-        "/api/v1/auth/login",
-        json={"username": username, "password": password}
+        "/api/v1/auth/login", json={"username": username, "password": password}
     )
     if response.status_code == 200:
         token = response.json()["access_token"]
@@ -56,9 +58,7 @@ async def test_list_permissions_with_filters(client: AsyncClient):
     """Test list permissions with module filter."""
     headers = await get_auth_headers(client)
     response = await client.get(
-        "/api/v1/permissions",
-        params={"module": "user", "is_active": True},
-        headers=headers
+        "/api/v1/permissions", params={"module": "user", "is_active": True}, headers=headers
     )
     assert response.status_code == 200
     data = response.json()
@@ -70,9 +70,7 @@ async def test_list_permissions_pagination(client: AsyncClient):
     """Test list permissions with pagination."""
     headers = await get_auth_headers(client)
     response = await client.get(
-        "/api/v1/permissions",
-        params={"page": 1, "page_size": 10},
-        headers=headers
+        "/api/v1/permissions", params={"page": 1, "page_size": 10}, headers=headers
     )
     assert response.status_code == 200
     data = response.json()

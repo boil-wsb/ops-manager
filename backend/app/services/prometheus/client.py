@@ -1003,9 +1003,7 @@ class PrometheusClient:
                         )
                 return terminal
 
-        enriched_terminals = await asyncio.gather(
-            *[_enrich_terminal(t) for t in terminals]
-        )
+        enriched_terminals = await asyncio.gather(*[_enrich_terminal(t) for t in terminals])
 
         return list(enriched_terminals)
 

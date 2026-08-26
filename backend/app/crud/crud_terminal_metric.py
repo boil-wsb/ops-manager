@@ -164,9 +164,7 @@ class CRUDBerminalMetric(CRUDBase[TerminalMetric, Any, Any]):
         await db.flush()
 
         # ON CONFLICT 后查询返回 ORM 对象（UNIQUE 约束保证仅 1 行）
-        result = await db.execute(
-            select(TerminalMetric).where(TerminalMetric.asset_id == asset_id)
-        )
+        result = await db.execute(select(TerminalMetric).where(TerminalMetric.asset_id == asset_id))
         return result.scalar_one()
 
     async def get_last_sync_time(

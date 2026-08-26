@@ -77,9 +77,7 @@ async def get_department_tree(
 ):
     """Get the department tree with users under each department."""
     # Load all departments (flat list) with leader preloaded
-    result = await db.execute(
-        select(Department).options(selectinload(Department.leader))
-    )
+    result = await db.execute(select(Department).options(selectinload(Department.leader)))
     departments = list(result.scalars().all())
 
     # Load all users
@@ -91,14 +89,16 @@ async def get_department_tree(
     for user in all_users:
         if user.department_id:
             dept_users = users_by_dept.setdefault(user.department_id, [])
-            dept_users.append({
-                "id": user.id,
-                "username": user.username,
-                "full_name": user.full_name,
-                "email": user.email,
-                "feishu_open_id": user.feishu_open_id,
-                "is_active": user.is_active,
-            })
+            dept_users.append(
+                {
+                    "id": user.id,
+                    "username": user.username,
+                    "full_name": user.full_name,
+                    "email": user.email,
+                    "feishu_open_id": user.feishu_open_id,
+                    "is_active": user.is_active,
+                }
+            )
 
     tree = _build_department_tree(departments, users_by_dept)
     return tree

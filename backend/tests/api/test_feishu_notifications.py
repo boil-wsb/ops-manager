@@ -1,6 +1,7 @@
 """
 Tests for Feishu Notifications API.
 """
+
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -11,11 +12,12 @@ from sqlalchemy import text
 from app.db.session import db_operation_with_retry
 
 
-async def get_auth_headers(client: AsyncClient, username: str = "admin", password: str = "admin123") -> dict:
+async def get_auth_headers(
+    client: AsyncClient, username: str = "admin", password: str = "admin123"
+) -> dict:
     """Helper function to get authentication headers."""
     response = await client.post(
-        "/api/v1/auth/login",
-        json={"username": username, "password": password}
+        "/api/v1/auth/login", json={"username": username, "password": password}
     )
     if response.status_code == 200:
         token = response.json()["access_token"]
@@ -26,20 +28,12 @@ async def get_auth_headers(client: AsyncClient, username: str = "admin", passwor
 FeishuCardRequest = {
     "card_content": {
         "schema": "2.0",
-        "header": {
-            "title": {
-                "tag": "plain_text",
-                "content": "测试卡片"
-            },
-            "template": "blue"
-        },
+        "header": {"title": {"tag": "plain_text", "content": "测试卡片"}, "template": "blue"},
         "body": {
-            "elements": [
-                {"tag": "div", "text": {"tag": "lark_md", "content": "**测试内容**"}}
-            ]
-        }
+            "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**测试内容**"}}]
+        },
     },
-    "user": "王仕彬"
+    "user": "王仕彬",
 }
 
 
@@ -52,30 +46,21 @@ class MockFeishuService:
 
     def send_message_to_user(self, user_id: str, msg_type: str, content):
         if self._should_succeed:
-            return {
-                "message_id": self._message_id,
-                "code": 0,
-                "msg": "success"
-            }
+            return {"message_id": self._message_id, "code": 0, "msg": "success"}
         else:
-            return {
-                "message_id": None,
-                "code": 1,
-                "msg": "Failed to send message"
-            }
+            return {"message_id": None, "code": 1, "msg": "Failed to send message"}
 
 
 @pytest.mark.skip(reason="Complex mock dependency on internal db session - tested via integration")
 @pytest.mark.asyncio
 async def test_send_feishu_card_notification_user_not_found(client: AsyncClient):
     """Test sending card notification when user does not exist."""
-    with patch("app.api.v1.feishu_notifications._get_user_by_identifier", new_callable=AsyncMock) as mock_get_user:
+    with patch(
+        "app.api.v1.feishu_notifications._get_user_by_identifier", new_callable=AsyncMock
+    ) as mock_get_user:
         mock_get_user.return_value = None
 
-        response = await client.post(
-            "/api/v1/feishu/notify",
-            json=FeishuCardRequest
-        )
+        response = await client.post("/api/v1/feishu/notify", json=FeishuCardRequest)
         assert response.status_code == 404
         data = response.json()
         assert data["detail"] == "User not found"
@@ -88,16 +73,18 @@ async def test_send_feishu_card_notification_user_no_feishu_open_id(client: Asyn
     mock_user.username = "testuser"
     mock_user.feishu_open_id = None
 
-    with patch("app.crud.crud_user.CRUDUser.get_by_username", new_callable=AsyncMock) as mock_get_by_username, \
-         patch("app.crud.crud_user.CRUDUser.get_by_full_name", new_callable=AsyncMock) as mock_get_by_full_name:
-
+    with (
+        patch(
+            "app.crud.crud_user.CRUDUser.get_by_username", new_callable=AsyncMock
+        ) as mock_get_by_username,
+        patch(
+            "app.crud.crud_user.CRUDUser.get_by_full_name", new_callable=AsyncMock
+        ) as mock_get_by_full_name,
+    ):
         mock_get_by_username.return_value = mock_user
         mock_get_by_full_name.return_value = None
 
-        response = await client.post(
-            "/api/v1/feishu/notify",
-            json=FeishuCardRequest
-        )
+        response = await client.post("/api/v1/feishu/notify", json=FeishuCardRequest)
         assert response.status_code == 400
         data = response.json()
         assert "does not have a feishu_open_id" in data["detail"]
@@ -110,19 +97,21 @@ async def test_send_feishu_card_notification_success_by_username(client: AsyncCl
     mock_user.username = "admin"
     mock_user.feishu_open_id = "ou_test123"
 
-    with patch("app.crud.crud_user.CRUDUser.get_by_username", new_callable=AsyncMock) as mock_get_by_username, \
-         patch("app.crud.crud_user.CRUDUser.get_by_full_name", new_callable=AsyncMock) as mock_get_by_full_name, \
-         patch("app.api.v1.feishu_notifications.get_feishu_service") as mock_get_service:
-
+    with (
+        patch(
+            "app.crud.crud_user.CRUDUser.get_by_username", new_callable=AsyncMock
+        ) as mock_get_by_username,
+        patch(
+            "app.crud.crud_user.CRUDUser.get_by_full_name", new_callable=AsyncMock
+        ) as mock_get_by_full_name,
+        patch("app.api.v1.feishu_notifications.get_feishu_service") as mock_get_service,
+    ):
         mock_get_by_username.return_value = mock_user
         mock_get_by_full_name.return_value = None
         mock_service = MockFeishuService(should_succeed=True)
         mock_get_service.return_value = mock_service
 
-        response = await client.post(
-            "/api/v1/feishu/notify",
-            json=FeishuCardRequest
-        )
+        response = await client.post("/api/v1/feishu/notify", json=FeishuCardRequest)
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
@@ -139,9 +128,12 @@ async def test_send_feishu_card_notification_success_by_full_name(client: AsyncC
     mock_user.username = "admin"
     mock_user.feishu_open_id = "ou_test456"
 
-    with patch("app.api.v1.feishu_notifications._get_user_by_identifier", new_callable=AsyncMock) as mock_get_user, \
-         patch("app.api.v1.feishu_notifications.get_feishu_service") as mock_get_service:
-
+    with (
+        patch(
+            "app.api.v1.feishu_notifications._get_user_by_identifier", new_callable=AsyncMock
+        ) as mock_get_user,
+        patch("app.api.v1.feishu_notifications.get_feishu_service") as mock_get_service,
+    ):
         mock_get_user.return_value = mock_user
         mock_service = MockFeishuService(should_succeed=True)
         mock_get_service.return_value = mock_service
@@ -149,10 +141,7 @@ async def test_send_feishu_card_notification_success_by_full_name(client: AsyncC
         request_data = FeishuCardRequest.copy()
         request_data["user"] = "管理员"
 
-        response = await client.post(
-            "/api/v1/feishu/notify",
-            json=request_data
-        )
+        response = await client.post("/api/v1/feishu/notify", json=request_data)
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
@@ -167,19 +156,21 @@ async def test_send_feishu_card_notification_feishu_send_failure(client: AsyncCl
     mock_user.username = "admin"
     mock_user.feishu_open_id = "ou_test789"
 
-    with patch("app.crud.crud_user.CRUDUser.get_by_username", new_callable=AsyncMock) as mock_get_by_username, \
-         patch("app.crud.crud_user.CRUDUser.get_by_full_name", new_callable=AsyncMock) as mock_get_by_full_name, \
-         patch("app.api.v1.feishu_notifications.get_feishu_service") as mock_get_service:
-
+    with (
+        patch(
+            "app.crud.crud_user.CRUDUser.get_by_username", new_callable=AsyncMock
+        ) as mock_get_by_username,
+        patch(
+            "app.crud.crud_user.CRUDUser.get_by_full_name", new_callable=AsyncMock
+        ) as mock_get_by_full_name,
+        patch("app.api.v1.feishu_notifications.get_feishu_service") as mock_get_service,
+    ):
         mock_get_by_username.return_value = mock_user
         mock_get_by_full_name.return_value = None
         mock_service = MockFeishuService(should_succeed=False)
         mock_get_service.return_value = mock_service
 
-        response = await client.post(
-            "/api/v1/feishu/notify",
-            json=FeishuCardRequest
-        )
+        response = await client.post("/api/v1/feishu/notify", json=FeishuCardRequest)
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is False
@@ -194,18 +185,20 @@ async def test_send_feishu_card_notification_runtime_error(client: AsyncClient):
     mock_user.username = "admin"
     mock_user.feishu_open_id = "ou_test789"
 
-    with patch("app.crud.crud_user.CRUDUser.get_by_username", new_callable=AsyncMock) as mock_get_by_username, \
-         patch("app.crud.crud_user.CRUDUser.get_by_full_name", new_callable=AsyncMock) as mock_get_by_full_name, \
-         patch("app.api.v1.feishu_notifications.get_feishu_service") as mock_get_service:
-
+    with (
+        patch(
+            "app.crud.crud_user.CRUDUser.get_by_username", new_callable=AsyncMock
+        ) as mock_get_by_username,
+        patch(
+            "app.crud.crud_user.CRUDUser.get_by_full_name", new_callable=AsyncMock
+        ) as mock_get_by_full_name,
+        patch("app.api.v1.feishu_notifications.get_feishu_service") as mock_get_service,
+    ):
         mock_get_by_username.return_value = mock_user
         mock_get_by_full_name.return_value = None
         mock_get_service.side_effect = RuntimeError("Feishu integration is not enabled")
 
-        response = await client.post(
-            "/api/v1/feishu/notify",
-            json=FeishuCardRequest
-        )
+        response = await client.post("/api/v1/feishu/notify", json=FeishuCardRequest)
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is False
@@ -215,29 +208,18 @@ async def test_send_feishu_card_notification_runtime_error(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_send_feishu_card_notification_invalid_request(client: AsyncClient):
     """Test sending card notification with invalid request body."""
-    invalid_request = {
-        "card_content": "not_a_dict",
-        "user": ""
-    }
+    invalid_request = {"card_content": "not_a_dict", "user": ""}
 
-    response = await client.post(
-        "/api/v1/feishu/notify",
-        json=invalid_request
-    )
+    response = await client.post("/api/v1/feishu/notify", json=invalid_request)
     assert response.status_code == 422
 
 
 @pytest.mark.asyncio
 async def test_send_feishu_card_notification_missing_fields(client: AsyncClient):
     """Test sending card notification with missing required fields."""
-    incomplete_request = {
-        "card_content": {"test": "content"}
-    }
+    incomplete_request = {"card_content": {"test": "content"}}
 
-    response = await client.post(
-        "/api/v1/feishu/notify",
-        json=incomplete_request
-    )
+    response = await client.post("/api/v1/feishu/notify", json=incomplete_request)
     assert response.status_code == 422
 
 
@@ -259,10 +241,10 @@ async def _insert_record(
     async def _op(session):
         result = await session.execute(
             text(
-                'INSERT INTO notification_records '
+                "INSERT INTO notification_records "
                 '("user", matched_user, feishu_open_id, chat_id, receive_type, '
-                ' callback_id, open_message_id, callback_url, card_content, '
-                ' message_id, success, error, created_at, updated_at) '
+                " callback_id, open_message_id, callback_url, card_content, "
+                " message_id, success, error, created_at, updated_at) "
                 "VALUES (:user, NULL, NULL, :chat_id, 'chat_id', "
                 "        :callback_id, :open_message_id, NULL, CAST(:card AS JSONB), "
                 "        :message_id, TRUE, NULL, NOW(), NOW()) "
@@ -330,9 +312,21 @@ async def test_update_by_open_message_id_with_callback_id_isolates_project(clien
     chat_a = f"oc_chat_a_{suffix}"
     chat_b = f"oc_chat_b_{suffix}"
 
-    card_running_a = {"schema": "2.0", "header": {"title": {"content": "项目A运行中"}}, "body": {"elements": []}}
-    card_running_b = {"schema": "2.0", "header": {"title": {"content": "项目B运行中"}}, "body": {"elements": []}}
-    card_success_b = {"schema": "2.0", "header": {"title": {"content": "项目B成功"}}, "body": {"elements": []}}
+    card_running_a = {
+        "schema": "2.0",
+        "header": {"title": {"content": "项目A运行中"}},
+        "body": {"elements": []},
+    }
+    card_running_b = {
+        "schema": "2.0",
+        "header": {"title": {"content": "项目B运行中"}},
+        "body": {"elements": []},
+    }
+    card_success_b = {
+        "schema": "2.0",
+        "header": {"title": {"content": "项目B成功"}},
+        "body": {"elements": []},
+    }
 
     # 1. 模拟项目A、项目B两条记录共用同一 open_message_id
     rid_a = await _insert_record(
@@ -391,13 +385,23 @@ async def test_update_by_open_message_id_with_callback_id_isolates_project(clien
 
 
 @pytest.mark.asyncio
-async def test_update_by_open_message_id_without_callback_id_backwards_compatible(client: AsyncClient):
+async def test_update_by_open_message_id_without_callback_id_backwards_compatible(
+    client: AsyncClient,
+):
     """不传 callback_id 时维持原行为：更新所有 open_message_id 匹配的记录（向后兼容）。"""
     suffix = uuid.uuid4().hex[:8]
     open_message_id = f"pipeline_compat_{suffix}_5010"
 
-    card_running = {"schema": "2.0", "header": {"title": {"content": "运行中"}}, "body": {"elements": []}}
-    card_done = {"schema": "2.0", "header": {"title": {"content": "完成"}}, "body": {"elements": []}}
+    card_running = {
+        "schema": "2.0",
+        "header": {"title": {"content": "运行中"}},
+        "body": {"elements": []},
+    }
+    card_done = {
+        "schema": "2.0",
+        "header": {"title": {"content": "完成"}},
+        "body": {"elements": []},
+    }
 
     rid_1 = await _insert_record(
         open_message_id=open_message_id,
@@ -442,12 +446,18 @@ async def test_update_by_open_message_id_without_callback_id_backwards_compatibl
 
 
 @pytest.mark.asyncio
-async def test_update_by_open_message_id_with_nonexistent_callback_id_returns_404(client: AsyncClient):
+async def test_update_by_open_message_id_with_nonexistent_callback_id_returns_404(
+    client: AsyncClient,
+):
     """传入不存在的 callback_id 时返回 404，避免误更新其他项目的记录。"""
     suffix = uuid.uuid4().hex[:8]
     open_message_id = f"pipeline_404_{suffix}_5010"
 
-    card_running = {"schema": "2.0", "header": {"title": {"content": "运行中"}}, "body": {"elements": []}}
+    card_running = {
+        "schema": "2.0",
+        "header": {"title": {"content": "运行中"}},
+        "body": {"elements": []},
+    }
 
     rid_a = await _insert_record(
         open_message_id=open_message_id,

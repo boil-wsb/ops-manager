@@ -1,6 +1,7 @@
 """
 Tests for authentication API.
 """
+
 import pytest
 from httpx import AsyncClient
 
@@ -8,11 +9,7 @@ from httpx import AsyncClient
 async def get_auth_headers(client: AsyncClient) -> dict:
     """Helper to get authentication headers."""
     login_response = await client.post(
-        "/api/v1/auth/login",
-        json={
-            "username": "admin",
-            "password": "admin123"
-        }
+        "/api/v1/auth/login", json={"username": "admin", "password": "admin123"}
     )
     if login_response.status_code == 200:
         token = login_response.json()["access_token"]
@@ -33,11 +30,7 @@ async def test_health_check(client: AsyncClient):
 async def test_login_with_invalid_credentials(client: AsyncClient):
     """Test login with invalid credentials."""
     response = await client.post(
-        "/api/v1/auth/login",
-        json={
-            "username": "nonexistent",
-            "password": "wrongpassword"
-        }
+        "/api/v1/auth/login", json={"username": "nonexistent", "password": "wrongpassword"}
     )
     assert response.status_code == 401
 
@@ -47,11 +40,7 @@ async def test_login_rate_limiting(client: AsyncClient):
     """Test that login endpoint is rate limited."""
     for _ in range(6):
         response = await client.post(
-            "/api/v1/auth/login",
-            json={
-                "username": "test",
-                "password": "test"
-            }
+            "/api/v1/auth/login", json={"username": "test", "password": "test"}
         )
 
     assert response.status_code == 429
@@ -102,20 +91,14 @@ async def test_change_password(client: AsyncClient):
     response = await client.post(
         "/api/v1/auth/change-password",
         headers=headers,
-        json={
-            "old_password": "admin123",
-            "new_password": "newpassword123"
-        }
+        json={"old_password": "admin123", "new_password": "newpassword123"},
     )
     if response.status_code == 200:
         assert response.json()["message"] == "密码修改成功"
         await client.post(
             "/api/v1/auth/change-password",
             headers=headers,
-            json={
-                "old_password": "newpassword123",
-                "new_password": "admin123"
-            }
+            json={"old_password": "newpassword123", "new_password": "admin123"},
         )
 
 
@@ -129,10 +112,7 @@ async def test_change_password_wrong_old_password(client: AsyncClient):
     response = await client.post(
         "/api/v1/auth/change-password",
         headers=headers,
-        json={
-            "old_password": "wrongpassword",
-            "new_password": "newpassword123"
-        }
+        json={"old_password": "wrongpassword", "new_password": "newpassword123"},
     )
     assert response.status_code == 400
 
@@ -141,11 +121,7 @@ async def test_change_password_wrong_old_password(client: AsyncClient):
 async def test_refresh_token(client: AsyncClient):
     """Test token refresh with valid refresh token."""
     login_response = await client.post(
-        "/api/v1/auth/login",
-        json={
-            "username": "admin",
-            "password": "admin123"
-        }
+        "/api/v1/auth/login", json={"username": "admin", "password": "admin123"}
     )
     if login_response.status_code != 200:
         pytest.skip("Cannot login for this test")
@@ -154,10 +130,7 @@ async def test_refresh_token(client: AsyncClient):
     refresh_token = token_data.get("refresh_token")
     assert refresh_token is not None
 
-    response = await client.post(
-        "/api/v1/auth/refresh",
-        json={"refresh_token": refresh_token}
-    )
+    response = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
     if response.status_code == 422:
         pytest.skip("Refresh endpoint parameter binding issue")
     assert response.status_code == 200
@@ -172,8 +145,7 @@ async def test_refresh_token(client: AsyncClient):
 async def test_refresh_token_invalid(client: AsyncClient):
     """Test token refresh with invalid token."""
     response = await client.post(
-        "/api/v1/auth/refresh",
-        json={"refresh_token": "invalid_refresh_token"}
+        "/api/v1/auth/refresh", json={"refresh_token": "invalid_refresh_token"}
     )
     if response.status_code == 422:
         pytest.skip("Refresh endpoint parameter binding issue")
@@ -184,11 +156,7 @@ async def test_refresh_token_invalid(client: AsyncClient):
 async def test_refresh_token_wrong_type(client: AsyncClient):
     """Test token refresh with access token instead of refresh token."""
     login_response = await client.post(
-        "/api/v1/auth/login",
-        json={
-            "username": "admin",
-            "password": "admin123"
-        }
+        "/api/v1/auth/login", json={"username": "admin", "password": "admin123"}
     )
     if login_response.status_code != 200:
         pytest.skip("Cannot login for this test")
@@ -196,10 +164,7 @@ async def test_refresh_token_wrong_type(client: AsyncClient):
     token_data = login_response.json()
     access_token = token_data.get("access_token")
 
-    response = await client.post(
-        "/api/v1/auth/refresh",
-        json={"refresh_token": access_token}
-    )
+    response = await client.post("/api/v1/auth/refresh", json={"refresh_token": access_token})
     if response.status_code == 422:
         pytest.skip("Refresh endpoint parameter binding issue")
     assert response.status_code == 401
@@ -210,11 +175,7 @@ async def test_invalid_login_attempts(client: AsyncClient):
     """Test multiple invalid login attempts."""
     for _ in range(5):
         response = await client.post(
-            "/api/v1/auth/login",
-            json={
-                "username": "wronguser",
-                "password": "wrongpassword"
-            }
+            "/api/v1/auth/login", json={"username": "wronguser", "password": "wrongpassword"}
         )
         assert response.status_code == 401
 
@@ -226,10 +187,7 @@ async def test_token_expiry(client: AsyncClient):
 
     from app.core.security import create_access_token
 
-    expired_token = create_access_token(
-        data={"sub": "1"},
-        expires_delta=timedelta(seconds=-1)
-    )
+    expired_token = create_access_token(data={"sub": "1"}, expires_delta=timedelta(seconds=-1))
     headers = {"Authorization": f"Bearer {expired_token}"}
 
     response = await client.get("/api/v1/auth/me", headers=headers)

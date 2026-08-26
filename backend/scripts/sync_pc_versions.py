@@ -8,6 +8,7 @@ update the database with version information from the frontend files.
 Usage:
     python sync_pc_versions.py [--dry-run]
 """
+
 import argparse
 import json
 import os
@@ -48,20 +49,19 @@ def discover_versions(pcinfo_dir: Path) -> list[dict]:
     for vbs_file in pcinfo_dir.glob("PC_*.vbs"):
         version = extract_version_from_filename(vbs_file.name)
         if version:
-            versions.append({
-                "version": version,
-                "filename": vbs_file.name,
-                "path": str(vbs_file.relative_to(pcinfo_dir.parent.parent))
-            })
+            versions.append(
+                {
+                    "version": version,
+                    "filename": vbs_file.name,
+                    "path": str(vbs_file.relative_to(pcinfo_dir.parent.parent)),
+                }
+            )
 
     return sorted(versions, key=lambda x: x["version"], reverse=True)
 
 
 def sync_version_to_api(
-    version: str,
-    api_base: str,
-    api_token: str | None = None,
-    dry_run: bool = False
+    version: str, api_base: str, api_token: str | None = None, dry_run: bool = False
 ) -> bool:
     """Sync a single version to the database via API."""
     url = f"{api_base}/api/v1/versions"
@@ -74,7 +74,7 @@ def sync_version_to_api(
         "version": version,
         "release_notes": f"PC Client version {version}",
         "is_active": True,
-        "download_url": f"/pcinfo/PC_{version}_modular.vbs"
+        "download_url": f"/pcinfo/PC_{version}_modular.vbs",
     }
 
     if dry_run:
@@ -103,24 +103,20 @@ def sync_version_to_api(
 def main():
     parser = argparse.ArgumentParser(description="Sync PC Client versions to database")
     parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Show what would be done without making changes"
+        "--dry-run", action="store_true", help="Show what would be done without making changes"
     )
     parser.add_argument(
         "--api-base",
         default=os.environ.get("API_BASE", "http://localhost:8000"),
-        help="API base URL (default: http://localhost:8000)"
+        help="API base URL (default: http://localhost:8000)",
     )
     parser.add_argument(
-        "--api-token",
-        default=os.environ.get("API_TOKEN"),
-        help="API token for authentication"
+        "--api-token", default=os.environ.get("API_TOKEN"), help="API token for authentication"
     )
     parser.add_argument(
         "--activate-latest",
         action="store_true",
-        help="Activate the latest version (deactivate older versions)"
+        help="Activate the latest version (deactivate older versions)",
     )
 
     args = parser.parse_args()
@@ -152,12 +148,7 @@ def main():
     success_count = 0
     for v in versions:
         print(f"Processing version {v['version']}...")
-        if sync_version_to_api(
-            v["version"],
-            args.api_base,
-            args.api_token,
-            args.dry_run
-        ):
+        if sync_version_to_api(v["version"], args.api_base, args.api_token, args.dry_run):
             success_count += 1
 
     print()

@@ -23,7 +23,10 @@ class Department(BaseModel):
         String(100), nullable=True, index=True, comment="所属公司名称（根组织名）"
     )
     parent_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("departments.id", ondelete="SET NULL"), nullable=True, comment="父部门ID"
+        Integer,
+        ForeignKey("departments.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="父部门ID",
     )
     feishu_parent_department_id: Mapped[str | None] = mapped_column(
         String(100), nullable=True, comment="飞书父部门ID"
@@ -38,8 +41,7 @@ class Department(BaseModel):
         DateTime(timezone=True), nullable=True, comment="最后同步时间"
     )
     leader_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True, comment="部门负责人"
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, comment="部门负责人"
     )
 
     # Relationships

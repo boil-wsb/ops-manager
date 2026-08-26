@@ -314,7 +314,9 @@ async def discover_prometheus_assets(
     prometheus_client = get_prometheus_client()
     nodes = await prometheus_client.get_all_nodes()
 
-    existing_assets, _ = await crud_asset.get_multi_with_filters(db, skip=0, limit=10000, exclude_retired=False)
+    existing_assets, _ = await crud_asset.get_multi_with_filters(
+        db, skip=0, limit=10000, exclude_retired=False
+    )
     existing_ips = {asset.ip_address for asset in existing_assets if asset.ip_address}
 
     discovered_nodes = []
@@ -404,7 +406,9 @@ async def import_prometheus_asset(
 async def get_asset_topology(
     asset_type: str | None = Query(None, description="按资产类型筛选"),
     status: str | None = Query(None, description="按状态筛选"),
-    refresh: bool = Query(False, description="true=实时拉取 Prometheus 指标(同每日巡检), false=读最新巡检报告"),
+    refresh: bool = Query(
+        False, description="true=实时拉取 Prometheus 指标(同每日巡检), false=读最新巡检报告"
+    ),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permissions(["asset:read"])),
 ):

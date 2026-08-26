@@ -155,9 +155,7 @@ class GitRepoService:
     def get_sparse(self) -> list[str]:
         """读取当前稀疏检出路径（含 core.sparseCheckoutCone 及匹配到的路径）。"""
         self._require_cloned()
-        run = self.run_git(
-            ["sparse-checkout", "list"], cwd=str(self.repo_dir), check=False
-        )
+        run = self.run_git(["sparse-checkout", "list"], cwd=str(self.repo_dir), check=False)
         return [line for line in run["stdout"].splitlines() if line.strip()]
 
     def set_sparse(self, paths: list[str]) -> dict[str, Any]:
@@ -176,7 +174,10 @@ class GitRepoService:
         with self._lock:
             run = self.run_git(["fetch", "origin"], cwd=str(self.repo_dir), auth=True, check=False)
             if run["code"] != 0:
-                raise AppException(500, detail=f"git fetch 失败: {self._strip(run['stderr']) or self._strip(run['stdout'])}")
+                raise AppException(
+                    500,
+                    detail=f"git fetch 失败: {self._strip(run['stderr']) or self._strip(run['stdout'])}",
+                )
             return {"output": run["stdout"].strip() or run["stderr"].strip()}
 
     def pull(self) -> dict[str, Any]:

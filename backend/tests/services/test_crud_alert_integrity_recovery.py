@@ -15,6 +15,7 @@ ND-1 根因:
 
 修复: 重试 SELECT 也加 AlertHistory.status == "firing" 过滤。
 """
+
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
@@ -91,12 +92,9 @@ class TestCreateFromAlertmanagerIntegrityRecovery:
         # 验证 execute 接收的是 select 语句（不是其他类型）
         select_stmt = db.execute.await_args.args[0]
         # 编译 SQL 查看是否包含 status = 'firing' 过滤
-        compiled = str(
-            select_stmt.compile(compile_kwargs={"literal_binds": True})
-        )
+        compiled = str(select_stmt.compile(compile_kwargs={"literal_binds": True}))
         assert "firing" in compiled.lower(), (
-            "ND-1: 重试 SELECT 必须包含 status='firing' 过滤条件，"
-            "避免命中已 resolved 的记录并加锁"
+            "ND-1: 重试 SELECT 必须包含 status='firing' 过滤条件，避免命中已 resolved 的记录并加锁"
         )
 
     async def test_integrity_error_recovery_raises_when_no_firing_record(self):

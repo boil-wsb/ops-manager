@@ -1,6 +1,7 @@
 """
 Tests for Notification Records API.
 """
+
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -21,7 +22,7 @@ class MockCrudNotificationRecord:
         if success is not None:
             filtered = [r for r in filtered if r.success == success]
         total = len(filtered)
-        items = filtered[skip:skip + limit]
+        items = filtered[skip : skip + limit]
         return total, items
 
     async def get(self, db, record_id):
@@ -160,7 +161,9 @@ class TestNotificationRecordsAPI:
             assert data["items"][0]["user"] == "user_a"
 
     @pytest.mark.asyncio
-    async def test_list_notification_records_filter_by_success(self, client: AsyncClient, mock_crud):
+    async def test_list_notification_records_filter_by_success(
+        self, client: AsyncClient, mock_crud
+    ):
         """Test filtering notification records by success status."""
         mock_record1 = MagicMock()
         mock_record1.id = 1
@@ -294,7 +297,7 @@ class TestNotificationRecordSchemaConversion:
             "messageId": "msg_123",
             "success": True,
             "error": None,
-            "createdAt": "2024-01-01T00:00:00"
+            "createdAt": "2024-01-01T00:00:00",
         }
         assert "matchedUser" in response_data
         assert "feishuOpenId" in response_data
@@ -324,7 +327,7 @@ class TestNotificationRecordSchemaConversion:
             "callback_id": None,
             "open_message_id": None,
             "card_content": {"schema": "2.0"},
-            "success": True
+            "success": True,
         }
         assert "user" in request_data
         assert "matched_user" in request_data

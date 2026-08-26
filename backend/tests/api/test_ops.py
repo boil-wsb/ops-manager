@@ -1,6 +1,7 @@
 """
 Tests for ops API (deployments and DNS records).
 """
+
 import pytest
 from httpx import AsyncClient
 
@@ -8,11 +9,7 @@ from httpx import AsyncClient
 async def get_auth_headers(client: AsyncClient) -> dict:
     """Helper to get authentication headers."""
     login_response = await client.post(
-        "/api/v1/auth/login",
-        json={
-            "username": "admin",
-            "password": "admin123"
-        }
+        "/api/v1/auth/login", json={"username": "admin", "password": "admin123"}
     )
     if login_response.status_code == 200:
         token = login_response.json()["access_token"]

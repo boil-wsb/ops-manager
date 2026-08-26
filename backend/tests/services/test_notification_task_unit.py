@@ -26,6 +26,7 @@ L3 单元测试: 三阶段通知 API 全路径覆盖.
 7. 无 instance → 直接返回
 8. 多收件人去重 + 首个 message_id 保存
 """
+
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -121,9 +122,7 @@ def mock_db_with_feishu_template(mock_db):
 @pytest.fixture
 def patched_template_render():
     """patch alert_template_service.render_alert_template 返回有效内容."""
-    with patch(
-        "app.services.alerts.notification_task.alert_template_service"
-    ) as svc:
+    with patch("app.services.alerts.notification_task.alert_template_service") as svc:
         svc.render_alert_template = AsyncMock(return_value=("告警主题", "告警正文"))
         svc.render_template = MagicMock(return_value='{"schema":"2.0","body":{}}')
         yield svc
@@ -182,7 +181,9 @@ def patched_save_message_id():
 def mock_feishu_svc():
     """patch get_feishu_notification_service 返回 mock service."""
     svc = MagicMock()
-    svc.send_p2p_card_message = MagicMock(return_value={"success": True, "message_id": "om_test123"})
+    svc.send_p2p_card_message = MagicMock(
+        return_value={"success": True, "message_id": "om_test123"}
+    )
     svc.update_card_message = MagicMock(return_value={"success": True})
     svc.build_alert_card = MagicMock(return_value={"schema": "2.0", "body": {}})
     svc.build_resolved_card = MagicMock(return_value={"schema": "2.0", "body": {}})
@@ -258,14 +259,17 @@ class TestSendAlertFiringWithRecipients:
         mock_feishu_svc,
     ):
         """收件人去重: asset owner 同时在通知组 → 只发送一次."""
-        with patch(
-            "app.services.alerts.notification_task._get_asset_owner_open_id",
-            new_callable=AsyncMock,
-            return_value="ou_dup",
-        ), patch(
-            "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
-            new_callable=AsyncMock,
-            return_value=["ou_dup", "ou_other"],
+        with (
+            patch(
+                "app.services.alerts.notification_task._get_asset_owner_open_id",
+                new_callable=AsyncMock,
+                return_value="ou_dup",
+            ),
+            patch(
+                "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
+                new_callable=AsyncMock,
+                return_value=["ou_dup", "ou_other"],
+            ),
         ):
             alert_data = _make_alert_data(status="firing")
 
@@ -379,7 +383,7 @@ class TestSendAlertResolved:
 
         mock_db.execute.side_effect = [
             _make_scalars_result([template]),  # feishu templates
-            select_result,                     # resolved SELECT alert_card_messages
+            select_result,  # resolved SELECT alert_card_messages
         ]
 
         alert_data = _make_alert_data(status="resolved")
@@ -429,8 +433,8 @@ class TestSendAlertResolved:
 
         mock_db.execute.side_effect = [
             _make_scalars_result([template]),  # feishu templates
-            empty_select,                      # resolved SELECT alert_card_messages (空)
-            empty_legacy,                      # legacy fallback SELECT alert_history (空)
+            empty_select,  # resolved SELECT alert_card_messages (空)
+            empty_legacy,  # legacy fallback SELECT alert_history (空)
         ]
 
         alert_data = _make_alert_data(status="resolved")
@@ -493,14 +497,17 @@ class TestPreMarkBeforeSend:
         patched_save_message_id,
         mock_feishu_svc,
     ):
-        with patch(
-            "app.services.alerts.notification_task._get_asset_owner_open_id",
-            new_callable=AsyncMock,
-            return_value="ou_owner",
-        ), patch(
-            "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
-            new_callable=AsyncMock,
-            return_value=[],
+        with (
+            patch(
+                "app.services.alerts.notification_task._get_asset_owner_open_id",
+                new_callable=AsyncMock,
+                return_value="ou_owner",
+            ),
+            patch(
+                "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
         ):
             call_sequence = []
 
@@ -543,18 +550,22 @@ class TestAsyncioToThreadWrapper:
         patched_save_message_id,
         mock_feishu_svc,
     ):
-        with patch(
-            "app.services.alerts.notification_task._get_asset_owner_open_id",
-            new_callable=AsyncMock,
-            return_value="ou_owner",
-        ), patch(
-            "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
-            new_callable=AsyncMock,
-            return_value=[],
-        ), patch(
-            "app.services.alerts.notification_task.asyncio.to_thread",
-            new=AsyncMock(),
-        ) as mock_to_thread:
+        with (
+            patch(
+                "app.services.alerts.notification_task._get_asset_owner_open_id",
+                new_callable=AsyncMock,
+                return_value="ou_owner",
+            ),
+            patch(
+                "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch(
+                "app.services.alerts.notification_task.asyncio.to_thread",
+                new=AsyncMock(),
+            ) as mock_to_thread,
+        ):
             mock_to_thread.return_value = {"success": True, "message_id": "om_thread_test"}
 
             alert_data = _make_alert_data(status="firing")
@@ -602,22 +613,26 @@ class TestAsyncioToThreadWrapper:
         select_result.fetchall.return_value = [row]
 
         mock_db.execute.side_effect = [
-            _make_scalars_result([template]), # feishu templates
-            select_result,                   # resolved SELECT alert_card_messages
+            _make_scalars_result([template]),  # feishu templates
+            select_result,  # resolved SELECT alert_card_messages
         ]
 
-        with patch(
-            "app.services.alerts.notification_task._get_asset_owner_open_id",
-            new_callable=AsyncMock,
-            return_value="ou_owner",
-        ), patch(
-            "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
-            new_callable=AsyncMock,
-            return_value=[],
-        ), patch(
-            "app.services.alerts.notification_task.asyncio.to_thread",
-            new=AsyncMock(return_value={"success": True}),
-        ) as mock_to_thread:
+        with (
+            patch(
+                "app.services.alerts.notification_task._get_asset_owner_open_id",
+                new_callable=AsyncMock,
+                return_value="ou_owner",
+            ),
+            patch(
+                "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch(
+                "app.services.alerts.notification_task.asyncio.to_thread",
+                new=AsyncMock(return_value={"success": True}),
+            ) as mock_to_thread,
+        ):
             alert_data = _make_alert_data(status="resolved")
 
             await _run_three_stage(alert_data, mock_db)
@@ -640,14 +655,17 @@ class TestSendAlertSavesFirstMessageId:
         patched_save_message_id,
         mock_feishu_svc,
     ):
-        with patch(
-            "app.services.alerts.notification_task._get_asset_owner_open_id",
-            new_callable=AsyncMock,
-            return_value="ou_owner",
-        ), patch(
-            "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
-            new_callable=AsyncMock,
-            return_value=["ou_member1", "ou_member2"],
+        with (
+            patch(
+                "app.services.alerts.notification_task._get_asset_owner_open_id",
+                new_callable=AsyncMock,
+                return_value="ou_owner",
+            ),
+            patch(
+                "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
+                new_callable=AsyncMock,
+                return_value=["ou_member1", "ou_member2"],
+            ),
         ):
             # 三个收件人,返回不同 message_id
             mock_feishu_svc.send_p2p_card_message.side_effect = [
@@ -664,7 +682,9 @@ class TestSendAlertSavesFirstMessageId:
             patched_save_message_id.assert_awaited_once()
             # 三参数签名: (db, ctx, result)
             call_args = patched_save_message_id.call_args
-            result_arg = call_args.args[2] if len(call_args.args) >= 3 else call_args.kwargs.get("result")
+            result_arg = (
+                call_args.args[2] if len(call_args.args) >= 3 else call_args.kwargs.get("result")
+            )
             # sent_cards 应包含 2 个成功发送的卡片（首个为 om_first）
             assert len(result_arg.sent_cards) == 2
             assert result_arg.sent_cards[0]["open_message_id"] == "om_first"
@@ -678,16 +698,22 @@ class TestSendAlertSavesFirstMessageId:
         patched_save_message_id,
         mock_feishu_svc,
     ):
-        with patch(
-            "app.services.alerts.notification_task._get_asset_owner_open_id",
-            new_callable=AsyncMock,
-            return_value="ou_owner",
-        ), patch(
-            "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
-            new_callable=AsyncMock,
-            return_value=[],
+        with (
+            patch(
+                "app.services.alerts.notification_task._get_asset_owner_open_id",
+                new_callable=AsyncMock,
+                return_value="ou_owner",
+            ),
+            patch(
+                "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
         ):
-            mock_feishu_svc.send_p2p_card_message.return_value = {"success": False, "message_id": None}
+            mock_feishu_svc.send_p2p_card_message.return_value = {
+                "success": False,
+                "message_id": None,
+            }
 
             alert_data = _make_alert_data(status="firing")
 

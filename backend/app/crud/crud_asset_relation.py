@@ -220,9 +220,7 @@ class CRUDAssetRelation(CRUDBase[AssetRelation, AssetRelationCreate, dict[str, A
 
         # Latest report id
         rep_result = await db.execute(
-            select(HealthCheckReport.id)
-            .order_by(HealthCheckReport.report_time.desc())
-            .limit(1)
+            select(HealthCheckReport.id).order_by(HealthCheckReport.report_time.desc()).limit(1)
         )
         report_id = rep_result.scalar_one_or_none()
         if not report_id:
@@ -257,9 +255,7 @@ class CRUDAssetRelation(CRUDBase[AssetRelation, AssetRelationCreate, dict[str, A
                     "checked_at": detail.checked_at.isoformat() if detail.checked_at else None,
                 }
 
-    def _match_detail(
-        self, asset: Asset, detail_by_instance: dict[str, Any]
-    ) -> Any:
+    def _match_detail(self, asset: Asset, detail_by_instance: dict[str, Any]) -> Any:
         """Find a matching health-check detail for an asset."""
         candidates: list[str] = []
         if asset.prometheus_instance:
@@ -331,9 +327,7 @@ class CRUDAssetRelation(CRUDBase[AssetRelation, AssetRelationCreate, dict[str, A
                 )
                 if m.get("memory_total_mb")
                 else (
-                    round((m.get("memory_total", 0.0) or 0.0), 2)
-                    if "memory_total" in m
-                    else None
+                    round((m.get("memory_total", 0.0) or 0.0), 2) if "memory_total" in m else None
                 ),
                 "disk_total_gb": round(
                     (m.get("disk_total_gb") or (m.get("disk_total", 0.0) or 0.0)),
@@ -349,7 +343,9 @@ class CRUDAssetRelation(CRUDBase[AssetRelation, AssetRelationCreate, dict[str, A
                 "checked_at": None,
             }
 
-    def _lookup_metric(self, asset: Asset, by_key: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
+    def _lookup_metric(
+        self, asset: Asset, by_key: dict[str, dict[str, Any]]
+    ) -> dict[str, Any] | None:
         """Look up a prometheus metric dict for an asset across candidate keys."""
         candidates: list[str] = []
         if asset.prometheus_instance:
@@ -379,6 +375,7 @@ class CRUDAssetRelation(CRUDBase[AssetRelation, AssetRelationCreate, dict[str, A
         Label edges are keyed per (pair, label) so two nodes sharing two labels
         produce two edges.
         """
+
         # Unordered pair helper
         def pair_key(a_id: str, b_id: str) -> tuple[str, str]:
             return (a_id, b_id) if a_id <= b_id else (b_id, a_id)

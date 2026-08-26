@@ -144,13 +144,19 @@ async def _get_asset_stats(db: AsyncSession) -> dict:
     active_filter = Asset.status != AssetStatus.RETIRED
     total_stmt = select(func.count()).select_from(Asset).where(active_filter)
     server_stmt = (
-        select(func.count()).select_from(Asset).where(Asset.asset_type == AssetType.SERVER, active_filter)
+        select(func.count())
+        .select_from(Asset)
+        .where(Asset.asset_type == AssetType.SERVER, active_filter)
     )
     domain_stmt = (
-        select(func.count()).select_from(Asset).where(Asset.asset_type == AssetType.NETWORK, active_filter)
+        select(func.count())
+        .select_from(Asset)
+        .where(Asset.asset_type == AssetType.NETWORK, active_filter)
     )
     terminal_stmt = (
-        select(func.count()).select_from(Asset).where(Asset.asset_type == AssetType.TERMINAL, active_filter)
+        select(func.count())
+        .select_from(Asset)
+        .where(Asset.asset_type == AssetType.TERMINAL, active_filter)
     )
 
     total_count, server_count, domain_count, terminal_count = await asyncio.gather(

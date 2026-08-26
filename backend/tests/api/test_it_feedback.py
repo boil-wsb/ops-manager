@@ -1,15 +1,17 @@
 """
 Tests for IT Feedback API.
 """
+
 import pytest
 from httpx import AsyncClient
 
 
-async def get_auth_headers(client: AsyncClient, username: str = "admin", password: str = "admin123") -> dict:
+async def get_auth_headers(
+    client: AsyncClient, username: str = "admin", password: str = "admin123"
+) -> dict:
     """Helper function to get authentication headers."""
     response = await client.post(
-        "/api/v1/auth/login",
-        json={"username": username, "password": password}
+        "/api/v1/auth/login", json={"username": username, "password": password}
     )
     if response.status_code == 200:
         token = response.json()["access_token"]
@@ -98,9 +100,7 @@ async def test_get_feedback_not_found(client: AsyncClient):
 async def test_create_feedback_with_client_ip(client: AsyncClient):
     """Test create feedback captures client IP."""
     response = await client.post(
-        "/api/v1/it-feedback",
-        json=ITFeedbackCreate,
-        headers={"X-Forwarded-For": "192.168.1.100"}
+        "/api/v1/it-feedback", json=ITFeedbackCreate, headers={"X-Forwarded-For": "192.168.1.100"}
     )
     assert response.status_code == 200
     data = response.json()
@@ -177,7 +177,7 @@ async def test_update_feedback_status(client: AsyncClient):
     response = await client.put(
         f"/api/v1/it-feedback/{feedback_id}/resolve",
         headers=headers,
-        params={"resolved_by": "admin"}
+        params={"resolved_by": "admin"},
     )
     assert response.status_code == 200
     data = response.json()
@@ -196,7 +196,7 @@ async def test_update_feedback_status_with_notes(client: AsyncClient):
     response = await client.put(
         f"/api/v1/it-feedback/{feedback_id}/resolve",
         headers=headers,
-        params={"resolved_by": "admin", "notes": "已处理完成"}
+        params={"resolved_by": "admin", "notes": "已处理完成"},
     )
     assert response.status_code == 200
     data = response.json()
@@ -209,9 +209,7 @@ async def test_update_feedback_status_not_found(client: AsyncClient):
     """Test update feedback status with non-existent ID."""
     headers = await get_auth_headers(client)
     response = await client.put(
-        "/api/v1/it-feedback/99999/resolve",
-        headers=headers,
-        params={"resolved_by": "admin"}
+        "/api/v1/it-feedback/99999/resolve", headers=headers, params={"resolved_by": "admin"}
     )
     assert response.status_code == 404
 

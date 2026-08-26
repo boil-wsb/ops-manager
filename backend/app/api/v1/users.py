@@ -37,7 +37,9 @@ async def list_users(
     cache_key = f"users:list:{keyword}:{is_active}:{page}:{page_size}"
 
     async def _fetch_users():
-        query = select(User).options(selectinload(User.roles)).options(selectinload(User.department))
+        query = (
+            select(User).options(selectinload(User.roles)).options(selectinload(User.department))
+        )
 
         if keyword:
             query = query.where(
@@ -98,14 +100,16 @@ async def list_ip_bindings(
     result = []
     for b in bindings:
         user = await crud_user.get(db, id=b.user_id)
-        result.append({
-            "id": b.id,
-            "user_id": b.user_id,
-            "username": user.username if user else None,
-            "full_name": user.full_name if user else None,
-            "ip_address": b.ip_address,
-            "bound_at": b.bound_at,
-        })
+        result.append(
+            {
+                "id": b.id,
+                "user_id": b.user_id,
+                "username": user.username if user else None,
+                "full_name": user.full_name if user else None,
+                "ip_address": b.ip_address,
+                "bound_at": b.bound_at,
+            }
+        )
 
     return {"items": result, "total": len(result)}
 
@@ -397,7 +401,11 @@ async def send_message_to_user(
             error_msg = result.get("msg", "Unknown error")
             logger.error(
                 f"消息发送失败: user={user.username}, error={error_msg}",
-                extra={"action": "user.send_message", "username": user.username, "error": error_msg},
+                extra={
+                    "action": "user.send_message",
+                    "username": user.username,
+                    "error": error_msg,
+                },
             )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

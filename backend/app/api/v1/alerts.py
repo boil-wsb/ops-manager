@@ -177,7 +177,9 @@ async def process_alert(
                         "action": "alert.resolve",
                         "alertname": alertname,
                         "instance": instance,
-                        "starts_at": effective_starts_at.isoformat() if effective_starts_at else None,
+                        "starts_at": effective_starts_at.isoformat()
+                        if effective_starts_at
+                        else None,
                         "resolved_count": len(pending_alerts),
                     },
                 )
@@ -266,7 +268,11 @@ async def process_alert(
             history = existing_record
             logger.info(
                 f"Updated existing history record: id={history.id}, already_notified={already_notified}",
-                extra={"action": "alert.receive", "history_id": history.id, "already_notified": already_notified},
+                extra={
+                    "action": "alert.receive",
+                    "history_id": history.id,
+                    "already_notified": already_notified,
+                },
             )
         else:
             history = await crud_alert_history.create_from_alertmanager(
@@ -338,17 +344,14 @@ async def process_alert(
             is_aggregated = False
             if aggregation_window > 0 and instance:
                 window_start = now_shanghai() - timedelta(seconds=aggregation_window)
-                agg_query = (
-                    select(func.count(AlertHistory.id))
-                    .where(
-                        and_(
-                            AlertHistory.alertname == alertname,
-                            AlertHistory.labels.op("->>")("instance") == instance,
-                            AlertHistory.notification_sent.is_(True),
-                            AlertHistory.status != AlertHistoryStatus.RESOLVED.value,
-                            AlertHistory.id != history.id,
-                            AlertHistory.created_at >= window_start,
-                        )
+                agg_query = select(func.count(AlertHistory.id)).where(
+                    and_(
+                        AlertHistory.alertname == alertname,
+                        AlertHistory.labels.op("->>")("instance") == instance,
+                        AlertHistory.notification_sent.is_(True),
+                        AlertHistory.status != AlertHistoryStatus.RESOLVED.value,
+                        AlertHistory.id != history.id,
+                        AlertHistory.created_at >= window_start,
                     )
                 )
                 agg_result = await db.execute(agg_query)
@@ -378,19 +381,31 @@ async def process_alert(
                 if notification_ctx:
                     logger.info(
                         f"Alert notification prepared: {alertname}, history_id={history.id}",
-                        extra={"action": "alert.receive", "alertname": alertname, "history_id": history.id},
+                        extra={
+                            "action": "alert.receive",
+                            "alertname": alertname,
+                            "history_id": history.id,
+                        },
                     )
                 else:
                     logger.info(
                         f"Alert notification skipped (no recipients or template): "
                         f"{alertname}, history_id={history.id}",
-                        extra={"action": "alert.receive", "alertname": alertname, "history_id": history.id},
+                        extra={
+                            "action": "alert.receive",
+                            "alertname": alertname,
+                            "history_id": history.id,
+                        },
                     )
             else:
                 logger.info(
                     f"Alert notification skipped due to aggregation: "
                     f"{alertname}, history_id={history.id}",
-                    extra={"action": "alert.aggregate", "alertname": alertname, "history_id": history.id},
+                    extra={
+                        "action": "alert.aggregate",
+                        "alertname": alertname,
+                        "history_id": history.id,
+                    },
                 )
                 notification_ctx = None
     else:
@@ -497,14 +512,10 @@ async def receive_alertmanager_webhook(
                 if feishu_result.needs_save:
                     # B023 修复：通过默认参数绑定循环变量，避免闭包延迟绑定陷阱
                     async def _save_op(session, _ctx=notification_ctx, _result=feishu_result):
-                        await save_notification_result(
-                            session, _ctx, _result
-                        )
+                        await save_notification_result(session, _ctx, _result)
 
                     try:
-                        await db_operation_with_retry(
-                            _save_op, max_retries=1, retry_delay=1.0
-                        )
+                        await db_operation_with_retry(_save_op, max_retries=1, retry_delay=1.0)
                     except Exception as save_exc:
                         import traceback as _tb
 

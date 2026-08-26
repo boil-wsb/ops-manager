@@ -1,6 +1,7 @@
 """
 Tests for roles API.
 """
+
 import uuid
 
 import pytest
@@ -12,11 +13,12 @@ def unique_name(prefix: str = "Test") -> str:
     return f"{prefix}_{uuid.uuid4().hex[:8]}"
 
 
-async def get_auth_headers(client: AsyncClient, username: str = "admin", password: str = "admin123") -> dict:
+async def get_auth_headers(
+    client: AsyncClient, username: str = "admin", password: str = "admin123"
+) -> dict:
     """Helper function to get authentication headers."""
     response = await client.post(
-        "/api/v1/auth/login",
-        json={"username": username, "password": password}
+        "/api/v1/auth/login", json={"username": username, "password": password}
     )
     if response.status_code == 200:
         token = response.json()["access_token"]
@@ -74,8 +76,7 @@ async def test_get_role_not_found(client: AsyncClient):
 async def test_create_role_unauthorized(client: AsyncClient):
     """Test create role without authentication."""
     response = await client.post(
-        "/api/v1/roles",
-        json={"name": "Test Role", "description": "Test description"}
+        "/api/v1/roles", json={"name": "Test Role", "description": "Test description"}
     )
     assert response.status_code == 401
 
@@ -88,10 +89,7 @@ async def test_create_role(client: AsyncClient):
     response = await client.post(
         "/api/v1/roles",
         headers=headers,
-        json={
-            "name": role_name,
-            "description": "Test role description"
-        }
+        json={"name": role_name, "description": "Test role description"},
     )
     assert response.status_code == 201
     data = response.json()
@@ -105,10 +103,7 @@ async def test_create_role(client: AsyncClient):
 async def test_create_role_duplicate_name(client: AsyncClient):
     """Test create role with duplicate name."""
     headers = await get_auth_headers(client)
-    role_data = {
-        "name": "Duplicate Role",
-        "description": "Test role"
-    }
+    role_data = {"name": "Duplicate Role", "description": "Test role"}
     await client.post("/api/v1/roles", headers=headers, json=role_data)
     response = await client.post("/api/v1/roles", headers=headers, json=role_data)
     assert response.status_code == 400

@@ -73,7 +73,10 @@ class HealthCheckService:
             windows_server_metrics = await client.get_all_windows_nodes_health_check()
             logger.info(
                 f"采集Windows服务器指标: {len(windows_server_metrics)} 台",
-                extra={"action": "health_check.run", "windows_server_count": len(windows_server_metrics)},
+                extra={
+                    "action": "health_check.run",
+                    "windows_server_count": len(windows_server_metrics),
+                },
             )
         except Exception as e:
             logger.error(f"采集Windows服务器指标失败: {e}", extra={"action": "health_check.run"})
@@ -596,8 +599,7 @@ class HealthCheckService:
             abnormal_hosts = [
                 d
                 for d in report.details
-                if d.host_status in ("warning", "critical")
-                and d.instance not in silenced_instances
+                if d.host_status in ("warning", "critical") and d.instance not in silenced_instances
             ]
             abnormal_hosts.sort(key=lambda d: 0 if d.host_status == "critical" else 1)
             abnormal_hosts = abnormal_hosts[:3]
@@ -643,8 +645,7 @@ class HealthCheckService:
         total_unsilenced_abnormal = sum(
             1
             for d in report.details
-            if d.host_status in ("warning", "critical")
-            and d.instance not in silenced_instances
+            if d.host_status in ("warning", "critical") and d.instance not in silenced_instances
         )
         if total_unsilenced_abnormal == 0 and report.warning_count + report.critical_count > 0:
             logger.info(
@@ -793,7 +794,9 @@ class HealthCheckService:
             retry_delay=1.0,
         )
 
-    async def _create_silence_db(self, db, instance: str, reason: str, duration_hours: int | None, created_by: int | None):
+    async def _create_silence_db(
+        self, db, instance: str, reason: str, duration_hours: int | None, created_by: int | None
+    ):
         """在数据库中创建抑制规则。"""
         now = now_shanghai()
         if duration_hours is None or duration_hours <= 0:
@@ -846,9 +849,7 @@ class HealthCheckService:
 
     async def _delete_silence_db(self, db, silence_id: int) -> bool:
         """删除指定的抑制规则。"""
-        result = await db.execute(
-            select(AlertSilence).where(AlertSilence.id == silence_id)
-        )
+        result = await db.execute(select(AlertSilence).where(AlertSilence.id == silence_id))
         silence = result.scalar_one_or_none()
         if not silence:
             return False

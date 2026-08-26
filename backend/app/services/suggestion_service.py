@@ -130,9 +130,7 @@ def _build_tags_rows(tags: list[dict[str, str]]) -> list[dict]:
                     {
                         "tag": "column",
                         "width": "auto",
-                        "elements": [
-                            {"tag": "div", "text": {"tag": "lark_md", "content": value}}
-                        ],
+                        "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": value}}],
                     },
                 ],
             }
@@ -350,14 +348,24 @@ def send_pending_card_sync(
     ]
     body = [
         {"tag": "hr"},
-        {"tag": "button", "text": {"tag": "plain_text", "content": buttons[0]["text"]},
-         "type": buttons[0]["type"], "width": "fill",
-         "value": {"action": buttons[0]["value"]}},
-        {"tag": "button", "text": {"tag": "plain_text", "content": buttons[1]["text"]},
-         "type": buttons[1]["type"], "width": "fill",
-         "value": {"action": buttons[1]["value"]}},
+        {
+            "tag": "button",
+            "text": {"tag": "plain_text", "content": buttons[0]["text"]},
+            "type": buttons[0]["type"],
+            "width": "fill",
+            "value": {"action": buttons[0]["value"]},
+        },
+        {
+            "tag": "button",
+            "text": {"tag": "plain_text", "content": buttons[1]["text"]},
+            "type": buttons[1]["type"],
+            "width": "fill",
+            "value": {"action": buttons[1]["value"]},
+        },
     ]
-    card = _build_card("【匿名建议待审批】", tags=tags, body_elements=body, header_template="orange")
+    card = _build_card(
+        "【匿名建议待审批】", tags=tags, body_elements=body, header_template="orange"
+    )
 
     msg_id = _send_with_retry(
         _get_feishu_service().send_message_to_user,
@@ -368,7 +376,11 @@ def send_pending_card_sync(
     if msg_id is not None:
         logger.info(
             f"Suggestion pending card sent: suggestion={suggestion_id}, open_id={open_id}, msg_id={msg_id}",
-            extra={"action": "suggestion.notify", "suggestion_id": suggestion_id, "message_id": msg_id},
+            extra={
+                "action": "suggestion.notify",
+                "suggestion_id": suggestion_id,
+                "message_id": msg_id,
+            },
         )
     return msg_id
 
@@ -385,7 +397,13 @@ async def send_pending_card(
     """Async wrapper for send_pending_card_sync (used by API endpoints)."""
     return await asyncio.to_thread(
         send_pending_card_sync,
-        open_id, suggestion_id, assignment_id, content, highlights, innovation_ideas, dept_names,
+        open_id,
+        suggestion_id,
+        assignment_id,
+        content,
+        highlights,
+        innovation_ideas,
+        dept_names,
     )
 
 
@@ -398,8 +416,16 @@ def update_to_approved_sync(open_message_id: str, approver_name: str) -> None:
         {"label": "审批人", "value": approver_name or "未知"},
         {"label": "审批时间", "value": now_shanghai().strftime("%Y-%m-%d %H:%M")},
     ]
-    body = [{"tag": "hr"}, {"tag": "div", "text": {"tag": "lark_md",
-        "content": "**状态**：<font color='blue'>已审批通过，转市场部处理中</font>"}}]
+    body = [
+        {"tag": "hr"},
+        {
+            "tag": "div",
+            "text": {
+                "tag": "lark_md",
+                "content": "**状态**：<font color='blue'>已审批通过，转市场部处理中</font>",
+            },
+        },
+    ]
     card = _build_card("【匿名建议已审批】", tags=tags, body_elements=body, header_template="blue")
     _update_card_with_retry(open_message_id, card, action="suggestion.update.approved")
 
@@ -457,7 +483,11 @@ def send_market_card_sync(
     if msg_id is not None:
         logger.info(
             f"Suggestion market card sent: suggestion={suggestion_id}, open_id={open_id}, msg_id={msg_id}",
-            extra={"action": "suggestion.notify", "suggestion_id": suggestion_id, "message_id": msg_id},
+            extra={
+                "action": "suggestion.notify",
+                "suggestion_id": suggestion_id,
+                "message_id": msg_id,
+            },
         )
     return msg_id
 
@@ -474,7 +504,13 @@ async def send_market_card(
     """Async wrapper for send_market_card_sync."""
     return await asyncio.to_thread(
         send_market_card_sync,
-        open_id, suggestion_id, content, highlights, innovation_ideas, approver_name, approved_at_str,
+        open_id,
+        suggestion_id,
+        content,
+        highlights,
+        innovation_ideas,
+        approver_name,
+        approved_at_str,
     )
 
 
@@ -487,8 +523,13 @@ def update_to_archived_sync(open_message_id: str, market_result: str) -> None:
         {"label": "执行结果", "value": _truncate(market_result, 300)},
         {"label": "存档时间", "value": now_shanghai().strftime("%Y-%m-%d %H:%M")},
     ]
-    body = [{"tag": "hr"}, {"tag": "div", "text": {"tag": "lark_md",
-        "content": "**状态**：<font color='green'>已存档</font>"}}]
+    body = [
+        {"tag": "hr"},
+        {
+            "tag": "div",
+            "text": {"tag": "lark_md", "content": "**状态**：<font color='green'>已存档</font>"},
+        },
+    ]
     card = _build_card("【匿名建议已存档】", tags=tags, body_elements=body, header_template="green")
     _update_card_with_retry(open_message_id, card, action="suggestion.update.archived")
 
@@ -506,8 +547,13 @@ def update_to_rejected_sync(open_message_id: str, reject_reason: str) -> None:
     tags = [
         {"label": "驳回原因", "value": _truncate(reject_reason, 300)},
     ]
-    body = [{"tag": "hr"}, {"tag": "div", "text": {"tag": "lark_md",
-        "content": "**状态**：<font color='grey'>已驳回</font>"}}]
+    body = [
+        {"tag": "hr"},
+        {
+            "tag": "div",
+            "text": {"tag": "lark_md", "content": "**状态**：<font color='grey'>已驳回</font>"},
+        },
+    ]
     card = _build_card("【匿名建议已驳回】", tags=tags, body_elements=body, header_template="grey")
     _update_card_with_retry(open_message_id, card, action="suggestion.update.rejected")
 

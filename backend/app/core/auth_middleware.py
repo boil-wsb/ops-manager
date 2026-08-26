@@ -255,16 +255,20 @@ class PureASGIAuthMiddleware:
         import json
 
         body = json.dumps({"detail": detail}).encode("utf-8")
-        await send({
-            "type": "http.response.start",
-            "status": status.HTTP_401_UNAUTHORIZED,
-            "headers": [
-                [b"content-type", b"application/json"],
-                [b"www-authenticate", b"Bearer"],
-                [b"content-length", str(len(body)).encode()],
-            ],
-        })
-        await send({
-            "type": "http.response.body",
-            "body": body,
-        })
+        await send(
+            {
+                "type": "http.response.start",
+                "status": status.HTTP_401_UNAUTHORIZED,
+                "headers": [
+                    [b"content-type", b"application/json"],
+                    [b"www-authenticate", b"Bearer"],
+                    [b"content-length", str(len(body)).encode()],
+                ],
+            }
+        )
+        await send(
+            {
+                "type": "http.response.body",
+                "body": body,
+            }
+        )

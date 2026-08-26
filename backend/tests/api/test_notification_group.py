@@ -1,6 +1,7 @@
 """
 Tests for notification groups API.
 """
+
 import uuid
 
 import pytest
@@ -12,11 +13,12 @@ def unique_name(prefix: str = "Group") -> str:
     return f"{prefix}_{uuid.uuid4().hex[:8]}"
 
 
-async def get_auth_headers(client: AsyncClient, username: str = "admin", password: str = "admin123") -> dict:
+async def get_auth_headers(
+    client: AsyncClient, username: str = "admin", password: str = "admin123"
+) -> dict:
     """Helper function to get authentication headers via login."""
     response = await client.post(
-        "/api/v1/auth/login",
-        json={"username": username, "password": password}
+        "/api/v1/auth/login", json={"username": username, "password": password}
     )
     if response.status_code == 200:
         token = response.json()["access_token"]
@@ -39,8 +41,8 @@ async def test_notification_group_crud(client: AsyncClient):
             "name": unique_name("TestGroup"),
             "description": "Test notification group",
             "notification_type": "feishu",
-            "is_active": True
-        }
+            "is_active": True,
+        },
     )
     assert create_response.status_code == 201
     data = create_response.json()
@@ -72,8 +74,8 @@ async def test_notification_group_crud(client: AsyncClient):
         json={
             "name": unique_name("UpdatedGroup"),
             "description": "Updated description",
-            "is_active": False
-        }
+            "is_active": False,
+        },
     )
     assert update_response.status_code == 200
     update_data = update_response.json()
@@ -81,11 +83,15 @@ async def test_notification_group_crud(client: AsyncClient):
     assert update_data["is_active"] is False
 
     # Delete
-    delete_response = await client.delete(f"/api/v1/notification-groups/{group_id}", headers=headers)
+    delete_response = await client.delete(
+        f"/api/v1/notification-groups/{group_id}", headers=headers
+    )
     assert delete_response.status_code == 204
 
     # Verify deleted
-    get_deleted_response = await client.get(f"/api/v1/notification-groups/{group_id}", headers=headers)
+    get_deleted_response = await client.get(
+        f"/api/v1/notification-groups/{group_id}", headers=headers
+    )
     assert get_deleted_response.status_code == 404
 
 
@@ -104,8 +110,8 @@ async def test_notification_group_members(client: AsyncClient):
             "name": unique_name("MemberTestGroup"),
             "description": "Group for member test",
             "notification_type": "feishu",
-            "is_active": True
-        }
+            "is_active": True,
+        },
     )
     assert group_response.status_code == 201
     group_id = group_response.json()["id"]
@@ -118,16 +124,15 @@ async def test_notification_group_members(client: AsyncClient):
             "username": unique_name("MemberUser"),
             "password": "test123456",
             "email": f"{uuid.uuid4().hex[:8]}@example.com",
-            "full_name": "Test Member User"
-        }
+            "full_name": "Test Member User",
+        },
     )
     assert user_response.status_code == 201
     user_id = user_response.json()["id"]
 
     # Add member to group
     add_response = await client.post(
-        f"/api/v1/notification-groups/{group_id}/members/{user_id}",
-        headers=headers
+        f"/api/v1/notification-groups/{group_id}/members/{user_id}", headers=headers
     )
     assert add_response.status_code == 200
     add_data = add_response.json()
@@ -136,7 +141,9 @@ async def test_notification_group_members(client: AsyncClient):
     assert user_id in member_ids
 
     # Verify member is in group
-    get_group_response = await client.get(f"/api/v1/notification-groups/{group_id}", headers=headers)
+    get_group_response = await client.get(
+        f"/api/v1/notification-groups/{group_id}", headers=headers
+    )
     assert get_group_response.status_code == 200
     group_data = get_group_response.json()
     member_ids = [m["id"] for m in group_data["members"]]
@@ -144,8 +151,7 @@ async def test_notification_group_members(client: AsyncClient):
 
     # Remove member from group
     remove_response = await client.delete(
-        f"/api/v1/notification-groups/{group_id}/members/{user_id}",
-        headers=headers
+        f"/api/v1/notification-groups/{group_id}/members/{user_id}", headers=headers
     )
     assert remove_response.status_code == 200
     remove_data = remove_response.json()
@@ -168,9 +174,7 @@ async def test_notification_group_list_with_filters(client: AsyncClient):
 
     # Test with notification_type filter
     response = await client.get(
-        "/api/v1/notification-groups",
-        params={"notification_type": "feishu"},
-        headers=headers
+        "/api/v1/notification-groups", params={"notification_type": "feishu"}, headers=headers
     )
     assert response.status_code == 200
     data = response.json()
@@ -179,9 +183,7 @@ async def test_notification_group_list_with_filters(client: AsyncClient):
 
     # Test with is_active filter
     response = await client.get(
-        "/api/v1/notification-groups",
-        params={"is_active": True},
-        headers=headers
+        "/api/v1/notification-groups", params={"is_active": True}, headers=headers
     )
     assert response.status_code == 200
 
@@ -196,10 +198,7 @@ async def test_notification_group_unauthorized(client: AsyncClient):
     # Create without auth
     response = await client.post(
         "/api/v1/notification-groups",
-        json={
-            "name": "UnauthorizedGroup",
-            "notification_type": "feishu"
-        }
+        json={"name": "UnauthorizedGroup", "notification_type": "feishu"},
     )
     assert response.status_code == 401
 
@@ -217,9 +216,7 @@ async def test_notification_group_not_found(client: AsyncClient):
 
     # Update non-existent group
     response = await client.put(
-        "/api/v1/notification-groups/99999",
-        headers=headers,
-        json={"name": "UpdatedName"}
+        "/api/v1/notification-groups/99999", headers=headers, json={"name": "UpdatedName"}
     )
     assert response.status_code == 404
 
@@ -228,10 +225,7 @@ async def test_notification_group_not_found(client: AsyncClient):
     assert response.status_code == 404
 
     # Add member to non-existent group
-    response = await client.post(
-        "/api/v1/notification-groups/99999/members/1",
-        headers=headers
-    )
+    response = await client.post("/api/v1/notification-groups/99999/members/1", headers=headers)
     assert response.status_code == 404
 
 
@@ -246,18 +240,14 @@ async def test_add_member_user_not_found(client: AsyncClient):
     group_response = await client.post(
         "/api/v1/notification-groups",
         headers=headers,
-        json={
-            "name": unique_name("AddMemberTest"),
-            "notification_type": "feishu"
-        }
+        json={"name": unique_name("AddMemberTest"), "notification_type": "feishu"},
     )
     assert group_response.status_code == 201
     group_id = group_response.json()["id"]
 
     # Add non-existent user
     response = await client.post(
-        f"/api/v1/notification-groups/{group_id}/members/99999",
-        headers=headers
+        f"/api/v1/notification-groups/{group_id}/members/99999", headers=headers
     )
     assert response.status_code == 404
 

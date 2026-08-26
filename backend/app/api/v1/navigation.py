@@ -50,7 +50,9 @@ async def get_public_navigation_links(
         result.append(
             {
                 "category": category,
-                "links": [NavigationLinkResponse.model_validate(link).model_dump() for link in links],
+                "links": [
+                    NavigationLinkResponse.model_validate(link).model_dump() for link in links
+                ],
             }
         )
     return {"groups": result}

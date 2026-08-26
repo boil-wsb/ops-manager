@@ -10,6 +10,7 @@ on Windows, causing access violation during Base.metadata.create_all().
   sessions against the existing schema (already created by alembic migrations
   in prior test runs).
 """
+
 import pytest
 
 

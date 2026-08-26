@@ -161,8 +161,13 @@ class MonitorConfigService:
             # 防重复：同 file 同 address 已存在（含已暂存）则拒绝
             self._ensure_not_exists(file, addr)
             self._ops.append({"type": "add", "file": file, "addr": addr, "entry": dict(entry)})
-        return {"file": file, "addr": addr, "ip": (entry.get("ip") or "").strip(),
-                "port": (entry.get("port") or "").strip(), "message": f"已暂存新增 {addr}"}
+        return {
+            "file": file,
+            "addr": addr,
+            "ip": (entry.get("ip") or "").strip(),
+            "port": (entry.get("port") or "").strip(),
+            "message": f"已暂存新增 {addr}",
+        }
 
     def update_host(self, entry: dict[str, Any]) -> dict[str, Any]:
         file = self._get_file(entry)
@@ -242,7 +247,9 @@ class MonitorConfigService:
     def _write_file(self, file: str, arr: list[dict[str, Any]]) -> None:
         self.conf_dir.mkdir(parents=True, exist_ok=True)
         path = self._file_path(file)
-        path.write_text(json.dumps(arr, ensure_ascii=False, indent=2), encoding="utf-8", newline="\n")
+        path.write_text(
+            json.dumps(arr, ensure_ascii=False, indent=2), encoding="utf-8", newline="\n"
+        )
         logger.info(
             f"配置落盘: {FILES[file]} ({len(arr)} 条)",
             extra={"action": "monitor_config.write", "file": FILES[file], "count": len(arr)},

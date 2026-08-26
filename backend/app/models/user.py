@@ -44,7 +44,10 @@ class User(BaseModel):
     is_feishu_user: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     department_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("departments.id", ondelete="SET NULL"), nullable=True, comment="所属部门ID"
+        Integer,
+        ForeignKey("departments.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="所属部门ID",
     )
 
     # Relationships

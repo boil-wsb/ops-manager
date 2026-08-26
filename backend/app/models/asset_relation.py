@@ -35,9 +35,7 @@ class AssetRelation(BaseModel):
         default=RelationType.CUSTOM,
         nullable=False,
     )
-    auto_inferred: Mapped[bool] = mapped_column(
-        Boolean, default=False, nullable=False
-    )
+    auto_inferred: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Relationships
     source_asset: Mapped["Asset"] = relationship(
@@ -66,6 +64,5 @@ class AssetRelation(BaseModel):
 
     def __repr__(self) -> str:
         return (
-            f"<AssetRelation {self.source_asset_id}->{self.target_asset_id} "
-            f"({self.relation_type})>"
+            f"<AssetRelation {self.source_asset_id}->{self.target_asset_id} ({self.relation_type})>"
         )

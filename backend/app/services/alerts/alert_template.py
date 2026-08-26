@@ -165,7 +165,9 @@ class AlertTemplateService:
             if not path:
                 return ""
             path = path.strip()
-            if (path.startswith('"') and path.endswith('"')) or (path.startswith("'") and path.endswith("'")):
+            if (path.startswith('"') and path.endswith('"')) or (
+                path.startswith("'") and path.endswith("'")
+            ):
                 return path[1:-1]
             if path.startswith("$"):
                 path = path[1:]
@@ -200,7 +202,9 @@ class AlertTemplateService:
             expr = expr.strip()
             if not expr:
                 return ""
-            if (expr.startswith('"') and expr.endswith('"')) or (expr.startswith("'") and expr.endswith("'")):
+            if (expr.startswith('"') and expr.endswith('"')) or (
+                expr.startswith("'") and expr.endswith("'")
+            ):
                 return expr[1:-1]
             if expr.startswith("index "):
                 rest = expr[6:].strip()

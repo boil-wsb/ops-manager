@@ -43,9 +43,7 @@ def _build_assignment_response(a: SuggestionAssignment) -> AssignmentResponse:
         department_name=a.department.name if a.department else None,
         assignee_user_id=a.assignee_user_id,
         assignee_name=(
-            a.assignee_user.full_name or a.assignee_user.username
-            if a.assignee_user
-            else None
+            a.assignee_user.full_name or a.assignee_user.username if a.assignee_user else None
         ),
         assignee_open_id=a.assignee_open_id,
         open_message_id=a.open_message_id,
@@ -108,7 +106,11 @@ async def _send_cards_task(
                     await db.commit()
                     logger.info(
                         f"Updated assignment open_message_id: assignment={assignment_id}, msg_id={msg_id}",
-                        extra={"action": "suggestion.submit", "assignment_id": assignment_id, "message_id": msg_id},
+                        extra={
+                            "action": "suggestion.submit",
+                            "assignment_id": assignment_id,
+                            "message_id": msg_id,
+                        },
                     )
 
 
@@ -177,7 +179,9 @@ async def submit_suggestion(
         raise HTTPException(status_code=500, detail="生成查询码失败")
 
     # 3. 收集接收人: 部门负责人 + 指派人
-    recipients: list[dict] = []  # [{assignee_open_id, department_id, assignee_user_id, assignment_id}]
+    recipients: list[
+        dict
+    ] = []  # [{assignee_open_id, department_id, assignee_user_id, assignment_id}]
     seen_open_ids: set[str] = set()
 
     # 3a. 部门负责人（单选）
@@ -200,10 +204,12 @@ async def submit_suggestion(
             )
             db.add(assignment)
             await db.flush()
-            recipients.append({
-                "assignee_open_id": open_id,
-                "assignment_id": assignment.id,
-            })
+            recipients.append(
+                {
+                    "assignee_open_id": open_id,
+                    "assignment_id": assignment.id,
+                }
+            )
         else:
             await db.rollback()
             raise HTTPException(
@@ -227,10 +233,12 @@ async def submit_suggestion(
             )
             db.add(assignment)
             await db.flush()
-            recipients.append({
-                "assignee_open_id": user.feishu_open_id,
-                "assignment_id": assignment.id,
-            })
+            recipients.append(
+                {
+                    "assignee_open_id": user.feishu_open_id,
+                    "assignment_id": assignment.id,
+                }
+            )
 
     if not recipients:
         await db.rollback()
@@ -254,7 +262,11 @@ async def submit_suggestion(
 
     logger.info(
         f"匿名建议已提交: suggestion={suggestion.id}, recipients={len(recipients)}, query_code={query_code}",
-        extra={"action": "suggestion.submit", "suggestion_id": suggestion.id, "recipients_count": len(recipients)},
+        extra={
+            "action": "suggestion.submit",
+            "suggestion_id": suggestion.id,
+            "recipients_count": len(recipients),
+        },
     )
 
     return SuggestionSubmitResponse(
@@ -270,9 +282,7 @@ async def track_suggestion(
     current_user: User = Depends(require_permissions(["suggestion:submit"])),
 ):
     """凭查询码查询建议进度（需登录，且查询码须属于当前用户）。"""
-    result = await db.execute(
-        select(Suggestion).where(Suggestion.query_code == query_code)
-    )
+    result = await db.execute(select(Suggestion).where(Suggestion.query_code == query_code))
     suggestion = result.scalar_one_or_none()
     if not suggestion:
         raise HTTPException(status_code=404, detail="查询码无效")
@@ -316,7 +326,9 @@ async def list_my_suggestion_codes(
                 "queryCode": row.query_code,
                 "status": row.status,
                 "createdAt": row.created_at.isoformat() if row.created_at else None,
-                "contentPreview": (row.content[:50] + "...") if row.content and len(row.content) > 50 else row.content,
+                "contentPreview": (row.content[:50] + "...")
+                if row.content and len(row.content) > 50
+                else row.content,
             }
             for row in rows
         ]
@@ -346,7 +358,9 @@ async def list_suggestions(
     total = total_result.scalar() or 0
 
     # 分页
-    query = query.order_by(Suggestion.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    query = (
+        query.order_by(Suggestion.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    )
     result = await db.execute(query)
     suggestions = result.scalars().all()
 
@@ -429,7 +443,11 @@ async def archive_suggestion(
 
     logger.info(
         f"建议已存档: suggestion={suggestion_id}, reviewer={current_user.username}",
-        extra={"action": "suggestion.archive", "suggestion_id": suggestion_id, "reviewer": current_user.username},
+        extra={
+            "action": "suggestion.archive",
+            "suggestion_id": suggestion_id,
+            "reviewer": current_user.username,
+        },
     )
 
     # 预加载 assignment 关联

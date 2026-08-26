@@ -297,12 +297,20 @@ async def prepare_alert_notification(
                 legacy_row = result.fetchone()
                 if legacy_row and legacy_row[1]:
                     ctx.resolved_card_messages = [
-                        {"history_id": legacy_row[0], "open_message_id": legacy_row[1], "card_message_id": None}
+                        {
+                            "history_id": legacy_row[0],
+                            "open_message_id": legacy_row[1],
+                            "card_message_id": None,
+                        }
                     ]
                 else:
                     logger.warning(
                         f"未找到待更新卡片: alertname={alertname}, instance={instance}",
-                        extra={"action": "alert.resolve", "alertname": alertname, "instance": instance},
+                        extra={
+                            "action": "alert.resolve",
+                            "alertname": alertname,
+                            "instance": instance,
+                        },
                     )
                     return None
             else:
@@ -329,9 +337,7 @@ async def prepare_alert_notification(
                 },
             )
         except Exception as exc:
-            logger.error(
-                f"查询resolved卡片异常: {str(exc)}", extra={"action": "alert.resolve"}
-            )
+            logger.error(f"查询resolved卡片异常: {str(exc)}", extra={"action": "alert.resolve"})
             return None
     else:
         # firing: 预占位标记
@@ -379,10 +385,12 @@ async def execute_feishu_notification(ctx: NotificationContext) -> FeishuResult:
                 if send_result.get("success"):
                     message_id = send_result.get("message_id")
                     if message_id:
-                        sent_cards.append({
-                            "open_message_id": message_id,
-                            "recipient_open_id": recipient_open_id,
-                        })
+                        sent_cards.append(
+                            {
+                                "open_message_id": message_id,
+                                "recipient_open_id": recipient_open_id,
+                            }
+                        )
                     logger.info(
                         f"P2P飞书卡片已发送: instance={ctx.instance}, open_id={recipient_open_id}",
                         extra={
@@ -453,9 +461,7 @@ async def execute_feishu_notification(ctx: NotificationContext) -> FeishuResult:
             result.success = len(updated_card_message_ids) > 0
             result.needs_save = len(updated_card_message_ids) > 0
         except Exception as exc:
-            logger.error(
-                f"更新resolved告警卡片异常: {str(exc)}", extra={"action": "alert.resolve"}
-            )
+            logger.error(f"更新resolved告警卡片异常: {str(exc)}", extra={"action": "alert.resolve"})
 
     return result
 
@@ -483,9 +489,7 @@ async def save_notification_result(
         try:
             if ctx.history_id is not None:
                 await db.execute(
-                    _text(
-                        "UPDATE alert_history SET notification_sent = false WHERE id = :id"
-                    ),
+                    _text("UPDATE alert_history SET notification_sent = false WHERE id = :id"),
                     {"id": ctx.history_id},
                 )
                 await db.commit()
@@ -543,7 +547,9 @@ async def save_notification_result(
             for cm_id in result.updated_card_message_ids:
                 if cm_id is not None:
                     await db.execute(
-                        _text("UPDATE alert_card_messages SET card_status = 'resolved' WHERE id = :id"),
+                        _text(
+                            "UPDATE alert_card_messages SET card_status = 'resolved' WHERE id = :id"
+                        ),
                         {"id": cm_id},
                     )
 
@@ -552,7 +558,7 @@ async def save_notification_result(
             # 未成功的卡片（避免告警状态提前关闭但卡片仍停留 firing 的不一致）
             total_cards = len(ctx.resolved_card_messages)
             updated_cards = len(result.updated_card_message_ids)
-            all_updated = (total_cards > 0 and updated_cards == total_cards)
+            all_updated = total_cards > 0 and updated_cards == total_cards
 
             if all_updated:
                 # 2. 所有卡片都更新成功，更新 alert_history.status = 'resolved'
@@ -602,9 +608,7 @@ async def save_notification_result(
         except Exception as exc:
             with contextlib.suppress(Exception):
                 await db.rollback()
-            logger.error(
-                f"保存resolved状态异常: {str(exc)}", extra={"action": "alert.resolve"}
-            )
+            logger.error(f"保存resolved状态异常: {str(exc)}", extra={"action": "alert.resolve"})
 
 
 async def _save_firing_alert_card_messages(
@@ -657,20 +661,27 @@ async def _save_firing_alert_card_messages(
                     "open_message_id = EXCLUDED.open_message_id, "
                     "card_status = 'firing'"
                 ),
-                {"hid": history_id_to_use, "mid": card["open_message_id"], "oid": card["recipient_open_id"]},
+                {
+                    "hid": history_id_to_use,
+                    "mid": card["open_message_id"],
+                    "oid": card["recipient_open_id"],
+                },
             )
         await db.commit()
         logger.info(
             f"批量保存卡片记录: alertname={alertname}, instance={instance}, "
             f"history_id={history_id_to_use}, card_count={len(sent_cards)}",
-            extra={"action": "alert.notify", "alertname": alertname, "instance": instance, "history_id": history_id_to_use},
+            extra={
+                "action": "alert.notify",
+                "alertname": alertname,
+                "instance": instance,
+                "history_id": history_id_to_use,
+            },
         )
     except Exception as exc:
         with contextlib.suppress(Exception):
             await db.rollback()
-        logger.error(
-            f"批量保存卡片记录异常: {str(exc)}", extra={"action": "alert.notify"}
-        )
+        logger.error(f"批量保存卡片记录异常: {str(exc)}", extra={"action": "alert.notify"})
 
 
 async def _update_alert_history_notification_sent(

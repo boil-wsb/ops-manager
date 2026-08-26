@@ -79,9 +79,7 @@ class CRMSyncService:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(url)
 
-            duration_ms = int(
-                (now_shanghai() - started_at).total_seconds() * 1000
-            )
+            duration_ms = int((now_shanghai() - started_at).total_seconds() * 1000)
 
             if response.status_code < 400:
                 # 尝试解析响应体
@@ -136,9 +134,7 @@ class CRMSyncService:
             }
 
         except httpx.TimeoutException:
-            duration_ms = int(
-                (now_shanghai() - started_at).total_seconds() * 1000
-            )
+            duration_ms = int((now_shanghai() - started_at).total_seconds() * 1000)
             logger.error(
                 f"{label} 触发超时: timeout={self.timeout}s",
                 extra={
@@ -159,9 +155,7 @@ class CRMSyncService:
                 "duration_ms": duration_ms,
             }
         except Exception as e:
-            duration_ms = int(
-                (now_shanghai() - started_at).total_seconds() * 1000
-            )
+            duration_ms = int((now_shanghai() - started_at).total_seconds() * 1000)
             logger.error(
                 f"{label} 触发异常: {e}",
                 extra={
@@ -213,9 +207,7 @@ class CRMSyncService:
             with _httpx.Client(timeout=self.timeout) as client:
                 response = client.post(url)
 
-            duration_ms = int(
-                (now_shanghai() - started_at).total_seconds() * 1000
-            )
+            duration_ms = int((now_shanghai() - started_at).total_seconds() * 1000)
 
             if response.status_code < 400:
                 try:
@@ -268,9 +260,7 @@ class CRMSyncService:
             }
 
         except _httpx.TimeoutException:
-            duration_ms = int(
-                (now_shanghai() - started_at).total_seconds() * 1000
-            )
+            duration_ms = int((now_shanghai() - started_at).total_seconds() * 1000)
             logger.error(
                 f"{label} 触发超时（同步）: timeout={self.timeout}s",
                 extra={
@@ -291,9 +281,7 @@ class CRMSyncService:
                 "duration_ms": duration_ms,
             }
         except Exception as e:
-            duration_ms = int(
-                (now_shanghai() - started_at).total_seconds() * 1000
-            )
+            duration_ms = int((now_shanghai() - started_at).total_seconds() * 1000)
             logger.error(
                 f"{label} 触发异常（同步）: {e}",
                 extra={
@@ -347,7 +335,11 @@ class CRMSyncService:
 
                 logger.info(
                     f"查询同步状态成功: status={response.status_code}, data={resp_data}",
-                    extra={"action": "crm.sync.status", "status_code": response.status_code, "response": resp_data},
+                    extra={
+                        "action": "crm.sync.status",
+                        "status_code": response.status_code,
+                        "response": resp_data,
+                    },
                 )
                 return {
                     "success": True,
@@ -359,7 +351,11 @@ class CRMSyncService:
             error_text = response.text[:500] if response.text else ""
             logger.error(
                 f"查询同步状态失败: status={response.status_code}, body={error_text}",
-                extra={"action": "crm.sync.status", "status_code": response.status_code, "error": error_text},
+                extra={
+                    "action": "crm.sync.status",
+                    "status_code": response.status_code,
+                    "error": error_text,
+                },
             )
             return {
                 "success": False,

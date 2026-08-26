@@ -24,6 +24,7 @@ L4 单元测试: DB session 生命周期验证（三阶段分离重构核心测�
 - 行为验证：prepare 不调用飞书，execute 不调用 db
 - 并发验证：10 个并发 execute 不涉及任何 db
 """
+
 import asyncio
 import inspect
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -146,22 +147,26 @@ class TestDBSessionLifecycle:
             feishu_calls_during_execute.append(prepare_db.execute.call_count)
             return {"success": True, "message_id": "om_test"}
 
-        with patch(
-            "app.services.alerts.notification_task._get_asset_owner_open_id",
-            new_callable=AsyncMock,
-            return_value="ou_owner",
-        ), patch(
-            "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
-            new_callable=AsyncMock,
-            return_value=[],
-        ), patch(
-            "app.services.alerts.notification_task._update_alert_history_notification_sent",
-            new_callable=AsyncMock,
-        ), patch(
-            "app.services.alerts.notification_task.alert_template_service"
-        ) as svc, patch(
-            "app.services.alerts.notification_task.get_feishu_notification_service"
-        ) as feishu_factory:
+        with (
+            patch(
+                "app.services.alerts.notification_task._get_asset_owner_open_id",
+                new_callable=AsyncMock,
+                return_value="ou_owner",
+            ),
+            patch(
+                "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch(
+                "app.services.alerts.notification_task._update_alert_history_notification_sent",
+                new_callable=AsyncMock,
+            ),
+            patch("app.services.alerts.notification_task.alert_template_service") as svc,
+            patch(
+                "app.services.alerts.notification_task.get_feishu_notification_service"
+            ) as feishu_factory,
+        ):
             svc.render_template = MagicMock(return_value='{"schema":"2.0"}')
             feishu_svc = MagicMock()
             feishu_svc.send_p2p_card_message = MagicMock(side_effect=_track_feishu_call)
@@ -273,22 +278,26 @@ class TestPreparePhaseCompleteness:
         feishu_result.scalars.return_value = feishu_scalars
         db.execute.side_effect = [feishu_result]
 
-        with patch(
-            "app.services.alerts.notification_task._get_asset_owner_open_id",
-            new_callable=AsyncMock,
-            return_value="ou_owner",
-        ), patch(
-            "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
-            new_callable=AsyncMock,
-            return_value=["ou_member1"],
-        ), patch(
-            "app.services.alerts.notification_task._update_alert_history_notification_sent",
-            new_callable=AsyncMock,
-        ), patch(
-            "app.services.alerts.notification_task.alert_template_service"
-        ) as svc, patch(
-            "app.services.alerts.notification_task.get_feishu_notification_service"
-        ) as feishu_factory:
+        with (
+            patch(
+                "app.services.alerts.notification_task._get_asset_owner_open_id",
+                new_callable=AsyncMock,
+                return_value="ou_owner",
+            ),
+            patch(
+                "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
+                new_callable=AsyncMock,
+                return_value=["ou_member1"],
+            ),
+            patch(
+                "app.services.alerts.notification_task._update_alert_history_notification_sent",
+                new_callable=AsyncMock,
+            ),
+            patch("app.services.alerts.notification_task.alert_template_service") as svc,
+            patch(
+                "app.services.alerts.notification_task.get_feishu_notification_service"
+            ) as feishu_factory,
+        ):
             svc.render_template = MagicMock(return_value='{"schema":"2.0"}')
             feishu_svc = MagicMock()
             feishu_svc.build_alert_card = MagicMock(return_value={"schema": "2.0"})
@@ -319,22 +328,26 @@ class TestPreparePhaseCompleteness:
         feishu_result.scalars.return_value = feishu_scalars
         db.execute.side_effect = [feishu_result]
 
-        with patch(
-            "app.services.alerts.notification_task._get_asset_owner_open_id",
-            new_callable=AsyncMock,
-            return_value="ou_owner",
-        ), patch(
-            "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
-            new_callable=AsyncMock,
-            return_value=[],
-        ), patch(
-            "app.services.alerts.notification_task._update_alert_history_notification_sent",
-            new_callable=AsyncMock,
-        ) as mock_mark_sent, patch(
-            "app.services.alerts.notification_task.alert_template_service"
-        ) as svc, patch(
-            "app.services.alerts.notification_task.get_feishu_notification_service"
-        ) as feishu_factory:
+        with (
+            patch(
+                "app.services.alerts.notification_task._get_asset_owner_open_id",
+                new_callable=AsyncMock,
+                return_value="ou_owner",
+            ),
+            patch(
+                "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch(
+                "app.services.alerts.notification_task._update_alert_history_notification_sent",
+                new_callable=AsyncMock,
+            ) as mock_mark_sent,
+            patch("app.services.alerts.notification_task.alert_template_service") as svc,
+            patch(
+                "app.services.alerts.notification_task.get_feishu_notification_service"
+            ) as feishu_factory,
+        ):
             svc.render_template = MagicMock(return_value='{"schema":"2.0"}')
             feishu_svc = MagicMock()
             feishu_svc.build_alert_card = MagicMock(return_value={"schema": "2.0"})
@@ -357,22 +370,26 @@ class TestPreparePhaseCompleteness:
         feishu_result.scalars.return_value = feishu_scalars
         db.execute.side_effect = [feishu_result]
 
-        with patch(
-            "app.services.alerts.notification_task._get_asset_owner_open_id",
-            new_callable=AsyncMock,
-            return_value="ou_owner",
-        ), patch(
-            "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
-            new_callable=AsyncMock,
-            return_value=[],
-        ), patch(
-            "app.services.alerts.notification_task._update_alert_history_notification_sent",
-            new_callable=AsyncMock,
-        ), patch(
-            "app.services.alerts.notification_task.alert_template_service"
-        ) as svc, patch(
-            "app.services.alerts.notification_task.get_feishu_notification_service"
-        ) as feishu_factory:
+        with (
+            patch(
+                "app.services.alerts.notification_task._get_asset_owner_open_id",
+                new_callable=AsyncMock,
+                return_value="ou_owner",
+            ),
+            patch(
+                "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch(
+                "app.services.alerts.notification_task._update_alert_history_notification_sent",
+                new_callable=AsyncMock,
+            ),
+            patch("app.services.alerts.notification_task.alert_template_service") as svc,
+            patch(
+                "app.services.alerts.notification_task.get_feishu_notification_service"
+            ) as feishu_factory,
+        ):
             svc.render_template = MagicMock(return_value='{"schema":"2.0"}')
             feishu_svc = MagicMock()
             feishu_svc.send_p2p_card_message = MagicMock()
@@ -402,9 +419,7 @@ class TestExecutePhaseIsolation:
         params = sig.parameters
 
         # ★ 核心断言: execute 只接受 ctx，不接受 db
-        assert "db" not in params, (
-            "execute_feishu_notification 不应接受 db 参数"
-        )
+        assert "db" not in params, "execute_feishu_notification 不应接受 db 参数"
         assert "ctx" in params, "execute_feishu_notification 必须接受 ctx 参数"
         assert len(params) == 1, f"execute 应只有 1 个参数，实际: {list(params.keys())}"
 
@@ -420,11 +435,14 @@ class TestExecutePhaseIsolation:
         """
         ctx = _make_notification_ctx(status="firing", needs_send=True)
 
-        with patch(
-            "app.services.alerts.notification_task.get_feishu_notification_service"
-        ) as feishu_factory, patch(
-            "app.services.alerts.notification_task.asyncio.to_thread",
-            new=AsyncMock(side_effect=ConnectionError("SSL handshake timeout")),
+        with (
+            patch(
+                "app.services.alerts.notification_task.get_feishu_notification_service"
+            ) as feishu_factory,
+            patch(
+                "app.services.alerts.notification_task.asyncio.to_thread",
+                new=AsyncMock(side_effect=ConnectionError("SSL handshake timeout")),
+            ),
         ):
             feishu_svc = MagicMock()
             feishu_svc.send_p2p_card_message = MagicMock()
@@ -441,6 +459,4 @@ class TestExecutePhaseIsolation:
             assert len(result.sent_cards) == 0, "sent_cards 应为空"
             # ★ 核心断言: execute 没有 db 参数，架构上保证不访问 DB
             sig = inspect.signature(execute_feishu_notification)
-            assert "db" not in sig.parameters, (
-                "execute 无 db 参数 → SSL 错误期间不占用 DB 连接"
-            )
+            assert "db" not in sig.parameters, "execute 无 db 参数 → SSL 错误期间不占用 DB 连接"

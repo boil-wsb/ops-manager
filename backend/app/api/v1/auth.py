@@ -154,9 +154,7 @@ async def login(
     if user.is_feishu_user and not user.is_superuser:
         client_ip = get_client_ip(request)
         if client_ip:
-            existing_binding = await crud_user_ip_binding.get_by_user_id(
-                db, user_id=user.id
-            )
+            existing_binding = await crud_user_ip_binding.get_by_user_id(db, user_id=user.id)
             if existing_binding:
                 if existing_binding.ip_address != client_ip:
                     logger.warning(
@@ -176,9 +174,7 @@ async def login(
                     )
             else:
                 # User not bound yet, check if IP is already taken
-                ip_binding = await crud_user_ip_binding.get_by_ip(
-                    db, ip_address=client_ip
-                )
+                ip_binding = await crud_user_ip_binding.get_by_ip(db, ip_address=client_ip)
                 if ip_binding:
                     logger.warning(
                         f"IP {client_ip} 已绑定其他用户(id={ip_binding.user_id})",
@@ -194,9 +190,7 @@ async def login(
                         detail="该IP已绑定其他账号，无法登录",
                     )
                 # Create binding
-                await crud_user_ip_binding.create_binding(
-                    db, user_id=user.id, ip_address=client_ip
-                )
+                await crud_user_ip_binding.create_binding(db, user_id=user.id, ip_address=client_ip)
                 logger.info(
                     f"用户 '{credentials.username}' 首次登录，绑定IP: {client_ip}",
                     extra={

@@ -126,7 +126,11 @@ async def sync_terminal_metrics_task() -> dict[str, Any]:
     prom_duration = (now_shanghai() - prom_start).total_seconds()
     logger.info(
         f"Prometheus 数据获取完成: {len(terminals)} 个终端, 耗时 {prom_duration:.1f}s",
-        extra={"action": "terminal.metrics", "terminals": len(terminals), "prom_duration": prom_duration},
+        extra={
+            "action": "terminal.metrics",
+            "terminals": len(terminals),
+            "prom_duration": prom_duration,
+        },
     )
     log_pool_status()
 
@@ -161,7 +165,11 @@ async def sync_terminal_metrics_task() -> dict[str, Any]:
             batch_duration = (now_shanghai() - batch_start).total_seconds()
             logger.info(
                 f"批次 {batch_num}/{total_batches} 写入完成: {synced} 条, 耗时 {batch_duration:.1f}s",
-                extra={"action": "terminal.metrics", "batch": batch_num, "duration": batch_duration},
+                extra={
+                    "action": "terminal.metrics",
+                    "batch": batch_num,
+                    "duration": batch_duration,
+                },
             )
         except Exception as e:
             batch_errors.append(f"Batch {batch_num}: {str(e)}")

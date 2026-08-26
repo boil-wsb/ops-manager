@@ -15,6 +15,7 @@ L5 集成测试: 告警去重与唯一性不变式验证.
 4. notification_sent 状态转移: False → True
 5. 并发 webhook 模拟 → 至多发送一次
 """
+
 import asyncio
 import uuid
 from datetime import timedelta
@@ -40,6 +41,7 @@ def _unique_instance() -> str:
 
 async def _cleanup_alerts(alertname: str, instance: str):
     """清理指定 alertname+instance 的测试数据,使用独立 session."""
+
     async def _op(session):
         await session.execute(
             text(
@@ -62,6 +64,7 @@ async def _create_history(
     severity: str = "critical",
 ) -> int:
     """直接创建 AlertHistory 记录,返回 history_id."""
+
     async def _op(session):
         result = await session.execute(
             text(
@@ -90,6 +93,7 @@ async def _create_history(
 
 async def _get_history_notification_sent(alertname: str, instance: str) -> bool | None:
     """查询指定 alert 的 notification_sent 状态."""
+
     async def _op(session):
         result = await session.execute(
             text(
@@ -131,6 +135,7 @@ def _make_alert_data(
 
 async def _run_process_alert(alert_data: dict) -> dict:
     """通过 db_operation_with_retry 运行 process_alert,模拟生产 webhook 行为."""
+
     async def _op(session):
         return await process_alert(session, alert_data)
 
@@ -294,9 +299,7 @@ class TestNotificationSentStateTransition:
             with patch("app.api.v1.alerts.alert_inhibition_service") as inhib:
                 inhib.check_alert_inhibition = AsyncMock(return_value=(False, None))
                 # mock execute_feishu_notification 防止真实飞书调用(安全措施)
-                with patch(
-                    "app.services.alerts.notification_task.execute_feishu_notification"
-                ):
+                with patch("app.services.alerts.notification_task.execute_feishu_notification"):
                     alert_data = _make_alert_data(
                         alertname=alertname,
                         instance=instance,
@@ -307,12 +310,8 @@ class TestNotificationSentStateTransition:
                         await _run_process_alert(alert_data)
 
                     # ★ 核心断言: prepare 执行预占位标记后 notification_sent=True
-                    final_sent = await _get_history_notification_sent(
-                        alertname, instance
-                    )
-                    assert final_sent is True, (
-                        "预占位标记后 notification_sent 必须为 True"
-                    )
+                    final_sent = await _get_history_notification_sent(alertname, instance)
+                    assert final_sent is True, "预占位标记后 notification_sent 必须为 True"
         finally:
             await _cleanup_alerts(alertname, instance)
 
@@ -343,6 +342,7 @@ class TestSequentialWebhookDedup:
                 from app.services.alerts.notification_task import (
                     _update_alert_history_notification_sent,
                 )
+
                 await _update_alert_history_notification_sent(
                     db=db,
                     alertname=alert_data["alertname"],
@@ -351,10 +351,13 @@ class TestSequentialWebhookDedup:
                 # 返回 truthy 表示有通知上下文
                 return MagicMock()
 
-            with patch(
-                "app.services.alerts.notification_task.prepare_alert_notification",
-                side_effect=_counting_prepare,
-            ), patch("app.api.v1.alerts.alert_inhibition_service") as inhib:
+            with (
+                patch(
+                    "app.services.alerts.notification_task.prepare_alert_notification",
+                    side_effect=_counting_prepare,
+                ),
+                patch("app.api.v1.alerts.alert_inhibition_service") as inhib,
+            ):
                 inhib.check_alert_inhibition = AsyncMock(return_value=(False, None))
 
                 alert_data = _make_alert_data(
@@ -372,14 +375,10 @@ class TestSequentialWebhookDedup:
                     # 第二次 webhook(模拟 Alertmanager 90s 重发):
                     # 第一次已完成预占位标记 → already_notified=True → 跳过
                     result2 = await _run_process_alert(alert_data)
-                    assert result2["is_aggregated"] is True, (
-                        "第二次应被去重(已通知标记命中)"
-                    )
+                    assert result2["is_aggregated"] is True, "第二次应被去重(已通知标记命中)"
 
             # ★ 核心断言: 只发送一次
-            assert send_count == 1, (
-                f"顺序重复 webhook 应只发送一次,实际发送 {send_count} 次"
-            )
+            assert send_count == 1, f"顺序重复 webhook 应只发送一次,实际发送 {send_count} 次"
         finally:
             await _cleanup_alerts(alertname, instance)
 
@@ -419,10 +418,13 @@ class TestConcurrentWebhookTOCTOU:
                 # 返回 truthy 表示有通知上下文
                 return MagicMock()
 
-            with patch(
-                "app.services.alerts.notification_task.prepare_alert_notification",
-                side_effect=_counting_prepare,
-            ), patch("app.api.v1.alerts.alert_inhibition_service") as inhib:
+            with (
+                patch(
+                    "app.services.alerts.notification_task.prepare_alert_notification",
+                    side_effect=_counting_prepare,
+                ),
+                patch("app.api.v1.alerts.alert_inhibition_service") as inhib,
+            ):
                 inhib.check_alert_inhibition = AsyncMock(return_value=(False, None))
 
                 alert_data = _make_alert_data(

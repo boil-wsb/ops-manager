@@ -16,7 +16,9 @@ class SuggestionCreate(BaseModel):
         None, alias="innovationIdeas", max_length=2000, description="创新/团队协助效能提高idea"
     )
     department_id: int | None = Field(None, alias="departmentId", description="指派部门ID(单选)")
-    assignee_user_id: int | None = Field(None, alias="assigneeUserId", description="指派人用户ID(单选)")
+    assignee_user_id: int | None = Field(
+        None, alias="assigneeUserId", description="指派人用户ID(单选)"
+    )
 
     model_config = ConfigDict(populate_by_name=True)
 

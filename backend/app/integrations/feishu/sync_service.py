@@ -393,10 +393,7 @@ async def sync_users(db, crud_user) -> dict:
                 if existing_user.department_id != user_department_id:
                     existing_user.department_id = user_department_id
                     need_update = True
-                if (
-                    feishu_user.employee_no
-                    and existing_user.employee_id != feishu_user.employee_no
-                ):
+                if feishu_user.employee_no and existing_user.employee_id != feishu_user.employee_no:
                     existing_user.employee_id = feishu_user.employee_no
                     # Reset password to employee_no when it changes
                     new_hashed_password = get_password_hash(feishu_user.employee_no)
@@ -518,9 +515,7 @@ async def sync_departments(db) -> dict:
     # Get existing departments
     result = await db.execute(select(Department))
     existing_departments = result.scalars().all()
-    existing_map: dict[str, Department] = {
-        d.feishu_department_id: d for d in existing_departments
-    }
+    existing_map: dict[str, Department] = {d.feishu_department_id: d for d in existing_departments}
 
     created = 0
     updated = 0

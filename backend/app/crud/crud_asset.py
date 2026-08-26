@@ -16,9 +16,7 @@ from app.schemas.asset import AssetCreate, AssetUpdate
 logger = get_logger(__name__)
 
 
-async def _resolve_owner_id_by_name(
-    db: AsyncSession, owner_name: str
-) -> tuple[int | None, bool]:
+async def _resolve_owner_id_by_name(db: AsyncSession, owner_name: str) -> tuple[int | None, bool]:
     """通过 owner_name 解析 owner_id。
 
     I-12 修复：使用 limit(2) 检测重名用户，重名时记 WARNING 日志并取 id 最大的一条。

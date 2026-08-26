@@ -9,6 +9,7 @@ frontend/public/pcinfo files.
 Usage:
     python init_pc_versions.py
 """
+
 import asyncio
 import os
 import re
@@ -18,6 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 from app.config import settings
@@ -63,7 +65,7 @@ async def create_version_if_not_exists(session, version: str, is_active: bool = 
         version=version,
         release_notes=f"PC Client version {version}",
         is_active=is_active,
-        download_url=f"/pcinfo/PC_{version}_modular.vbs"
+        download_url=f"/pcinfo/PC_{version}_modular.vbs",
     )
     session.add(new_version)
     await session.commit()
@@ -106,7 +108,7 @@ async def init_versions():
         print(f"Found {len(versions)} version(s): {versions}")
 
         for i, version in enumerate(versions):
-            is_active = (i == 0)
+            is_active = i == 0
             print(f"Processing version {version} (active={is_active})...")
             await create_version_if_not_exists(session, version, is_active)
 

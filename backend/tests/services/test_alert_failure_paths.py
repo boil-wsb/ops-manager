@@ -23,6 +23,7 @@ L6 失败路径测试: 异常场景下的一致性保障.
 6. 飞书 update_card_message 失败 → save_notification_result 不被调用
 7. 多个 alert 在同一 webhook 中,首个失败不影响后续
 """
+
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -108,9 +109,7 @@ def mock_db_with_template():
 
 @pytest.fixture
 def patched_template_render():
-    with patch(
-        "app.services.alerts.notification_task.alert_template_service"
-    ) as svc:
+    with patch("app.services.alerts.notification_task.alert_template_service") as svc:
         svc.render_alert_template = AsyncMock(return_value=("告警", "正文"))
         svc.render_template = MagicMock(return_value='{"schema":"2.0"}')
         yield svc
@@ -154,17 +153,21 @@ class TestOwnerLookupException:
         patched_mark_sent,
         patched_save_message_id,
     ):
-        with patch(
-            "app.services.alerts.notification_task._get_asset_owner_open_id",
-            new_callable=AsyncMock,
-            return_value=None,
-        ), patch(
-            "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
-            new_callable=AsyncMock,
-            return_value=[],
-        ), patch(
-            "app.services.alerts.notification_task.get_feishu_notification_service"
-        ) as feishu_factory:
+        with (
+            patch(
+                "app.services.alerts.notification_task._get_asset_owner_open_id",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch(
+                "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch(
+                "app.services.alerts.notification_task.get_feishu_notification_service"
+            ) as feishu_factory,
+        ):
             # _get_asset_owner_open_id 内部 catch 异常后 return None
             # 用 return_value=None 模拟异常后的真实行为
             feishu_svc = MagicMock()
@@ -193,17 +196,21 @@ class TestGroupLookupException:
         patched_mark_sent,
         patched_save_message_id,
     ):
-        with patch(
-            "app.services.alerts.notification_task._get_asset_owner_open_id",
-            new_callable=AsyncMock,
-            return_value=None,
-        ), patch(
-            "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
-            new_callable=AsyncMock,
-            return_value=[],
-        ), patch(
-            "app.services.alerts.notification_task.get_feishu_notification_service"
-        ) as feishu_factory:
+        with (
+            patch(
+                "app.services.alerts.notification_task._get_asset_owner_open_id",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch(
+                "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch(
+                "app.services.alerts.notification_task.get_feishu_notification_service"
+            ) as feishu_factory,
+        ):
             # _get_alert_notification_group_open_ids 内部 catch 异常后 return []
             # 用 return_value=[] 模拟异常后的真实行为
             feishu_svc = MagicMock()
@@ -230,17 +237,21 @@ class TestFeishuSendFailure:
         patched_mark_sent,
         patched_save_message_id,
     ):
-        with patch(
-            "app.services.alerts.notification_task._get_asset_owner_open_id",
-            new_callable=AsyncMock,
-            return_value="ou_owner",
-        ), patch(
-            "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
-            new_callable=AsyncMock,
-            return_value=[],
-        ), patch(
-            "app.services.alerts.notification_task.get_feishu_notification_service"
-        ) as feishu_factory:
+        with (
+            patch(
+                "app.services.alerts.notification_task._get_asset_owner_open_id",
+                new_callable=AsyncMock,
+                return_value="ou_owner",
+            ),
+            patch(
+                "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch(
+                "app.services.alerts.notification_task.get_feishu_notification_service"
+            ) as feishu_factory,
+        ):
             feishu_svc = MagicMock()
             # 飞书发送失败
             feishu_svc.send_p2p_card_message = MagicMock(
@@ -273,17 +284,21 @@ class TestFeishuSendException:
         patched_mark_sent,
         patched_save_message_id,
     ):
-        with patch(
-            "app.services.alerts.notification_task._get_asset_owner_open_id",
-            new_callable=AsyncMock,
-            return_value="ou_owner",
-        ), patch(
-            "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
-            new_callable=AsyncMock,
-            return_value=[],
-        ), patch(
-            "app.services.alerts.notification_task.get_feishu_notification_service"
-        ) as feishu_factory:
+        with (
+            patch(
+                "app.services.alerts.notification_task._get_asset_owner_open_id",
+                new_callable=AsyncMock,
+                return_value="ou_owner",
+            ),
+            patch(
+                "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch(
+                "app.services.alerts.notification_task.get_feishu_notification_service"
+            ) as feishu_factory,
+        ):
             feishu_svc = MagicMock()
             # 飞书发送抛异常
             feishu_svc.send_p2p_card_message = MagicMock(
@@ -384,22 +399,27 @@ class TestResolvedCardUpdateFailure:
 
         mock_db.execute.side_effect = [
             _make_scalars_result([template]),  # feishu templates
-            select_result,                     # resolved SELECT alert_card_messages
+            select_result,  # resolved SELECT alert_card_messages
         ]
 
-        with patch(
-            "app.services.alerts.notification_task._get_asset_owner_open_id",
-            new_callable=AsyncMock,
-            return_value="ou_owner",
-        ), patch(
-            "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
-            new_callable=AsyncMock,
-            return_value=[],
-        ), patch(
-            "app.services.alerts.notification_task.get_feishu_notification_service"
-        ) as feishu_factory, patch(
-            "app.services.alerts.notification_task.asyncio.to_thread",
-            new=AsyncMock(return_value={"success": False, "error": "card not found"}),
+        with (
+            patch(
+                "app.services.alerts.notification_task._get_asset_owner_open_id",
+                new_callable=AsyncMock,
+                return_value="ou_owner",
+            ),
+            patch(
+                "app.services.alerts.notification_task._get_alert_notification_group_open_ids",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch(
+                "app.services.alerts.notification_task.get_feishu_notification_service"
+            ) as feishu_factory,
+            patch(
+                "app.services.alerts.notification_task.asyncio.to_thread",
+                new=AsyncMock(return_value={"success": False, "error": "card not found"}),
+            ),
         ):
             feishu_svc = MagicMock()
             feishu_svc.build_resolved_card = MagicMock(return_value={"schema": "2.0"})
@@ -472,9 +492,7 @@ class TestIndependentSessionIsolation:
         assert result1 == 1
         assert result2 == 2
         # 两个 session 是不同的对象
-        assert sessions[0] is not sessions[1], (
-            "每个 alert 应使用独立 DB session (P0-A)"
-        )
+        assert sessions[0] is not sessions[1], "每个 alert 应使用独立 DB session (P0-A)"
 
     async def test_db_operation_with_retry_does_not_propagate_transient_error(self):
         """验证瞬态错误触发重试,不污染后续调用."""

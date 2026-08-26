@@ -15,6 +15,7 @@ NC-1 根因:
 
 修复: 在 AssetHistory 构造前加 await db.flush()。
 """
+
 import importlib
 import sys
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -40,6 +41,7 @@ class TestCreateWithLabelsFlushBeforeHistory:
         """
         # 用 MagicMock 包装 AsyncMock 以追踪调用顺序
         db = AsyncMock()
+
         # 关键: 让 flush 调用后 db_obj.id 有值（模拟真实 DB 行为）
         # 通过 side_effect 在 flush 时设置 db_obj.id
         async def _flush_side_effect():
@@ -109,8 +111,7 @@ class TestCreateWithLabelsFlushBeforeHistory:
         assert len(commit_calls) == 1
         # flush 必须在第一次 add 之后、第二次 add 之前
         assert add_calls[0] < flush_calls[0] < add_calls[1], (
-            "NC-1 调用顺序: add(Asset) → flush → add(AssetHistory)，"
-            "flush 必须在两次 add 之间"
+            "NC-1 调用顺序: add(Asset) → flush → add(AssetHistory)，flush 必须在两次 add 之间"
         )
         # commit 必须在第二次 add 之后
         assert add_calls[1] < commit_calls[0]

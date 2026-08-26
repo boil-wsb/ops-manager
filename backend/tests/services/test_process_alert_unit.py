@@ -21,6 +21,7 @@ L2 单元测试: process_alert 所有分支覆盖.
 - 重构前: process_alert 调用 send_alert_notification(alert_data, db)
 - 重构后: process_alert 调用 prepare_alert_notification(db, alert_data) 返回 NotificationContext 或 None
 """
+
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -57,7 +58,9 @@ def _make_alert_data(
     }
 
 
-def _make_history(*, id: int = 1, notification_sent: bool = False, status: str = "firing") -> AlertHistory:
+def _make_history(
+    *, id: int = 1, notification_sent: bool = False, status: str = "firing"
+) -> AlertHistory:
     """构造 AlertHistory 实例."""
     return AlertHistory(
         id=id,
@@ -298,7 +301,9 @@ class TestProcessAlertResolvedStartsAtNone:
             mock_db.execute.return_value = pending_result
 
             # startsAt 缺失（None）—— ND-2 关键场景
-            alert_data = _make_alert_data(status="resolved", starts_at=None, ends_at="2026-07-16T11:00:00Z")
+            alert_data = _make_alert_data(
+                status="resolved", starts_at=None, ends_at="2026-07-16T11:00:00Z"
+            )
             with patch("app.api.v1.alerts.settings") as mock_settings:
                 mock_settings.alert_aggregation_window_seconds = 0
                 with patch("app.api.v1.alerts.now_shanghai") as mock_now:
@@ -357,7 +362,9 @@ class TestProcessAlertInhibitionCheckException:
             "app.services.alerts.notification_task.prepare_alert_notification",
             new=AsyncMock(return_value=MagicMock()),
         ) as prepare_fn:
-            patched_inhibition.check_alert_inhibition.side_effect = RuntimeError("DB connection lost")
+            patched_inhibition.check_alert_inhibition.side_effect = RuntimeError(
+                "DB connection lost"
+            )
 
             existing_result = MagicMock()
             existing_result.scalar_one_or_none.return_value = None

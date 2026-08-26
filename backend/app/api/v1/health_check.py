@@ -36,9 +36,7 @@ def _serialize_report(report, silenced_instances: set[str] | None = None) -> dic
         "created_at": report.created_at.isoformat() if report.created_at else None,
     }
     if hasattr(report, "details") and report.details:
-        data["details"] = [
-            _serialize_detail(d, silenced_instances) for d in report.details
-        ]
+        data["details"] = [_serialize_detail(d, silenced_instances) for d in report.details]
     return data
 
 

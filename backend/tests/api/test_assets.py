@@ -1,15 +1,17 @@
 """
 Tests for assets API.
 """
+
 import pytest
 from httpx import AsyncClient
 
 
-async def get_auth_headers(client: AsyncClient, username: str = "admin", password: str = "admin123") -> dict:
+async def get_auth_headers(
+    client: AsyncClient, username: str = "admin", password: str = "admin123"
+) -> dict:
     """Helper function to get authentication headers."""
     response = await client.post(
-        "/api/v1/auth/login",
-        json={"username": username, "password": password}
+        "/api/v1/auth/login", json={"username": username, "password": password}
     )
     if response.status_code == 200:
         token = response.json()["access_token"]
@@ -51,10 +53,7 @@ async def test_list_assets_with_pagination(client: AsyncClient):
 async def test_list_assets_with_filters(client: AsyncClient):
     """Test list assets with filter parameters."""
     headers = await get_auth_headers(client)
-    response = await client.get(
-        "/api/v1/assets?asset_type=SERVER&status=ACTIVE",
-        headers=headers
-    )
+    response = await client.get("/api/v1/assets?asset_type=SERVER&status=ACTIVE", headers=headers)
     assert response.status_code == 200
 
 
@@ -100,8 +99,7 @@ async def test_search_assets(client: AsyncClient):
 
     # Test search with multiple filters
     response = await client.get(
-        "/api/v1/assets?asset_type=SERVER&status=ACTIVE&idc=TestIDC&keyword=server",
-        headers=headers
+        "/api/v1/assets?asset_type=SERVER&status=ACTIVE&idc=TestIDC&keyword=server", headers=headers
     )
     assert response.status_code == 200
     data = response.json()
@@ -118,11 +116,7 @@ async def test_create_and_delete_label(client: AsyncClient):
     headers = await get_auth_headers(client)
 
     # Create a label
-    label_data = {
-        "name": "test-label",
-        "color": "#ff0000",
-        "description": "Test label for assets"
-    }
+    label_data = {"name": "test-label", "color": "#ff0000", "description": "Test label for assets"}
     response = await client.post("/api/v1/labels", json=label_data, headers=headers)
     assert response.status_code == 201
     label = response.json()
@@ -182,6 +176,7 @@ async def test_create_asset(client: AsyncClient):
     label_id = label_response.json()["id"]
 
     import time
+
     asset_data = {
         "asset_id": f"TEST-SERVER-{time.time():.0f}",
         "name": "Test Server",
@@ -197,7 +192,7 @@ async def test_create_asset(client: AsyncClient):
         "region": "TestRegion",
         "rack": "TestRack",
         "description": "Test server for unit testing",
-        "label_ids": [label_id]
+        "label_ids": [label_id],
     }
     response = await client.post("/api/v1/assets", json=asset_data, headers=headers)
     if response.status_code == 201:
@@ -215,10 +210,14 @@ async def test_create_asset(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_update_asset(client: AsyncClient):
     """Test updating an existing asset."""
-    pytest.skip("Skipped: requires asset:admin permission which returns PermissionChecker object instead of User")
+    pytest.skip(
+        "Skipped: requires asset:admin permission which returns PermissionChecker object instead of User"
+    )
 
 
 @pytest.mark.asyncio
 async def test_delete_asset(client: AsyncClient):
     """Test deleting an asset."""
-    pytest.skip("Skipped: requires asset:admin permission which returns PermissionChecker object instead of User")
+    pytest.skip(
+        "Skipped: requires asset:admin permission which returns PermissionChecker object instead of User"
+    )

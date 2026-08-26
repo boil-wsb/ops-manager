@@ -110,9 +110,7 @@ async def trigger_sync_async(
     )
 
     # 启动后台任务执行同步 + 卡片更新
-    asyncio.create_task(
-        _run_sync_and_update_card(sync_type, open_message_id, operator_open_id)
-    )
+    asyncio.create_task(_run_sync_and_update_card(sync_type, open_message_id, operator_open_id))
 
     return {
         "success": True,

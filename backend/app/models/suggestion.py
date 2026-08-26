@@ -14,10 +14,10 @@ from app.models.base import BaseModel
 class SuggestionStatus(enum.StrEnum):
     """Suggestion status lifecycle."""
 
-    PENDING = "pending"        # 待审批（已提交，待部门负责人处理）
-    APPROVED = "approved"      # 部门已审批通过（待市场部处理）
-    ARCHIVED = "archived"      # 已存档（市场部已填写执行结果）
-    REJECTED = "rejected"      # 已驳回
+    PENDING = "pending"  # 待审批（已提交，待部门负责人处理）
+    APPROVED = "approved"  # 部门已审批通过（待市场部处理）
+    ARCHIVED = "archived"  # 已存档（市场部已填写执行结果）
+    REJECTED = "rejected"  # 已驳回
 
 
 class Suggestion(BaseModel):
@@ -37,16 +37,17 @@ class Suggestion(BaseModel):
         String(6), unique=True, index=True, nullable=False, comment="匿名查询码"
     )
     submitter_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True, comment="提交者ID(审计用,不展示)"
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="提交者ID(审计用,不展示)",
     )
     client_ip: Mapped[str | None] = mapped_column(String(45), nullable=True, comment="提交IP")
 
     # 市场部存档字段
     market_result: Mapped[str | None] = mapped_column(Text, nullable=True, comment="市场部执行结果")
     market_reviewer_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True, comment="市场部存档人"
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, comment="市场部存档人"
     )
     archived_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, comment="存档时间"
@@ -55,8 +56,7 @@ class Suggestion(BaseModel):
     # 驳回字段
     reject_reason: Mapped[str | None] = mapped_column(Text, nullable=True, comment="驳回原因")
     rejected_by: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True, comment="驳回人"
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, comment="驳回人"
     )
     rejected_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, comment="驳回时间"
@@ -80,16 +80,20 @@ class SuggestionAssignment(BaseModel):
     __tablename__ = "suggestion_assignments"
 
     suggestion_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("suggestions.id", ondelete="CASCADE"),
-        nullable=False, index=True, comment="建议ID"
+        Integer,
+        ForeignKey("suggestions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="建议ID",
     )
     department_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("departments.id", ondelete="SET NULL"),
-        nullable=True, comment="指派部门"
+        Integer,
+        ForeignKey("departments.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="指派部门",
     )
     assignee_user_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True, comment="指派人"
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, comment="指派人"
     )
     assignee_open_id: Mapped[str | None] = mapped_column(
         String(64), nullable=True, comment="指派人飞书open_id"
@@ -105,9 +109,7 @@ class SuggestionAssignment(BaseModel):
     )
     review_comment: Mapped[str | None] = mapped_column(Text, nullable=True, comment="审批意见")
 
-    suggestion: Mapped["Suggestion"] = relationship(
-        "Suggestion", back_populates="assignments"
-    )
+    suggestion: Mapped["Suggestion"] = relationship("Suggestion", back_populates="assignments")
     department: Mapped["Department | None"] = relationship(
         "Department", foreign_keys=[department_id], lazy="selectin"
     )

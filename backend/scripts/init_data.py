@@ -3,6 +3,7 @@
 Initialize database with default data.
 Usage: python scripts/init_data.py
 """
+
 import asyncio
 import sys
 from pathlib import Path
@@ -19,7 +20,7 @@ async def main():
     print("=" * 60)
     print("OpsManager Database Initialization")
     print("=" * 60)
-    
+
     try:
         await init_db()
         print("\n" + "=" * 60)

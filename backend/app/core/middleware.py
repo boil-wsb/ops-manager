@@ -14,13 +14,15 @@ from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
-SKIP_AUDIT_PATHS = frozenset({
-    "/health",
-    "/",
-    "/docs",
-    "/redoc",
-    "/openapi.json",
-})
+SKIP_AUDIT_PATHS = frozenset(
+    {
+        "/health",
+        "/",
+        "/docs",
+        "/redoc",
+        "/openapi.json",
+    }
+)
 
 
 class PureASGILoggingMiddleware:

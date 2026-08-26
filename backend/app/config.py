@@ -163,9 +163,7 @@ class Settings(BaseSettings):
     )
     git_private_token: str = Field(default="", alias="GIT_PRIVATE_TOKEN")
     git_repo_base_dir: str = Field(default="/app/git-repos", alias="GIT_REPO_LOCAL_DIR")
-    git_repo_sparse_paths: str = Field(
-        default="conf/prometheus", alias="GIT_REPO_SPARSE_PATHS"
-    )
+    git_repo_sparse_paths: str = Field(default="conf/prometheus", alias="GIT_REPO_SPARSE_PATHS")
     git_command_timeout: int = Field(default=60, alias="GIT_COMMAND_TIMEOUT")
 
     def _parse_list(self, raw: str) -> list[str]:

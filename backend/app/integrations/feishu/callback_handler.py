@@ -628,6 +628,7 @@ def _do_card_action_trigger(data: Any) -> Any:
                 from lark_oapi.event.callback.model.p2_card_action_trigger import (
                     P2CardActionTriggerResponse,
                 )
+
                 return P2CardActionTriggerResponse(resp)
 
             threading.Thread(
@@ -698,7 +699,15 @@ def _handle_suggestion_approve(
                 engine.dispose()
                 return
 
-            _, suggestion_id, assign_msg_id, assign_status, content, highlights, innovation_ideas = row
+            (
+                _,
+                suggestion_id,
+                assign_msg_id,
+                assign_status,
+                content,
+                highlights,
+                innovation_ideas,
+            ) = row
 
             # 查询审批人姓名
             approver_name = "未知"
@@ -749,7 +758,11 @@ def _handle_suggestion_approve(
 
         logger.info(
             f"建议审批通过: suggestion={suggestion_id}, assignment={assignment_id}, approver={approver_name}",
-            extra={"action": "suggestion.approve", "suggestion_id": suggestion_id, "assignment_id": assignment_id},
+            extra={
+                "action": "suggestion.approve",
+                "suggestion_id": suggestion_id,
+                "assignment_id": assignment_id,
+            },
         )
 
         # I-09: 更新原卡片为"已审批"（直接同步调用，移除 asyncio.run）
@@ -760,16 +773,26 @@ def _handle_suggestion_approve(
             except Exception as e:
                 logger.error(
                     f"更新审批卡片失败: msg_id={card_msg_id}, error={e}",
-                    extra={"action": "suggestion.update", "message_id": card_msg_id, "error": str(e)},
+                    extra={
+                        "action": "suggestion.update",
+                        "message_id": card_msg_id,
+                        "error": str(e),
+                    },
                 )
 
         # I-09: 发送市场部卡片（直接同步调用，移除 asyncio.run）
         try:
-            _sync_send_market_card(suggestion_id, content, highlights, innovation_ideas, approver_name)
+            _sync_send_market_card(
+                suggestion_id, content, highlights, innovation_ideas, approver_name
+            )
         except Exception as e:
             logger.error(
                 f"发送市场部卡片失败: suggestion={suggestion_id}, error={e}",
-                extra={"action": "suggestion.approve", "suggestion_id": suggestion_id, "error": str(e)},
+                extra={
+                    "action": "suggestion.approve",
+                    "suggestion_id": suggestion_id,
+                    "error": str(e),
+                },
             )
 
     except Exception as e:
@@ -787,7 +810,11 @@ def _sync_update_to_approved(open_message_id: str, approver_name: str) -> None:
 
 
 def _sync_send_market_card(
-    suggestion_id: int, content: str, highlights: str | None, innovation_ideas: str | None, approver_name: str
+    suggestion_id: int,
+    content: str,
+    highlights: str | None,
+    innovation_ideas: str | None,
+    approver_name: str,
 ) -> None:
     """I-09: 同步版本，直接调用飞书 service，避免 asyncio.run()。"""
     from app.core.tz import now_shanghai
@@ -840,7 +867,11 @@ def _sync_send_market_card(
         )
         logger.info(
             f"市场部卡片已发送: suggestion={suggestion_id}, open_id={oid}, msg_id={msg_id}",
-            extra={"action": "suggestion.approve", "suggestion_id": suggestion_id, "message_id": msg_id},
+            extra={
+                "action": "suggestion.approve",
+                "suggestion_id": suggestion_id,
+                "message_id": msg_id,
+            },
         )
 
 
@@ -939,7 +970,11 @@ def _handle_suggestion_reject(
 
         logger.info(
             f"建议已驳回: suggestion={suggestion_id}, assignment={assignment_id}",
-            extra={"action": "suggestion.reject", "suggestion_id": suggestion_id, "assignment_id": assignment_id},
+            extra={
+                "action": "suggestion.reject",
+                "suggestion_id": suggestion_id,
+                "assignment_id": assignment_id,
+            },
         )
 
         # I-09: 更新原卡片为"已驳回"（直接同步调用，移除 asyncio.run）
@@ -950,7 +985,11 @@ def _handle_suggestion_reject(
             except Exception as e:
                 logger.error(
                     f"更新驳回卡片失败: msg_id={card_msg_id}, error={e}",
-                    extra={"action": "suggestion.update", "message_id": card_msg_id, "error": str(e)},
+                    extra={
+                        "action": "suggestion.update",
+                        "message_id": card_msg_id,
+                        "error": str(e),
+                    },
                 )
 
     except Exception as e:
@@ -961,7 +1000,10 @@ def _handle_suggestion_reject(
 
 
 def _handle_suggestion_archive(
-    suggestion_id: str, market_result: str, open_message_id: str | None, operator_open_id: str | None
+    suggestion_id: str,
+    market_result: str,
+    open_message_id: str | None,
+    operator_open_id: str | None,
 ) -> None:
     """处理建议存档: 更新状态 + 更新市场部卡片。
 
@@ -1052,7 +1094,11 @@ def _handle_suggestion_archive(
             except Exception as e:
                 logger.error(
                     f"更新存档卡片失败: msg_id={open_message_id}, error={e}",
-                    extra={"action": "suggestion.update", "message_id": open_message_id, "error": str(e)},
+                    extra={
+                        "action": "suggestion.update",
+                        "message_id": open_message_id,
+                        "error": str(e),
+                    },
                 )
 
     except Exception as e:
@@ -1834,7 +1880,9 @@ def _resolve_alert_sync(alert_id: str, notes: str, open_message_id: str | None =
                     # 3. 批量更新 alert_card_messages 状态
                     for cm_id in updated_card_ids:
                         conn.execute(
-                            text("UPDATE alert_card_messages SET card_status = 'resolved' WHERE id = :id"),
+                            text(
+                                "UPDATE alert_card_messages SET card_status = 'resolved' WHERE id = :id"
+                            ),
                             {"id": cm_id},
                         )
                     updated_card_count = len(updated_card_ids)
@@ -2225,12 +2273,21 @@ def _trigger_crm_sync_from_text(sender_id: str, sync_type: str) -> None:
         feishu.send_text_message(sender_id, f"⏳ 已收到指令，正在执行 {label}，请稍候...")
         logger.info(
             f"[CRM文本触发] 已回复执行中提示: sender_id={sender_id}",
-            extra={"action": "crm.sync.text_trigger", "sender_id": sender_id, "step": "reply_running"},
+            extra={
+                "action": "crm.sync.text_trigger",
+                "sender_id": sender_id,
+                "step": "reply_running",
+            },
         )
     except Exception as e:
         logger.error(
             f"[CRM文本触发] 回复执行中提示失败: {e}",
-            extra={"action": "crm.sync.text_trigger", "sender_id": sender_id, "error": str(e), "step": "reply_running_error"},
+            extra={
+                "action": "crm.sync.text_trigger",
+                "sender_id": sender_id,
+                "error": str(e),
+                "step": "reply_running_error",
+            },
         )
 
     # 2. 启动后台线程执行同步并发送结果卡片
@@ -2289,12 +2346,22 @@ def _run_crm_sync_from_text(sender_id: str, sync_type: str) -> None:
             card_message_id = send_syncing_card_sync(sender_id, sync_type)
             logger.info(
                 f"[CRM文本触发] 已发送同步中卡片: sender_id={sender_id}, card_message_id={card_message_id}",
-                extra={"action": "crm.sync.text_trigger", "sender_id": sender_id, "card_message_id": card_message_id, "step": "send_syncing_card_done"},
+                extra={
+                    "action": "crm.sync.text_trigger",
+                    "sender_id": sender_id,
+                    "card_message_id": card_message_id,
+                    "step": "send_syncing_card_done",
+                },
             )
         except Exception as e:
             logger.warning(
                 f"[CRM文本触发] 发送同步中卡片失败: {e}",
-                extra={"action": "crm.sync.text_trigger", "sender_id": sender_id, "error": str(e), "step": "send_syncing_card_error"},
+                extra={
+                    "action": "crm.sync.text_trigger",
+                    "sender_id": sender_id,
+                    "error": str(e),
+                    "step": "send_syncing_card_error",
+                },
             )
 
         # 2. 调用 CRM 同步接口
@@ -2302,7 +2369,12 @@ def _run_crm_sync_from_text(sender_id: str, sync_type: str) -> None:
         url = service._build_url(sync_type)
         logger.info(
             f"[CRM文本触发] 调用 CRM 接口: url={url}",
-            extra={"action": "crm.sync.text_trigger", "url": url, "sync_type": sync_type, "step": "call_crm_api"},
+            extra={
+                "action": "crm.sync.text_trigger",
+                "url": url,
+                "sync_type": sync_type,
+                "step": "call_crm_api",
+            },
         )
 
         trigger_result = service.trigger_sync_sync(sync_type)
@@ -2326,12 +2398,23 @@ def _run_crm_sync_from_text(sender_id: str, sync_type: str) -> None:
             # 触发失败，立即更新卡片为失败状态
             logger.info(
                 f"[CRM文本触发] 触发失败或无 status_url，立即更新卡片为失败状态: success={trigger_result.get('success')}, has_status_url={bool(status_url)}",
-                extra={"action": "crm.sync.text_trigger", "success": trigger_result.get("success"), "has_status_url": bool(status_url), "step": "update_card_failed_immediately"},
+                extra={
+                    "action": "crm.sync.text_trigger",
+                    "success": trigger_result.get("success"),
+                    "has_status_url": bool(status_url),
+                    "step": "update_card_failed_immediately",
+                },
             )
             _update_crm_sync_card(sender_id, card_message_id, sync_type, trigger_result)
             logger.info(
                 f"[CRM文本触发] {label} 全流程完成（触发失败）: success=False",
-                extra={"action": "crm.sync.text_trigger", "sync_type": sync_type, "success": False, "sender_id": sender_id, "step": "all_done_failed"},
+                extra={
+                    "action": "crm.sync.text_trigger",
+                    "sync_type": sync_type,
+                    "success": False,
+                    "sender_id": sender_id,
+                    "step": "all_done_failed",
+                },
             )
             return
 
@@ -2411,7 +2494,11 @@ def _run_crm_sync_from_text(sender_id: str, sync_type: str) -> None:
             _crm_sync_in_progress[sync_type] = False
         logger.info(
             f"[CRM文本触发] 已清除同步状态: sync_type={sync_type}",
-            extra={"action": "crm.sync.text_trigger", "sync_type": sync_type, "step": "clear_in_progress"},
+            extra={
+                "action": "crm.sync.text_trigger",
+                "sync_type": sync_type,
+                "step": "clear_in_progress",
+            },
         )
 
 
@@ -2436,13 +2523,22 @@ def _update_crm_sync_card(
             update_card_to_sync_result_sync(card_message_id, sync_type, result)
             logger.info(
                 f"[CRM文本触发] 已更新卡片为最终结果: card_message_id={card_message_id}",
-                extra={"action": "crm.sync.text_trigger", "card_message_id": card_message_id, "step": "update_card_result_done"},
+                extra={
+                    "action": "crm.sync.text_trigger",
+                    "card_message_id": card_message_id,
+                    "step": "update_card_result_done",
+                },
             )
             return
         except Exception as e:
             logger.warning(
                 f"[CRM文本触发] 更新卡片失败，降级为发送新卡片: {e}",
-                extra={"action": "crm.sync.text_trigger", "card_message_id": card_message_id, "error": str(e), "step": "update_card_fallback"},
+                extra={
+                    "action": "crm.sync.text_trigger",
+                    "card_message_id": card_message_id,
+                    "error": str(e),
+                    "step": "update_card_fallback",
+                },
             )
 
     # 降级：发送新卡片
@@ -2450,12 +2546,21 @@ def _update_crm_sync_card(
         send_sync_result_card_sync(sender_id, sync_type, result)
         logger.info(
             f"[CRM文本触发] 已发送结果卡片（降级）: sender_id={sender_id}",
-            extra={"action": "crm.sync.text_trigger", "sender_id": sender_id, "step": "send_result_card_fallback_done"},
+            extra={
+                "action": "crm.sync.text_trigger",
+                "sender_id": sender_id,
+                "step": "send_result_card_fallback_done",
+            },
         )
     except Exception as e:
         logger.error(
             f"[CRM文本触发] 发送结果卡片（降级）失败: {e}",
-            extra={"action": "crm.sync.text_trigger", "sender_id": sender_id, "error": str(e), "step": "send_result_card_fallback_error"},
+            extra={
+                "action": "crm.sync.text_trigger",
+                "sender_id": sender_id,
+                "error": str(e),
+                "step": "send_result_card_fallback_error",
+            },
         )
 
 

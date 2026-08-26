@@ -1,6 +1,7 @@
 """
 Pytest configuration and fixtures.
 """
+
 import asyncio
 import os
 
@@ -48,7 +49,11 @@ async def setup_and_teardown_db():
     if database_url.startswith("postgresql+asyncpg://"):
         database_url = database_url.replace("postgresql+asyncpg://", "postgresql://", 1)
 
-    env = {**os.environ, "PYTHONPATH": os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "DATABASE_URL": database_url}
+    env = {
+        **os.environ,
+        "PYTHONPATH": os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "DATABASE_URL": database_url,
+    }
     subprocess.run(
         [sys.executable, "-m", "alembic", "upgrade", "head"],
         cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
