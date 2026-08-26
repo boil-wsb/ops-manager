@@ -18,10 +18,12 @@ from app.api.v1 import (
     feishu_interactions,
     feishu_notifications,
     feishu_sync,
+    git_repos,
     health_check,
     it_feedback,
     it_feedback_notifications,
     it_reporter,
+    monitor_config,
     navigation,
     notification_callback_logs,
     notification_groups,
@@ -69,3 +71,5 @@ api_router.include_router(health_check.router, prefix="/v1", tags=["每日健康
 api_router.include_router(open_id.router, prefix="/v1", tags=["Open ID 查询"])
 api_router.include_router(crm_sync.router, prefix="/v1", tags=["CRM 同步"])
 api_router.include_router(suggestions.router, prefix="/v1", tags=["匿名建议"])
+api_router.include_router(git_repos.router, prefix="/v1", tags=["仓库管理"])
+api_router.include_router(monitor_config.router, prefix="/v1", tags=["监控配置"])

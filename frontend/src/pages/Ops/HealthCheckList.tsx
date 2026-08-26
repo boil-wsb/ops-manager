@@ -214,16 +214,17 @@ const HostCard = ({ detail, thresholds, dark, canManage, onCreateSilence, onCanc
         </div>
       </div>
 
-      {detail.env && (
-        <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 10 }}>
-          {detail.env}{detail.kernelVersion ? ` | ${detail.kernelVersion}` : ''}
-        </div>
-      )}
-      {!detail.env && detail.osInfo && (
-        <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 10 }}>
-          {detail.osInfo}{detail.kernelVersion ? ` | ${detail.kernelVersion}` : ''}
-        </div>
-      )}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+        <Tag color={detail.env ? 'geekblue' : 'default'} style={{ margin: 0, fontSize: 11, fontFamily: 'monospace' }}>
+          env: {detail.env || '-'}
+        </Tag>
+        <Tag color="cyan" style={{ margin: 0, fontSize: 11, fontFamily: 'monospace' }}>
+          instance: {detail.instance}
+        </Tag>
+        <Tag color={detail.kernelVersion ? 'purple' : 'default'} style={{ margin: 0, fontSize: 11, fontFamily: 'monospace' }}>
+          内核: {detail.kernelVersion || (detail.osInfo ? detail.osInfo.split(' ')[0] : '-')}
+        </Tag>
+      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {[

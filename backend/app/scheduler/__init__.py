@@ -108,6 +108,15 @@ BUILTIN_TASKS = [
         "category": "ops",
         "description": "基于 Prometheus 的每日系统健康巡检",
     },
+    {
+        "task_id": "sync-git-prometheus-conf",
+        "name": "Prometheus 监控配置远端同步",
+        "task_function": "app.tasks.git_repo_sync_tasks.sync_git_repo_with_remote_task",
+        "trigger_type": "interval",
+        "trigger_config": {"minutes": 120},
+        "category": "sync",
+        "description": "每 2 小时与远端 prometheus 仓库同步监控配置（远端较新则拉取到本地）",
+    },
 ]
 
 

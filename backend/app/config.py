@@ -156,6 +156,26 @@ class Settings(BaseSettings):
     # IT Feedback Local IP Mapping
     local_ip_mapping_str: str = Field(default="", alias="LOCAL_IP_MAPPING")
 
+    # Git Repository Management Configuration
+    git_repo_url: str = Field(
+        default="http://192.168.23.19/devops/infrastructure/prometheus.git",
+        alias="GIT_REPO_URL",
+    )
+    git_private_token: str = Field(default="", alias="GIT_PRIVATE_TOKEN")
+    git_repo_base_dir: str = Field(default="/app/git-repos", alias="GIT_REPO_LOCAL_DIR")
+    git_repo_sparse_paths: str = Field(
+        default="conf/prometheus", alias="GIT_REPO_SPARSE_PATHS"
+    )
+    git_command_timeout: int = Field(default=60, alias="GIT_COMMAND_TIMEOUT")
+
+    def _parse_list(self, raw: str) -> list[str]:
+        """Parse comma/space separated string into a non-empty list."""
+        return [item.strip() for item in raw.replace(";", ",").split(",") if item.strip()]
+
+    @property
+    def git_repo_sparse_path_list(self) -> list[str]:
+        return self._parse_list(self.git_repo_sparse_paths)
+
     # PC Client Info Configuration
     pcinfo_pushgateway_url: str = Field(
         default="http://localhost:9091/metrics/job/pcinfo", alias="PCINFO_PUSHGATEWAY_URL"

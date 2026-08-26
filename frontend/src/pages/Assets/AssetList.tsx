@@ -14,6 +14,8 @@ import { useAuthStore } from '../../stores/authStore';
 
 // Lazy-load the topology view to keep the main bundle small
 const AssetTopology = lazy(() => import('./AssetTopology'));
+// 主机配置（Prometheus 监控主机管理），独立于资产列表数据流
+const MonitorConfig = lazy(() => import('../Ops/MonitorConfig'));
 
 const { Option } = Select;
 
@@ -570,6 +572,26 @@ const AssetList = () => {
           }
         >
           <AssetTopology />
+        </Suspense>
+      ),
+    },
+    {
+      key: 'monitor',
+      label: (
+        <span>
+          <DesktopOutlined style={{ marginRight: 8 }} />
+          主机配置
+        </span>
+      ),
+      children: (
+        <Suspense
+          fallback={
+            <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
+              <Spin tip="加载监控主机配置..." size="large" />
+            </div>
+          }
+        >
+          <MonitorConfig />
         </Suspense>
       ),
     },
