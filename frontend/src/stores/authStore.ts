@@ -39,12 +39,12 @@ export const useAuthStore = create<AuthState>()(
         set({
           user,
         }),
-      updateToken: (token, refreshToken, permissions, permissionVersion = null) =>
+      updateToken: (token, refreshToken, permissions, permissionVersion) =>
         set((state) => ({
           token,
           refreshToken,
           permissions: permissions !== undefined ? permissions : state.permissions,
-          permissionVersion: permissions !== undefined ? permissionVersion : state.permissionVersion,
+          permissionVersion: permissionVersion !== undefined ? permissionVersion : state.permissionVersion,
         })),
       setPermissions: (permissions, permissionVersion = null) =>
         set({

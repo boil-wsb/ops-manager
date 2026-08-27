@@ -110,7 +110,7 @@ function App() {
       }
     })();
     return () => { cancelled = true; };
-  }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, storePermissionVersion, setPermissions]);
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
