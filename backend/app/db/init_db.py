@@ -307,6 +307,27 @@ DEFAULT_PERMISSIONS = [
         "action": "write",
         "description": "管理巡检静默规则和阈值",
     },
+    {
+        "code": "monitor:read",
+        "name": "查看监控配置",
+        "module": "monitor",
+        "action": "read",
+        "description": "查看监控主机配置",
+    },
+    {
+        "code": "monitor:create",
+        "name": "新增监控主机",
+        "module": "monitor",
+        "action": "create",
+        "description": "新增监控主机配置",
+    },
+    {
+        "code": "monitor:update",
+        "name": "编辑监控配置",
+        "module": "monitor",
+        "action": "update",
+        "description": "编辑与提交监控主机配置",
+    },
 ]
 
 
@@ -356,6 +377,9 @@ DEFAULT_ROLES = {
             "notification_group:create",
             "notification_group:update",
             "notification_group:delete",
+            "monitor:read",
+            "monitor:create",
+            "monitor:update",
         ],
     },
     "operator": {
@@ -367,6 +391,9 @@ DEFAULT_ROLES = {
             "deployment:execute",
             "ops:read",
             "certificate:read",
+            "monitor:read",
+            "monitor:create",
+            "monitor:update",
         ],
     },
     "viewer": {

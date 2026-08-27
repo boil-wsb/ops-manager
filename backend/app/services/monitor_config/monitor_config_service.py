@@ -201,8 +201,12 @@ class MonitorConfigService:
             raise ConflictError(detail=f"主机 {addr} 已存在（{file}），请勿重复新增")
 
     def _worktree_dirty(self) -> bool:
-        """工作区（conf/prometheus 相关）是否存在未提交改动。"""
-        run = self.git.run_git(["status", "--porcelain"], cwd=str(self.git.repo_dir), check=False)
+        """conf/prometheus 路径是否存在未提交改动（忽略仓库内其它无关变更）。"""
+        run = self.git.run_git(
+            ["status", "--porcelain", "--", "conf/prometheus"],
+            cwd=str(self.git.repo_dir),
+            check=False,
+        )
         return bool((run.get("stdout") or "").strip())
 
     # ---------- 提交 ----------
