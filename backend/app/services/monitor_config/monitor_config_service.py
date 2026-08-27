@@ -200,20 +200,38 @@ class MonitorConfigService:
         if self._find_by_addr(view.get(file, []), addr) is not None:
             raise ConflictError(detail=f"主机 {addr} 已存在（{file}），请勿重复新增")
 
+    def _worktree_dirty(self) -> bool:
+        """工作区（conf/prometheus 相关）是否存在未提交改动。"""
+        run = self.git.run_git(["status", "--porcelain"], cwd=str(self.git.repo_dir), check=False)
+        return bool((run.get("stdout") or "").strip())
+
     # ---------- 提交 ----------
     def commit(self, message: str) -> dict[str, Any]:
-        """一键提交：先生成最新 base（clone→pull），再回放 op 写盘，然后 git commit+push。"""
-        with self._lock:
-            if not self._ops:
-                return {"message": "无可提交变更", "committed": False}
+        """一键提交：先生成最新 base（clone→pull），再回放 op 写盘，然后 git commit+push。
 
+        无暂存 op 但工作区存在未提交改动时，直接提交工作区（兜底恢复，见 C-4）。
+        失败时写盘已物化，清空 op 防止重试重复回放；后续可再次提交工作区恢复。
+        """
+        msg = (message or "").strip() or "sync: 监控配置同步"
+        with self._lock:
             # 1. 确保已 clone（未 clone 自动 clone+sparse）
             self.git.ensure_clone()
 
             # 2. pull 合并远端最新（在写盘之前，避免覆盖远端内容）
             self.git.pull()
 
-            # 3. 以 pull 后的最新磁盘内容为 base
+            if not self._ops:
+                # 3a. 无暂存操作：若工作区有未提交修改则直接提交（恢复失败遗留），否则无可提交
+                if not self._worktree_dirty():
+                    return {"message": "无可提交变更", "committed": False}
+                try:
+                    self.git.commit(message=msg, paths=["conf/prometheus"])
+                    self.git.push()
+                except Exception:
+                    raise
+                return {"message": f"已提交并推送: {msg}", "committed": True, "commit_message": msg}
+
+            # 3b. 以 pull 后的最新磁盘内容为 base
             files = sorted({op["file"] for op in self._ops})
             base: dict[str, list[dict[str, Any]]] = {f: self._load_file(f) for f in files}
             view = self._apply_ops(base)
@@ -223,15 +241,14 @@ class MonitorConfigService:
                 if f in files:
                     self._write_file(f, arr)
 
-            # 5. commit + push
-            msg = (message or "").strip() or "sync: 监控配置同步"
+            # 5. commit + push（成功后清空操作日志）
             try:
                 self.git.commit(message=msg, paths=["conf/prometheus"])
                 self.git.push()
             except Exception:
-                # 提交失败：保留 op，允许用户修复后重试
+                # 写盘已物化：清空 op，避免重试时重复回放；磁盘改动由"提交工作区"兜底
+                self._ops.clear()
                 raise
-            # 提交成功后清空操作日志
             self._ops.clear()
             return {"message": f"已提交并推送: {msg}", "committed": True, "commit_message": msg}
 

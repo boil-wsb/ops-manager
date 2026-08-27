@@ -207,11 +207,12 @@ const MonitorConfig = () => {
   };
 
   const handleCommit = () => {
-    if (pendingCount === 0 && !syncStatus?.local_newer) {
+    const hasDirty = !!syncStatus?.dirty;
+    if (pendingCount === 0 && !syncStatus?.local_newer && !hasDirty) {
       message.warning('无待提交变更');
       return;
     }
-    if (pendingCount === 0 && syncStatus?.local_newer) {
+    if (pendingCount === 0 && syncStatus?.local_newer && !hasDirty) {
       // 本地区有未推送提交但无 pending 暂存操作 → 仅推送
       modal.confirm({
         title: '确认推送',
@@ -226,10 +227,12 @@ const MonitorConfig = () => {
     const detail = pendingOps
       .map((op) => `${op.type}(${fileLabel[op.file] || op.file} ${op.addr})`)
       .join('; ');
-    const msg = `同步监控主机: ${detail}`;
+    const msg = detail ? `同步监控主机: ${detail}` : 'sync: 监控配置同步';
     modal.confirm({
       title: '确认提交并推送',
-      content: `将提交变更到 GitLab，提交信息：\n${msg}`,
+      content: detail
+        ? `将提交变更到 GitLab，提交信息：\n${msg}`
+        : '检测到未提交的配置变更（可能为上次提交失败产生），将直接提交到 GitLab。',
       onOk: () => {
         setCommitting(true);
         commitMutation.mutate(msg);
@@ -303,7 +306,12 @@ const MonitorConfig = () => {
                 type="primary"
                 icon={<SendOutlined />}
                 loading={committing}
-                disabled={!canCommit || (pendingCount === 0 && !syncStatus?.local_newer)}
+                disabled={
+                  !canCommit ||
+                  (pendingCount === 0 &&
+                    !syncStatus?.local_newer &&
+                    !syncStatus?.dirty)
+                }
                 onClick={handleCommit}
               >
                 提交并推送{pendingCount > 0 ? ` (${pendingCount})` : ''}

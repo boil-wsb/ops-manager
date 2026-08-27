@@ -165,6 +165,10 @@ class Settings(BaseSettings):
     git_repo_base_dir: str = Field(default="/app/git-repos", alias="GIT_REPO_LOCAL_DIR")
     git_repo_sparse_paths: str = Field(default="conf/prometheus", alias="GIT_REPO_SPARSE_PATHS")
     git_command_timeout: int = Field(default=60, alias="GIT_COMMAND_TIMEOUT")
+    git_commit_user_name: str = Field(default="ops-manager", alias="GIT_COMMIT_USER_NAME")
+    git_commit_user_email: str = Field(
+        default="ops-manager@ops-manager.local", alias="GIT_COMMIT_USER_EMAIL"
+    )
 
     def _parse_list(self, raw: str) -> list[str]:
         """Parse comma/space separated string into a non-empty list."""

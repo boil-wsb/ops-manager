@@ -190,7 +190,11 @@ class GitRepoService:
         return {"output": run["stdout"].strip() or run["stderr"].strip()}
 
     def commit(self, message: str, paths: list[str] | None = None) -> dict[str, Any]:
-        """提交本地改动（指定 paths 或全部）。"""
+        """提交本地改动（指定 paths 或全部）。
+
+        通过 -c 注入 user.name/user.email（容器内无全局 git 身份，
+        否则 commit 报 "Author identity unknown"）。
+        """
         self._require_cloned()
         if not message or not message.strip():
             raise AppException(422, detail="message 不能为空")
@@ -201,7 +205,17 @@ class GitRepoService:
             self.run_git(["add", "--", *clean], cwd=str(self.repo_dir))
         else:
             self.run_git(["add", "-A"], cwd=str(self.repo_dir))
-        run = self.run_git(["commit", "-m", message.strip()], cwd=str(self.repo_dir))
+        identity: list[str] = []
+        if settings.git_commit_user_name and settings.git_commit_user_email:
+            identity = [
+                "-c",
+                f"user.name={settings.git_commit_user_name}",
+                "-c",
+                f"user.email={settings.git_commit_user_email}",
+            ]
+        run = self.run_git(
+            [*identity, "commit", "-m", message.strip()], cwd=str(self.repo_dir)
+        )
         return {"output": (run["stdout"].strip() or run["stderr"].strip()) or "commit 完成"}
 
     def push(self) -> dict[str, Any]:
