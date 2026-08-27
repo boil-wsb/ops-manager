@@ -82,6 +82,7 @@ class UserResponse(UserBase):
     feishu_open_id: str | None = None
     permissions: list[str] = []
     roles: list[dict] = []
+    permission_version: str | None = None
 
     @field_validator("roles", mode="before")
     @classmethod
@@ -118,6 +119,7 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: int
     permissions: list[str] = []
+    permission_version: str | None = None
     user: UserResponse | None = None
 
 

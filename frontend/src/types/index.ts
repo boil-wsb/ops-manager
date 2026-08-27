@@ -25,6 +25,7 @@ export interface User {
   createdAt: string;
   updatedAt: string;
   permissions?: string[];
+  permissionVersion?: string;
   roles?: { id: number; name: string }[];
   departmentId?: number | null;
   departmentName?: string | null;
@@ -55,6 +56,8 @@ export interface TokenResponse {
   refreshToken: string;
   tokenType: string;
   expiresIn: number;
+  permissions?: string[];
+  permissionVersion?: string;
 }
 
 // Asset types

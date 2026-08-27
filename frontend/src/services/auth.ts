@@ -7,6 +7,7 @@ interface TokenResponseBackend {
   tokenType: string;
   expiresIn: number;
   permissions: string[];
+  permissionVersion: string;
   user?: {
     id: number;
     username: string;
@@ -28,6 +29,7 @@ export interface TokenResponse {
   tokenType: string;
   expiresIn: number;
   permissions: string[];
+  permissionVersion: string;
   user?: User;
 }
 
@@ -53,6 +55,7 @@ export const authApi = {
       tokenType: data.tokenType,
       expiresIn: data.expiresIn,
       permissions: data.permissions || [],
+      permissionVersion: data.permissionVersion || '',
       user: data.user ? {
         id: data.user.id,
         username: data.user.username,
@@ -64,6 +67,7 @@ export const authApi = {
         createdAt: data.user.createdAt,
         updatedAt: data.user.updatedAt,
         permissions: data.user.permissions || [],
+        permissionVersion: data.permissionVersion || '',
         roles: data.user.roles || [],
       } : undefined,
     };
@@ -84,6 +88,7 @@ export const authApi = {
       tokenType: data.tokenType,
       expiresIn: data.expiresIn,
       permissions: data.permissions || [],
+      permissionVersion: data.permissionVersion || '',
     };
   },
 
@@ -99,6 +104,8 @@ export const authApi = {
       lastLogin?: string;
       createdAt: string;
       updatedAt: string;
+      permissions?: string[];
+      permissionVersion?: string;
     };
     return {
       id: data.id,
@@ -110,6 +117,8 @@ export const authApi = {
       lastLogin: data.lastLogin,
       createdAt: data.createdAt,
       updatedAt: data.updatedAt,
+      permissions: data.permissions || [],
+      permissionVersion: data.permissionVersion || '',
     };
   },
 };

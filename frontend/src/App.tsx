@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import { useAuthStore } from './stores/authStore';
 import { useThemeStore } from './stores/themeStore';
 import { usePermission } from './hooks/usePermission';
+import { authApi } from './services/auth';
 import { getRoutePermission } from './config/routePermissions';
 import { lightTheme, darkTheme } from './config/theme';
 import Login from './pages/Login';
@@ -87,6 +88,29 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 function App() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const storePermissionVersion = useAuthStore((s) => s.permissionVersion);
+  const setPermissions = useAuthStore((s) => s.setPermissions);
+
+  // 已登录用户启动时 / 刷新时，调 /auth/me 获取最新权限版本，
+  // 与本地缓存版本比对，不一致则刷新缓存。
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const user = await authApi.getCurrentUser();
+        if (cancelled) return;
+        const remoteVersion = user.permissionVersion || '';
+        if (remoteVersion && remoteVersion !== storePermissionVersion) {
+          setPermissions(user.permissions || [], remoteVersion);
+        }
+      } catch {
+        // 网络错误 / 401 静默处理，下次刷新页面再试
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>

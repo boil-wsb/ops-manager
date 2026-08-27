@@ -7,11 +7,12 @@ interface AuthState {
   token: string | null;
   refreshToken: string | null;
   permissions: string[];
+  permissionVersion: string | null;
   isAuthenticated: boolean;
-  setAuth: (user: User, token: string, refreshToken: string, permissions?: string[]) => void;
+  setAuth: (user: User, token: string, refreshToken: string, permissions?: string[], permissionVersion?: string | null) => void;
   setUser: (user: User) => void;
-  updateToken: (token: string, refreshToken: string) => void;
-  setPermissions: (permissions: string[]) => void;
+  updateToken: (token: string, refreshToken: string, permissions?: string[], permissionVersion?: string | null) => void;
+  setPermissions: (permissions: string[], permissionVersion?: string | null) => void;
   clearAuth: () => void;
   logout: () => void;
 }
@@ -23,27 +24,32 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       refreshToken: null,
       permissions: [],
+      permissionVersion: null,
       isAuthenticated: false,
-      setAuth: (user, token, refreshToken, permissions = []) =>
+      setAuth: (user, token, refreshToken, permissions = [], permissionVersion = null) =>
         set({
           user,
           token,
           refreshToken,
           permissions,
+          permissionVersion,
           isAuthenticated: true,
         }),
       setUser: (user) =>
         set({
           user,
         }),
-      updateToken: (token, refreshToken) =>
-        set({
+      updateToken: (token, refreshToken, permissions, permissionVersion = null) =>
+        set((state) => ({
           token,
           refreshToken,
-        }),
-      setPermissions: (permissions) =>
+          permissions: permissions !== undefined ? permissions : state.permissions,
+          permissionVersion: permissions !== undefined ? permissionVersion : state.permissionVersion,
+        })),
+      setPermissions: (permissions, permissionVersion = null) =>
         set({
           permissions,
+          permissionVersion,
         }),
       clearAuth: () =>
         set({
@@ -51,6 +57,7 @@ export const useAuthStore = create<AuthState>()(
           token: null,
           refreshToken: null,
           permissions: [],
+          permissionVersion: null,
           isAuthenticated: false,
         }),
       logout: () =>
@@ -59,6 +66,7 @@ export const useAuthStore = create<AuthState>()(
           token: null,
           refreshToken: null,
           permissions: [],
+          permissionVersion: null,
           isAuthenticated: false,
         }),
     }),

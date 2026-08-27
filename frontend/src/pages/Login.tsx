@@ -74,10 +74,10 @@ const Login = () => {
       const tokenData = await authApi.login(values);
       
       if (tokenData.user) {
-        setAuth(tokenData.user, tokenData.accessToken, tokenData.refreshToken, tokenData.permissions || []);
+        setAuth(tokenData.user, tokenData.accessToken, tokenData.refreshToken, tokenData.permissions || [], tokenData.permissionVersion);
       } else {
         const user = await authApi.getCurrentUser();
-        setAuth(user, tokenData.accessToken, tokenData.refreshToken, user.permissions || []);
+        setAuth(user, tokenData.accessToken, tokenData.refreshToken, user.permissions || [], user.permissionVersion);
       }
       
       message.success('登录成功，欢迎回来！');

@@ -62,7 +62,7 @@ function processQueue(error: Error | null, token: string | null = null): void {
 }
 
 async function refreshAccessToken(): Promise<string | null> {
-  const { refreshToken, updateToken } = useAuthStore.getState();
+  const { refreshToken } = useAuthStore.getState();
 
   if (!refreshToken) {
     processQueue(new Error('No refresh token') as AxiosError, null);
@@ -80,7 +80,15 @@ async function refreshAccessToken(): Promise<string | null> {
 
     const accessToken = response.data.access_token;
     const newRefreshToken = response.data.refresh_token;
-    updateToken(accessToken, newRefreshToken);
+    // refresh 接口会顺带返回最新权限与版本号，与本地比对后决定是否刷新缓存
+    const remotePermissions: string[] | undefined = response.data?.permissions;
+    const remoteVersion: string | undefined = response.data?.permission_version;
+    const local = useAuthStore.getState();
+    if (remotePermissions !== undefined && remoteVersion !== undefined && remoteVersion !== local.permissionVersion) {
+      local.updateToken(accessToken, newRefreshToken, remotePermissions, remoteVersion);
+    } else {
+      local.updateToken(accessToken, newRefreshToken);
+    }
     processQueue(null, accessToken);
     return accessToken;
   } catch (err) {

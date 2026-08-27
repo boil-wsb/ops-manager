@@ -1,6 +1,6 @@
-"""
-Authentication API routes.
-"""
+"""Authentication API routes."""
+
+import hashlib
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -43,6 +43,18 @@ def extract_user_permissions(user: User) -> list[str]:
                     permissions.add(permission.code)
 
     return sorted(permissions)
+
+
+def compute_permission_version(permissions: list[str]) -> str | None:
+    """计算权限版本号：对排序后的权限代码做 sha1 哈希。
+
+    权限发生变化（增/删/改角色分配）时版本号必然变化，
+    前端据此判断本地缓存是否需要刷新。
+    """
+    if not permissions:
+        return None
+    raw = "|".join(permissions).encode("utf-8")
+    return hashlib.sha1(raw).hexdigest()
 
 
 async def get_current_user(
@@ -220,6 +232,8 @@ async def login(
 
     user_roles = [{"id": role.id, "name": role.name} for role in user.roles if role.is_active]
 
+    permission_version = compute_permission_version(permissions)
+
     user_response = UserResponse(
         id=user.id,
         username=user.username,
@@ -232,6 +246,7 @@ async def login(
         updated_at=user.updated_at,
         permissions=permissions,
         roles=user_roles,
+        permission_version=permission_version,
     )
 
     return TokenResponse(
@@ -240,6 +255,7 @@ async def login(
         token_type="bearer",
         expires_in=settings.access_token_expire_minutes * 60,
         permissions=permissions,
+        permission_version=permission_version,
         user=user_response,
     )
 
@@ -252,7 +268,10 @@ async def logout(request: Request):
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh_token(refresh_token: str):
+async def refresh_token(
+    refresh_token: str,
+    db: AsyncSession = Depends(get_db),
+):
     """Refresh access token."""
     payload = verify_token(refresh_token)
 
@@ -281,11 +300,19 @@ async def refresh_token(refresh_token: str):
     new_access_token = create_access_token(data={"sub": user_id})
     new_refresh_token = create_refresh_token(data={"sub": user_id})
 
+    # 顺带返回最新权限与版本号，前端可据此刷新本地权限缓存
+    permissions: list[str] = []
+    user = await crud_user.get(db, id=int(user_id))
+    if user is not None and user.is_active:
+        permissions = extract_user_permissions(user)
+
     return TokenResponse(
         access_token=new_access_token,
         refresh_token=new_refresh_token,
         token_type="bearer",
         expires_in=settings.access_token_expire_minutes * 60,
+        permissions=permissions,
+        permission_version=compute_permission_version(permissions),
     )
 
 
@@ -306,6 +333,7 @@ async def get_current_user_info(
         created_at=current_user.created_at,
         updated_at=current_user.updated_at,
         permissions=permissions,
+        permission_version=compute_permission_version(permissions),
     )
 
 
