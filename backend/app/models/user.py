@@ -31,6 +31,9 @@ class User(BaseModel):
     full_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    must_change_password: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, comment="待修改初始密码"
+    )
     last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     feishu_open_id: Mapped[str | None] = mapped_column(

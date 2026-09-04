@@ -333,10 +333,12 @@ DEFAULT_PERMISSIONS = [
 
 DEFAULT_ROLES = {
     "superadmin": {
+        "code": "superadmin",
         "description": "超级管理员",
         "permissions": ["*"],
     },
     "admin": {
+        "code": "admin",
         "description": "管理员",
         "permissions": [
             "user:read",
@@ -383,6 +385,7 @@ DEFAULT_ROLES = {
         ],
     },
     "operator": {
+        "code": "operator",
         "description": "运维人员",
         "permissions": [
             "asset:read",
@@ -397,6 +400,7 @@ DEFAULT_ROLES = {
         ],
     },
     "viewer": {
+        "code": "viewer",
         "description": "只读用户",
         "permissions": [
             "asset:read",
@@ -456,6 +460,7 @@ async def init_roles(db: AsyncSession, permission_map: dict) -> dict:
         if not role:
             role = Role(
                 name=role_name,
+                code=role_data.get("code"),
                 description=role_data["description"],
                 is_system=True,
                 is_active=True,

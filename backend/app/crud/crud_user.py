@@ -57,6 +57,15 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         result = await db.execute(select(User).where(User.feishu_open_id == feishu_open_id))
         return result.scalar_one_or_none()
 
+    async def get_by_employee_id(self, db: AsyncSession, *, employee_id: str) -> User | None:
+        """Get user by employee_id (工号) with roles preloaded."""
+        result = await db.execute(
+            select(User)
+            .options(selectinload(User.roles))
+            .where(User.employee_id == employee_id)
+        )
+        return result.scalar_one_or_none()
+
     async def get_all_feishu_users(
         self,
         db: AsyncSession,
@@ -80,6 +89,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             full_name=obj_in.full_name,
             hashed_password=get_password_hash(obj_in.password),
             is_active=obj_in.is_active,
+            must_change_password=obj_in.must_change_password,
         )
         db.add(db_obj)
         await db.commit()
@@ -106,6 +116,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         hashed_password: str,
         role_ids: list[int] | None = None,
         employee_no: str | None = None,
+        must_change_password: bool = True,
     ) -> User:
         """Create a new user synced from Feishu."""
         db_obj = User(
@@ -119,6 +130,8 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             feishu_sync_at=now_shanghai(),
             is_feishu_user=True,
             is_active=True,
+            # 飞书同步用户使用统一初始密码，首次登录需强制改密
+            must_change_password=must_change_password,
         )
         db.add(db_obj)
         await db.commit()

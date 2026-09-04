@@ -56,6 +56,7 @@ class RoleBase(BaseModel):
     """Base role schema."""
 
     name: str = Field(..., min_length=1, max_length=50)
+    code: str | None = Field(None, max_length=50)
     description: str | None = Field(None, max_length=255)
     is_active: bool = True
 
@@ -70,6 +71,7 @@ class RoleUpdate(BaseModel):
     """Role update schema."""
 
     name: str | None = Field(None, min_length=1, max_length=50)
+    code: str | None = Field(None, max_length=50)
     description: str | None = Field(None, max_length=255)
     is_active: bool | None = None
 

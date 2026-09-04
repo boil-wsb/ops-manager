@@ -16,6 +16,7 @@ class UserBase(BaseModel):
     full_name: str | None = Field(None, max_length=100)
     is_active: bool = True
     employee_id: str | None = Field(None, max_length=64)
+    must_change_password: bool = False
 
     @field_validator("email")
     @classmethod
@@ -45,6 +46,7 @@ class UserUpdate(BaseModel):
     password: str | None = Field(None, min_length=8, max_length=100)
     role_ids: list[int] | None = None
     employee_id: str | None = Field(None, max_length=64)
+    must_change_password: bool | None = None
 
     @field_validator("email")
     @classmethod
@@ -104,6 +106,13 @@ class UserLogin(BaseModel):
     password: str
 
 
+class EmployeeLoginRequest(BaseModel):
+    """工号登录请求体（外部服务）。"""
+
+    employee_id: str = Field(..., min_length=1, max_length=64, description="工号")
+    password: str = Field(..., min_length=1)
+
+
 class ChangePassword(BaseModel):
     """Change password schema."""
 
@@ -120,6 +129,7 @@ class TokenResponse(BaseModel):
     expires_in: int
     permissions: list[str] = []
     permission_version: str | None = None
+    must_change_password: bool = False
     user: UserResponse | None = None
 
 

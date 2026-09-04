@@ -55,6 +55,7 @@ async def list_roles(
             role_dict = {
                 "id": role.id,
                 "name": role.name,
+                "code": role.code,
                 "description": role.description,
                 "is_system": role.is_system,
                 "is_active": role.is_active,
@@ -94,6 +95,18 @@ async def create_role(
             detail="角色名称已存在",
         )
 
+    if role_in.code:
+        result = await db.execute(select(Role).where(Role.code == role_in.code))
+        if result.scalar_one_or_none():
+            logger.warning(
+                f"角色code '{role_in.code}' 已存在",
+                extra={"action": "role.create", "role_code": role_in.code},
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="角色code已存在",
+            )
+
     if role_in.permission_ids:
         perms_result = await db.execute(
             select(Permission).where(Permission.id.in_(role_in.permission_ids))
@@ -117,6 +130,7 @@ async def create_role(
     return {
         "id": role.id,
         "name": role.name,
+        "code": role.code,
         "description": role.description,
         "is_system": role.is_system,
         "is_active": role.is_active,
@@ -147,6 +161,7 @@ async def get_role(
     return {
         "id": role.id,
         "name": role.name,
+        "code": role.code,
         "description": role.description,
         "is_system": role.is_system,
         "is_active": role.is_active,
@@ -190,6 +205,14 @@ async def update_role(
                 detail="角色名称已存在",
             )
 
+    if role_in.code and role_in.code != role.code:
+        result = await db.execute(select(Role).where(Role.code == role_in.code))
+        if result.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="角色code已存在",
+            )
+
     role = await crud_role.update(db, db_obj=role, obj_in=role_in)
 
     await cache_delete_pattern("roles:list:*")
@@ -197,6 +220,7 @@ async def update_role(
     return {
         "id": role.id,
         "name": role.name,
+        "code": role.code,
         "description": role.description,
         "is_system": role.is_system,
         "is_active": role.is_active,

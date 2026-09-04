@@ -12,6 +12,7 @@ from app.api.v1 import (
     assets,
     audit_logs,
     auth,
+    auth_service,
     crm_sync,
     dashboard,
     departments,
@@ -73,3 +74,4 @@ api_router.include_router(crm_sync.router, prefix="/v1", tags=["CRM 同步"])
 api_router.include_router(suggestions.router, prefix="/v1", tags=["匿名建议"])
 api_router.include_router(git_repos.router, prefix="/v1", tags=["仓库管理"])
 api_router.include_router(monitor_config.router, prefix="/v1", tags=["监控配置"])
+api_router.include_router(auth_service.router, prefix="/v1", tags=["外部鉴权"])

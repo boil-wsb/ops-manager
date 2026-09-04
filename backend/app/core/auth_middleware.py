@@ -230,6 +230,16 @@ class PureASGIAuthMiddleware:
                 await self._send_unauthorized(send, "User not found or inactive")
                 return
 
+            # 首次登录强制改密：token 携带待改密标记时，拦截所有业务接口（/api/v1/auth 前缀已在
+            # EXCLUDE_PATHS 中放行，改密/登出/个人信息/刷新不受影响）。
+            if payload.get("pwd_change_required"):
+                await self._send_json_response(
+                    send,
+                    status.HTTP_403_FORBIDDEN,
+                    "请先修改初始密码",
+                )
+                return
+
             # Store authenticated user_id in scope state for downstream access.
             # The full User object will be loaded by downstream dependencies
             # (get_current_user) with proper session management and roles.
@@ -254,7 +264,7 @@ class PureASGIAuthMiddleware:
         """Send a 401 Unauthorized JSON response."""
         import json
 
-        body = json.dumps({"detail": detail}).encode("utf-8")
+        body = json.dumps({"detail": detail}, ensure_ascii=False).encode("utf-8")
         await send(
             {
                 "type": "http.response.start",
@@ -262,6 +272,28 @@ class PureASGIAuthMiddleware:
                 "headers": [
                     [b"content-type", b"application/json"],
                     [b"www-authenticate", b"Bearer"],
+                    [b"content-length", str(len(body)).encode()],
+                ],
+            }
+        )
+        await send(
+            {
+                "type": "http.response.body",
+                "body": body,
+            }
+        )
+
+    async def _send_json_response(self, send: Callable, http_status: int, detail: str):
+        """Send a generic JSON error response with the given status."""
+        import json
+
+        body = json.dumps({"detail": detail}, ensure_ascii=False).encode("utf-8")
+        await send(
+            {
+                "type": "http.response.start",
+                "status": http_status,
+                "headers": [
+                    [b"content-type", b"application/json"],
                     [b"content-length", str(len(body)).encode()],
                 ],
             }
