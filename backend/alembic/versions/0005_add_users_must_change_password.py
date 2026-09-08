@@ -7,7 +7,7 @@
 
 存量用户默认 false（不强制），仅新同步/新建用户由代码层置 true。
 
-Revision ID: 0005_add_users_must_change_password
+Revision ID: 0005_users_must_change_password
 Revises: 0004_add_auth_service_roles
 Create Date: 2026-09-03
 """
