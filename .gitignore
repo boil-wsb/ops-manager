@@ -84,6 +84,9 @@ build/
 *.temp
 _tmp_*
 
+# Git repos runtime data (monitor config local clones)
+backend/git-repos/
+
 # Virtuos
 Virtuos/
 
