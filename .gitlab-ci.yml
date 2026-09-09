@@ -279,9 +279,9 @@ deploy-docker:
       export VERSION=v1.0.$CI_PIPELINE_IID
 
       cd $REMOTE_DIR
-      docker-compose pull
-      docker-compose down
-      docker-compose up -d
+      docker compose pull
+      docker compose down
+      docker compose up -d
 
       echo "Waiting for services to start..."
       MAX_RETRIES=12
@@ -296,7 +296,7 @@ deploy-docker:
       done
 
       echo "=== Health check failed after $MAX_RETRIES attempts ==="
-      docker-compose logs --tail=50
+      docker compose logs --tail=50
       exit 1
   rules:
     - <<: *if-master-branch
