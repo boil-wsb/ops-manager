@@ -16,6 +16,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
     networks:
       - ops-network
 
@@ -34,6 +35,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
     networks:
       - ops-network
 
@@ -53,9 +55,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    restart: unless-stopped
     networks:
       - ops-network
-    restart: unless-stopped
+    
 
   nginx:
     image: ${REGISTRY_URL:-192.168.100.213:8083}/opsmanager/frontend:${VERSION:-latest}
@@ -67,9 +70,10 @@ services:
       # - "443:443"  # Enable for HTTPS
     depends_on:
       - backend
+    restart: unless-stopped
     networks:
       - ops-network
-    restart: unless-stopped
+    
 
 volumes:
   postgres_data:

@@ -135,6 +135,9 @@ class Settings(BaseSettings):
     auth_excluded_paths: str = Field(default="", alias="AUTH_EXCLUDED_PATHS")
     auth_trusted_networks: str = Field(default="", alias="AUTH_TRUSTED_NETWORKS")
 
+    # Auth Service Internal Reset Token（/auth-service/reset-password 调用方共享密钥；未配置则拒绝重置）
+    auth_service_reset_token: str = Field(default="", alias="AUTH_SERVICE_RESET_TOKEN")
+
     # Alert Aggregation Configuration
     alert_aggregation_window_seconds: int = Field(
         default=300, alias="ALERT_AGGREGATION_WINDOW_SECONDS"
