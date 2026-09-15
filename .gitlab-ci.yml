@@ -296,7 +296,7 @@ deploy-docker:
       done
 
       echo "=== Health check failed after $MAX_RETRIES attempts ==="
-      docker compose logs --tail=50
+      docker compose logs --tail=100
       exit 1
   rules:
     - <<: *if-master-branch
