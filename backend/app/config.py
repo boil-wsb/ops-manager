@@ -94,6 +94,9 @@ class Settings(BaseSettings):
     minio_secret_key: str = Field(default="", alias="MINIO_SECRET_KEY")
     minio_secure: bool = Field(default=False, alias="MINIO_SECURE")
 
+    # Artifact Upload Configuration（产物上传：multipart 直传，无服务端路径读取）
+    artifact_upload_default_bucket: str = Field(default="artifacts", alias="ARTIFACT_UPLOAD_DEFAULT_BUCKET")
+
     # IT Reporter Configuration
     itreporter_chat_id: str = Field(default="", alias="ITREPORTER_CHAT_ID")
     itreporter_minio_bucket: str = Field(default="devops-scripts", alias="ITREPORTER_MINIO_BUCKET")

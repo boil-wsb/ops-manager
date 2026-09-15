@@ -26,6 +26,45 @@ def get_minio_client() -> Minio:
     return _minio_client
 
 
+def upload_fileobj(
+    fileobj, bucket_name: str, object_path: str, length: int, content_type: str = "application/octet-stream"
+) -> dict:
+    """将文件对象流式上传到 MinIO 指定 bucket/object（put_object，不占内存）。
+
+    返回 {"bucket": ..., "object_path": ..., "size": ..., "etag": ...}。
+    """
+    client = get_minio_client()
+    result = client.put_object(
+        bucket_name, object_path, fileobj, length=length, content_type=content_type
+    )
+    logger.info(
+        f"产物上传成功: {bucket_name}/{object_path} ({length} bytes)",
+        extra={
+            "action": "minio.upload",
+            "bucket": bucket_name,
+            "object_path": object_path,
+            "size": length,
+        },
+    )
+    return {
+        "bucket": bucket_name,
+        "object_path": object_path,
+        "size": length,
+        "etag": result.etag,
+    }
+
+
+def bucket_exists(bucket_name: str) -> bool:
+    try:
+        return get_minio_client().bucket_exists(bucket_name)
+    except Exception as e:
+        logger.error(
+            f"检查桶是否存在失败: {bucket_name}",
+            extra={"action": "minio.upload", "bucket": bucket_name, "error": str(e)},
+        )
+        return False
+
+
 def download_file(bucket_name: str, object_path: str, local_dir: str = "downloads") -> str:
     client = get_minio_client()
     os.makedirs(local_dir, exist_ok=True)

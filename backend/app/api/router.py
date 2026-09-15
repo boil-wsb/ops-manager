@@ -10,6 +10,7 @@ from app.api.v1 import (
     alert_templates,
     alerts,
     assets,
+    artifacts,
     audit_logs,
     auth,
     auth_service,
@@ -75,3 +76,4 @@ api_router.include_router(suggestions.router, prefix="/v1", tags=["匿名建议"
 api_router.include_router(git_repos.router, prefix="/v1", tags=["仓库管理"])
 api_router.include_router(monitor_config.router, prefix="/v1", tags=["监控配置"])
 api_router.include_router(auth_service.router, prefix="/v1", tags=["外部鉴权"])
+api_router.include_router(artifacts.router, prefix="/v1", tags=["产物上传"])
