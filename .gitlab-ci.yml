@@ -281,7 +281,7 @@ deploy-docker:
       cd $REMOTE_DIR
       docker compose pull
       docker compose down
-      docker compose up -d ops-backend ops-frontend
+      docker compose up -d backend nginx
 
       echo "Waiting for services to start..."
       MAX_RETRIES=12
