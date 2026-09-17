@@ -2,6 +2,8 @@
 
 现代化的运维管理平台 - 基于 FastAPI + React
 
+OpsManager 提供资产管理、监控告警、运维管理、权限体系、飞书集成等一体化运维能力，同时可作为同网段服务间的 **auth 服务**（工号登录、角色校验、首次登录强制改密）。
+
 ## 技术栈
 
 ### 后端
@@ -39,46 +41,57 @@
 - 资产标签管理
 - 资产树形结构展示
 - 资产变更历史
+- 从 Prometheus 自动同步资产
 
 ### 2. 运维管理
 
 - 发布记录管理
 - 巡检任务配置
-- SSL 证书管理（到期提醒）
+- SSL 证书管理（域名到期状态展示，每日 03:00 从 Prometheus 同步）
 - DNS 记录管理
 - 定时任务管理（查看、编辑、手动执行、执行日志查看）
+- 监控主机配置管理（基于 Prometheus 配置仓库）
 
 ### 3. 监控告警
 
 - 监控项配置（Ping、HTTP、TCP、UDP）
-- 告警事件管理
+- 告警事件管理（Alertmanager webhook 接入）
 - 告警规则配置
 - 通知渠道配置（邮件、飞书、Webhook）
 - 告警抑制与静默
 
 ### 4. 权限管理
 
-- RBAC 权限模型
-- 用户管理
-- 角色管理
+- RBAC 权限模型（用户 / 角色 / 权限）
+- 角色支持稳定 ASCII `code` 标识（外部服务可按 code 匹配）
 - JWT 认证
 
-### 5. 飞书集成
+### 5. 外部鉴权服务（auth 服务）
 
-- 飞书用户自动同步（Open ID / Union ID）
+对外部服务（同信任网段）提供：
+
+- **工号角色校验** `POST /api/v1/auth-service/verify-role`：传入工号，返回该员工是否属于行政/采购/营销角色及角色标识（name + code）
+- **工号登录** `POST /api/v1/auth/external/login`：工号 + 密码登录并签发 JWT
+- **首次登录强制改密**：初始密码登录后，除改密/登出/个人信息外一切业务接口被拦截（403），改密后自动解除
+
+> 完整对接说明见 [外部鉴权服务对接文档](./docs/auth-service-role-verification.md)
+
+### 6. 飞书集成
+
+- 飞书用户自动同步（Open ID / Union ID / 工号）
 - 卡片通知发送（支持个人和群聊）
 - 交互卡片更新（通过 callback_id 验证）
 - 飞书回调事件处理（消息接收、卡片交互）
 - 通知记录管理与查询
 
-### 6. IT 反馈
+### 7. IT 反馈
 
 - 终端卡顿反馈提交
 - 飞书卡片通知 IT 人员
 - 处理状态流转（待处理 → 处理中 → 已解决）
 - 处理方式记录与反馈
 
-### 7. 匿名建议
+### 8. 匿名建议
 
 - 员工匿名提交意见（通过 6 位 `query_code` 查询进度，对提交者隐藏身份）
 - 飞书卡片流转：待审批（橙）→ 已审批（蓝）→ 市场部待执行（蓝）→ 已存档（绿） / 已驳回（灰）
@@ -87,6 +100,16 @@
 - 并发幂等：基于 `UPDATE ... WHERE status='pending'` + `rowcount` 校验，防止重复发卡
 - 重试机制：飞书卡片发送/更新 3 次指数退避（1s→2s→4s）；query_code 冲突自动重试
 - 详细业务逻辑流程图见 [匿名建议业务逻辑流程图](./docs/anonymous-suggestion-flow.md)
+
+### 9. 其它服务模块
+
+- **CRM 同步**：触发 CRM 增量/全量同步（`/api/v1/crm/sync`）
+- **Git 仓库管理**：管理 Prometheus 监控配置仓库（克隆、稀疏检出、远端同步）
+- **产物上传**：上传文件产物到 MinIO（`/api/v1/artifacts`）
+- **每日健康巡检**：每日 09:00 基于 Prometheus 采集 linux / windows / 终端指标并生成报告、推送飞书
+- **IT 巡检报告**：处理 IT 巡检报告（解析、存储、飞书通知）
+- **PC 客户端版本**：版本信息同步与管理
+- **导航管理 / 用户工具**：Open ID 查询、导航链接管理
 
 ## 定时任务
 
@@ -97,19 +120,13 @@
 | 审计日志数据库清理 | cleanup-audit-logs-db | cleanup | 每天 03:00 | 清理过期的审计日志数据库记录 |
 | 审计日志文件清理 | cleanup-audit-logs-file | cleanup | 每天 03:30 | 清理过期的审计日志文件 |
 | 飞书用户同步 | sync-feishu-users | sync | 每天 02:00 | 从飞书同步用户数据到本地数据库 |
-| Prometheus 资产同步 | sync-assets-from-prometheus | sync | 按配置间隔 | 从 Prometheus 自动同步资产数据 |
-| Prometheus 证书同步 | sync-certificates-from-prometheus | sync | 每天 03:00 | 从 Prometheus 同步 SSL 证书数据 |
+| Prometheus 资产同步 | sync-assets-from-prometheus | sync | 按配置间隔（默认 30 分钟） | 从 Prometheus 自动同步资产数据 |
+| Prometheus 证书同步 | sync-certificates-from-prometheus | sync | 每天 03:00 | 从 Prometheus 同步 SSL 证书/域名到期数据 |
 | 终端指标同步 | sync-terminal-metrics | sync | 每 5 分钟 | 从 Prometheus 同步终端性能指标（CPU/内存/磁盘）到本地数据库 |
 | Ansible Playbook 执行 | execute-ansible-playbook | ops | 按配置时间 | 通过 SSH 执行 Ansible Playbook |
-
-### 终端指标同步
-
-终端指标同步任务（`sync-terminal-metrics`）每 5 分钟执行一次，工作流程：
-
-1. 通过 PrometheusClient 获取所有终端及其性能指标
-2. 提取每个终端的 hostname、customer、instance、cpu_usage、memory_usage、disk_usage
-3. 获取或创建对应的资产记录
-4. 将指标数据写入 terminal_metrics 表
+| IT 巡检报告处理 | process-it-report | ops | 每天 09:00 | 处理 IT 系统健康巡检报告并发送飞书通知 |
+| 每日健康巡检 | daily-health-check | ops | 每天 09:00 | 基于 Prometheus 采集服务器/终端指标生成巡检报告 |
+| Prometheus 监控配置远端同步 | sync-git-prometheus-conf | sync | 每 2 小时 | 与远端 prometheus 仓库同步监控配置（远端较新则拉取到本地） |
 
 ## 快速开始
 
@@ -176,7 +193,10 @@ pip install -r requirements/dev.txt
 
 3. 配置环境变量
 
+配置读取**项目根目录**的 `.env`（`backend/app/config.py` 指向 `../.env`），非 backend 目录：
+
 ```bash
+cd ..  # 回到项目根 ops-manager
 cp .env.example .env
 # 编辑 .env 文件
 ```
@@ -184,6 +204,7 @@ cp .env.example .env
 4. 运行数据库迁移
 
 ```bash
+cd backend
 python -m alembic upgrade head
 ```
 
@@ -215,21 +236,27 @@ cp .env.example .env
 npm run dev
 ```
 
+4. 生产构建
+
+```bash
+npm run build
+```
+
 ## 项目结构
 
 ```
 ops-manager/
 ├── backend/                    # 后端代码
 │   ├── app/
-│   │   ├── api/v1/            # API 路由（auth, assets, alerts, feishu 等）
-│   │   ├── core/              # 核心模块（security, middleware, permissions, audit）
+│   │   ├── api/v1/            # API 路由（auth, auth_service, assets, alerts, artifacts 等）
+│   │   ├── core/              # 核心模块（security, middleware, auth_middleware, permissions, audit, rate_limit）
 │   │   ├── crud/              # 数据库 CRUD 操作
-│   │   ├── db/                # 数据库配置与会话管理
+│   │   ├── db/                # 数据库配置与会话管理、初始化数据
 │   │   ├── integrations/      # 外部系统集成（feishu）
 │   │   ├── models/            # SQLAlchemy 数据模型
 │   │   ├── schemas/           # Pydantic 请求/响应模型
 │   │   ├── scheduler/         # APScheduler 定时任务调度器
-│   │   ├── services/          # 业务逻辑（alerts, prometheus）
+│   │   ├── services/          # 业务逻辑（alerts, prometheus, crm, git_repo, monitor_config）
 │   │   ├── startup/           # 启动初始化
 │   │   ├── tasks/             # 定时任务函数实现
 │   │   ├── config.py          # 应用配置
@@ -248,6 +275,7 @@ ops-manager/
 │   │   ├── types/             # TypeScript 类型定义
 │   │   └── utils/             # 工具函数
 │   └── Dockerfile
+├── docs/                       # 业务流程与对接文档
 ├── nginx/                      # Nginx 配置
 ├── docker-compose.yml
 ├── feishu-notify-api.md        # 飞书通知 API 接口文档
@@ -263,14 +291,16 @@ ops-manager/
 
 飞书通知 API 详见 [feishu-notify-api.md](./feishu-notify-api.md)
 
-## 业务流程图
+## 业务流程图与对接文档
 
-各核心业务模块的详细流程图（状态机、业务流程、并发幂等、数据模型、时序图等）维护在 `docs/` 目录下，按业务模块组织：
+各核心业务模块的详细流程图（状态机、业务流程、并发幂等、时序图等）与对外对接文档维护在 `docs/` 目录下：
 
 | 业务模块 | 文档 | 主要内容 |
 |---|---|---|
-| 告警处理 | [docs/alert-processing-flow.md](./docs/alert-processing-flow.md) | Alertmanager webhook → 三阶段通知架构（prepare/execute/save）、第一性原理审查（13 个违反点）、并发安全（部分唯一索引 + ON CONFLICT）、多收件人 1:N 卡片一致性、闭环验证 |
+| 告警处理 | [docs/alert-processing-flow.md](./docs/alert-processing-flow.md) | Alertmanager webhook → 三阶段通知架构（prepare/execute/save）、并发安全（部分唯一索引 + ON CONFLICT）、多收件人 1:N 卡片一致性、闭环验证 |
 | 匿名建议 | [docs/anonymous-suggestion-flow.md](./docs/anonymous-suggestion-flow.md) | 状态机、3 阶段完整业务流程、并发幂等时序图、重试机制、API 端点、ER 图、飞书卡片流转 |
+| 外部鉴权服务 | [docs/auth-service-role-verification.md](./docs/auth-service-role-verification.md) | 工号角色校验 / 工号登录 / 首次登录强制改密，接口定义、错误码、调用示例、对接建议 |
+| IT 反馈 | [docs/it-feedback-optimization-plan.md](./docs/it-feedback-optimization-plan.md) | IT 反馈流程优化方案 |
 
 > 新增业务模块时，请在此表追加一行，并将流程图文档统一放置于 `docs/` 目录。
 
@@ -278,13 +308,13 @@ ops-manager/
 
 ### 核心表
 
-- `users` - 用户表
-- `roles` - 角色表
+- `users` - 用户表（含工号 `employee_id`、待改密标记 `must_change_password`）
+- `roles` - 角色表（含稳定 ASCII `code` 标识）
 - `assets` - 资产表
 - `labels` - 标签表
 - `monitors` - 监控项表
 - `deployments` - 发布记录表
-- `certificates` - 证书表
+- `certificates` - 证书/域名到期表
 - `dns_records` - DNS 记录表
 
 ### 监控告警
@@ -317,6 +347,7 @@ ops-manager/
 - `terminal_metrics` - 终端指标表
 - `pc_client_versions` - PC 客户端版本表
 - `system_configs` - 系统配置表（键值对配置，按分组管理）
+- `user_ip_bindings` - 用户 IP 绑定表（飞书账号登录限制）
 
 ## 监控检查类型
 
@@ -342,8 +373,3 @@ ops-manager/
 ## 许可证
 
 [MIT](LICENSE)
-
-## 联系方式
-
-- 项目主页: <https://github.com/your-org/ops-manager-v2>
-- 问题反馈: <https://github.com/your-org/ops-manager-v2/issues>

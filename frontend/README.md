@@ -1,73 +1,48 @@
-# React + TypeScript + Vite
+# OpsManager 前端
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+运维管理平台前端，基于 React 18 + TypeScript + Ant Design 5。
 
-Currently, two official plugins are available:
+## 技术栈
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **React 18** - UI 框架
+- **TypeScript** - 类型安全
+- **Vite** - 构建工具
+- **Ant Design 5.x** - UI 组件库
+- **Zustand** - 状态管理
+- **React Query** - 数据请求与缓存
+- **React Router 6** - 路由管理
 
-## React Compiler
+## 开发
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install      # 安装依赖
+npm run dev      # 启动开发服务器（默认 5173）
+npm run build    # 生产构建，产物输出至 dist/
+npm run preview  # 本地预览生产构建
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 环境变量
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+`VITE_API_BASE_URL`：后端 API 基础地址（如 `http://192.168.23.36:8000/api`），见 `.env.example`。
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 目录结构
+
 ```
+src/
+├── components/        # 通用组件（Layout, PermissionGuard 等）
+├── config/            # 配置（菜单权限、路由权限、主题）
+├── hooks/             # 自定义 Hooks（useFormModal, usePermission 等）
+├── pages/             # 页面组件（Alerts, Assets, Ops, System, Users 等）
+├── services/          # API 服务层
+├── stores/            # Zustand 状态管理
+├── types/             # TypeScript 类型定义
+├── utils/             # 工具函数
+├── App.tsx            # 应用入口与路由
+└── main.tsx           # 挂载入口
+```
+
+## 约定
+
+- API 封装统一在 `services/`，后端接口路径以 `/api/v1` 为前缀；
+- 页面级权限由路由权限与菜单权限配置控制（`config/`）；
+- 登录态使用 JWT（`/api/v1/auth/login`），请求拦截器自动携带 `Authorization: Bearer <token>`。
