@@ -98,7 +98,7 @@ flowchart TD
         UpdateAssign1 --> RowCount1{rowcount=1?}
         RowCount1 -->|否| Skip1[跳过 - 已被其他线程处理]
         RowCount1 -->|是| UpdateSugg1[UPDATE suggestion<br/>SET status=approved]
-        UpdateSugg1 --> UpdateCard1[更新原卡片为"已审批"<br/>蓝色无按钮]
+        UpdateSugg1 --> UpdateCard1[更新原卡片为“已审批”<br/>蓝色无按钮]
         UpdateCard1 --> SendMarketCard[发送市场部卡片<br/>含输入表单]
         SendMarketCard --> MarketTeam[市场部通知组成员]
     end
@@ -110,7 +110,7 @@ flowchart TD
         UpdateAssign2 --> RowCount2{rowcount=1?}
         RowCount2 -->|否| Skip2[跳过 - 已被其他线程处理]
         RowCount2 -->|是| UpdateSugg2[UPDATE suggestion<br/>SET status=rejected<br/>reject_reason=审批人驳回]
-        UpdateSugg2 --> UpdateCard2[更新原卡片为"已驳回"<br/>灰色无按钮]
+        UpdateSugg2 --> UpdateCard2[更新原卡片为“已驳回”<br/>灰色无按钮]
     end
 
     subgraph ArchiveStage [阶段 3: 存档 - 飞书卡片回调]
@@ -122,7 +122,7 @@ flowchart TD
         Thread3 --> UpdateSugg3[UPDATE suggestion<br/>SET status=archived<br/>market_result, archived_at<br/>WHERE status=approved]
         UpdateSugg3 --> RowCount3{rowcount=1?}
         RowCount3 -->|否| Skip3[跳过 - 已被其他线程处理]
-        RowCount3 -->|是| UpdateCard3[更新市场部卡片为"已存档"<br/>绿色无按钮]
+        RowCount3 -->|是| UpdateCard3[更新市场部卡片为“已存档”<br/>绿色无按钮]
     end
 
     UpdateCard1 -.->|卡片状态变化| Approver
