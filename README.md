@@ -301,6 +301,7 @@ ops-manager/
 | 匿名建议 | [docs/anonymous-suggestion-flow.md](./docs/anonymous-suggestion-flow.md) | 状态机、3 阶段完整业务流程、并发幂等时序图、重试机制、API 端点、ER 图、飞书卡片流转 |
 | 外部鉴权服务 | [docs/auth-service-role-verification.md](./docs/auth-service-role-verification.md) | 工号角色校验 / 工号登录 / 首次登录强制改密，接口定义、错误码、调用示例、对接建议 |
 | IT 反馈 | [docs/it-feedback-optimization-plan.md](./docs/it-feedback-optimization-plan.md) | IT 反馈流程优化方案 |
+| CICD 流水线通知 | [docs/cicd-feishu-flow.md](./docs/cicd-feishu-flow.md) · [流程图 HTML](./docs/cicd-feishu-flow.html) | 流水线开始 → 记录并生成唯一标识 → 判断新建还是更新 → 发出或原地更新飞书卡片 → 结束与卡片操作回调 → 超时盯守；说明为什么由两个角色分工（一方只负责接收与决策、一方只负责投递），以及唯一标识、单卡对应、去重、逐级退让、顺序约束五条关键规则 |
 
 > 新增业务模块时，请在此表追加一行，并将流程图文档统一放置于 `docs/` 目录。
 
