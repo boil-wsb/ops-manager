@@ -1,4 +1,4 @@
-import { Card, Form, Input, Button, App, Descriptions, Divider } from 'antd';
+import { Card, Form, Input, Button, App, Descriptions, Divider, Tag, Space } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { UserOutlined, LockOutlined, SaveOutlined } from '@ant-design/icons';
 import { useAuthStore } from '../../stores/authStore';
@@ -119,6 +119,21 @@ const Profile = () => {
           </Descriptions.Item>
           <Descriptions.Item label="超级管理员">
             {user.isSuperuser ? '是' : '否'}
+          </Descriptions.Item>
+          <Descriptions.Item label="角色">
+            {user.isSuperuser ? (
+              '超级管理员(全部权限)'
+            ) : (user.roles && user.roles.length > 0) ? (
+              <Space size={4} wrap>
+                {user.roles.map((r) => (
+                  <Tag key={r.id} color="blue">
+                    {r.name}
+                  </Tag>
+                ))}
+              </Space>
+            ) : (
+              '未分配'
+            )}
           </Descriptions.Item>
           <Descriptions.Item label="最后登录">
             {user.lastLogin ? new Date(user.lastLogin).toLocaleString() : '-'}

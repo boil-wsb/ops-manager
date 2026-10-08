@@ -238,6 +238,26 @@ const UserList = () => {
       render: (_: unknown, record: User) => record.departmentName || '-',
     },
     {
+      title: '角色',
+      key: 'roles',
+      render: (_: unknown, record: User) => {
+        if (record.isSuperuser) {
+          return <Tag color="purple">超级管理员</Tag>;
+        }
+        const roles = record.roles || [];
+        if (roles.length === 0) return <Tag color="default">未分配</Tag>;
+        return (
+          <Space size={4} wrap>
+            {roles.map((r) => (
+              <Tag key={r.id} color="blue">
+                {r.name}
+              </Tag>
+            ))}
+          </Space>
+        );
+      },
+    },
+    {
       title: '状态',
       dataIndex: 'isActive',
       key: 'isActive',

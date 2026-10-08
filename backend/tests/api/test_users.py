@@ -342,7 +342,7 @@ async def test_reset_password_unauthorized(client: AsyncClient):
 async def test_reset_password_forbidden_non_superuser(client: AsyncClient):
     """Test reset password by non-superuser → 403."""
     admin_headers = await get_auth_headers(client)
-    target = await _create_user(client, admin_headers, employee_id="RST001")
+    target = await _create_user(client, admin_headers, employee_id=f"RST{uuid.uuid4().hex[:6]}")
 
     # 创建普通用户并登录
     plain_username = unique_name("PlainUser")

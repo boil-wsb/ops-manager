@@ -454,6 +454,7 @@ async def get_current_user_info(
         created_at=current_user.created_at,
         updated_at=current_user.updated_at,
         permissions=permissions,
+        roles=current_user.roles,
         permission_version=compute_permission_version(permissions),
     )
 
