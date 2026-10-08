@@ -11,6 +11,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
@@ -28,6 +29,10 @@ TestSessionLocal = async_sessionmaker(
     autoflush=False,
     autocommit=False,
 )
+
+# 测试数据特征(与 tests/api 各用例的 unique_name 约定一致)
+TEST_USER_EMAIL_SUFFIX = "%@example.com"
+TEST_ROLE_NAME_PATTERN = "^(TestRole|Role)_[0-9a-f]{8}$"
 
 
 @pytest.fixture(scope="session")
@@ -75,6 +80,62 @@ def create_test_users():
     Other test users can be dynamically generated in individual tests.
     """
     yield
+
+
+@pytest.fixture(scope="session", autouse=True)
+async def cleanup_test_data_after_session(setup_and_teardown_db):
+    """Session 结束后清理本次测试产生的测试用户与测试角色。
+
+    - 用户: email 以 @example.com 结尾,且 id 大于 session 开始时的最大值
+      (基线保护: 不触碰测试运行前已存在的任何数据)
+    - 角色: name 匹配 TestRole_<hex> / Role_<hex>(unique_name 生成模式)
+    """
+    async with TestSessionLocal() as session:
+        baseline_id = (
+            await session.execute(text("SELECT coalesce(max(id), 0) FROM users"))
+        ).scalar() or 0
+
+    yield
+
+    params = {"email": TEST_USER_EMAIL_SUFFIX, "baseline": baseline_id, "pattern": TEST_ROLE_NAME_PATTERN}
+    async with TestSessionLocal() as session:
+        try:
+            await session.execute(
+                text(
+                    "DELETE FROM user_roles WHERE role_id IN ("
+                    "SELECT id FROM roles WHERE name ~ :pattern) "
+                    "OR user_id IN ("
+                    "SELECT id FROM users WHERE email LIKE :email AND id > :baseline)"
+                ),
+                params,
+            )
+            await session.execute(
+                text(
+                    "DELETE FROM role_permissions WHERE role_id IN ("
+                    "SELECT id FROM roles WHERE name ~ :pattern)"
+                ),
+                params,
+            )
+            await session.execute(
+                text(
+                    "DELETE FROM user_ip_bindings WHERE user_id IN ("
+                    "SELECT id FROM users WHERE email LIKE :email AND id > :baseline)"
+                ),
+                params,
+            )
+            await session.execute(
+                text("DELETE FROM roles WHERE name ~ :pattern"), params
+            )
+            await session.execute(
+                text(
+                    "DELETE FROM users WHERE email LIKE :email AND id > :baseline"
+                ),
+                params,
+            )
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
 
 
 @pytest.fixture(scope="function", autouse=True)
