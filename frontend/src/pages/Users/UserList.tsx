@@ -28,7 +28,6 @@ const UserList = () => {
     page: 1,
     page_size: 10,
     keyword: '',
-    isActive: undefined as boolean | undefined,
     orgFilter: undefined as string | undefined,
   });
   const [modalOpen, setModalOpen] = useState(false);
@@ -48,7 +47,6 @@ const UserList = () => {
       page: searchParams.page,
       page_size: searchParams.page_size,
       keyword: searchParams.keyword,
-      is_active: searchParams.isActive,
       org_name: searchParams.orgFilter,
     }),
     enabled: viewMode === 'list',
@@ -542,18 +540,6 @@ const UserList = () => {
                 style={{ width: 250 }}
                 allowClear
               />
-              <Select
-                placeholder="状态"
-                value={searchParams.isActive}
-                onChange={(value) => setSearchParams({ ...searchParams, isActive: value, page: 1 })}
-                style={{ width: 120 }}
-                allowClear
-                showSearch
-                filterOption={fuzzyFilterOption}
-              >
-                <Option value={true}>启用</Option>
-                <Option value={false}>禁用</Option>
-              </Select>
               <Select
                 placeholder="公司"
                 value={searchParams.orgFilter}

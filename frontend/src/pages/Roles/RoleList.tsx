@@ -129,7 +129,7 @@ const RoleList = () => {
       title: '权限数量',
       dataIndex: 'permissionCount',
       key: 'permissionCount',
-      width: 100,
+      width: '10%',
       sorter: (a: Role, b: Role) => (a.permissionCount || 0) - (b.permissionCount || 0),
       render: (count: number) => (
         <Tag icon={<SafetyOutlined />} color="success">
@@ -141,7 +141,7 @@ const RoleList = () => {
       title: '用户数量',
       dataIndex: 'userCount',
       key: 'userCount',
-      width: 100,
+      width: '10%',
       sorter: (a: Role, b: Role) => (a.userCount || 0) - (b.userCount || 0),
       render: (count: number) => (
         <Tag icon={<TeamOutlined />} color="processing">
@@ -153,7 +153,7 @@ const RoleList = () => {
       title: '状态',
       dataIndex: 'isActive',
       key: 'isActive',
-      width: 80,
+      width: '8%',
       sorter: (a: Role, b: Role) => (a.isActive === b.isActive ? 0 : a.isActive ? -1 : 1),
       render: (isActive: boolean) => (
         <Tag color={isActive ? 'success' : 'default'}>
@@ -165,7 +165,7 @@ const RoleList = () => {
       title: '创建时间',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      width: 180,
+      width: '16%',
       sorter: (a: Role, b: Role) => {
         const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
@@ -176,7 +176,7 @@ const RoleList = () => {
     {
       title: '操作',
       key: 'action',
-      width: 200,
+      width: '18%',
       render: (_: unknown, record: Role) => (
         <Space size="small">
           <Tooltip title="分配权限">
