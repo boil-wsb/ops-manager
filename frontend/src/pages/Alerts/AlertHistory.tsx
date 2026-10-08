@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Table, Button, Space, Card, DatePicker, Select, Input, Tag, Modal, Segmented } from 'antd';
 import { EyeOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
@@ -28,11 +29,13 @@ const severityColorMap: Record<string, string> = {
 };
 
 const AlertHistoryPage = () => {
+  // 支持从仪表盘行级跳转带入 alertname 过滤(?alertname=xxx)
+  const [searchParams] = useSearchParams();
   const [params, setParams] = useState({
     page: 1,
     pageSize: 20,
     status: undefined as AlertHistoryStatus | undefined,
-    alertname: undefined as string | undefined,
+    alertname: searchParams.get('alertname') || undefined,
     startTime: undefined as string | undefined,
     endTime: undefined as string | undefined,
   });
@@ -334,6 +337,7 @@ const AlertHistoryPage = () => {
           />
           <Search
             placeholder="搜索告警名称"
+            defaultValue={searchParams.get('alertname') || undefined}
             onSearch={handleSearch}
             style={{ width: 200 }}
             allowClear

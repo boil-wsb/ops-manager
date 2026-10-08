@@ -416,13 +416,20 @@ const Dashboard = () => {
       {!isViewer && (
         <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
           <Col xs={24} lg={12}>
-            <Card title="最近告警" extra={<a href="/alerts/alertmanager">查看全部</a>}>
+            <Card title="最近告警" extra={<a href="/alerts/alertmanager/history">查看全部</a>}>
               <Table
                 dataSource={recentAlerts}
                 rowKey={(r: RecentAlert) => r.id}
                 loading={overviewLoading}
                 pagination={false}
                 size="small"
+                onRow={(record: RecentAlert) => ({
+                  onClick: () =>
+                    navigate(
+                      `/alerts/alertmanager/history?alertname=${encodeURIComponent(record.alertname)}`
+                    ),
+                  style: { cursor: 'pointer' },
+                })}
                 columns={[
                   {
                     title: '名称',
@@ -486,6 +493,10 @@ const Dashboard = () => {
                 loading={overviewLoading}
                 pagination={false}
                 size="small"
+                onRow={() => ({
+                  onClick: () => navigate('/ops/deployments'),
+                  style: { cursor: 'pointer' },
+                })}
                 columns={[
                   {
                     title: '项目',
