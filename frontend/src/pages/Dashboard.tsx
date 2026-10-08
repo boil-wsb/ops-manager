@@ -1,5 +1,6 @@
 import { Row, Col, Card, Statistic, Table, Tag, Tooltip, Tabs, Progress, Badge } from 'antd';
 import { LinkOutlined, MonitorOutlined, CloudUploadOutlined, DatabaseOutlined, CloudOutlined, SettingOutlined, DashboardOutlined, SafetyOutlined, ApiOutlined, DesktopOutlined, CustomerServiceOutlined, AppstoreOutlined, GlobalOutlined, ExperimentOutlined, ThunderboltOutlined, RocketOutlined, ToolOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { navigationApi } from '../services/navigation';
 import { dashboardApi } from '../services/dashboard';
@@ -51,6 +52,7 @@ const formatTime = (isoStr: string | null): string => {
 
 const Dashboard = () => {
   const user = useAuthStore((state) => state.user);
+  const navigate = useNavigate();
   const isViewer = user?.roles?.some(role => role.name === 'viewer') ?? false;
 
   const { data: terminalMetrics, isLoading: terminalLoading } = useQuery({
@@ -174,7 +176,12 @@ const Dashboard = () => {
         {!isViewer && (
           <>
             <Col xs={24} sm={12} lg={6}>
-              <Card loading={overviewLoading}>
+              <Card
+                loading={overviewLoading}
+                hoverable
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate('/alerts/alertmanager')}
+              >
                 <Statistic
                   title="活跃告警"
                   value={alertStats?.firingCount || 0}
@@ -189,7 +196,12 @@ const Dashboard = () => {
             </Col>
 
             <Col xs={24} sm={12} lg={6}>
-              <Card loading={overviewLoading}>
+              <Card
+                loading={overviewLoading}
+                hoverable
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate('/ops/it-management')}
+              >
                 <Statistic
                   title="IT反馈"
                   value={itFeedbackStats?.pendingCount || 0}
@@ -206,7 +218,12 @@ const Dashboard = () => {
             </Col>
 
             <Col xs={24} sm={12} lg={6}>
-              <Card loading={overviewLoading}>
+              <Card
+                loading={overviewLoading}
+                hoverable
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate('/ops/domains')}
+              >
                 <Statistic
                   title="证书总数"
                   value={certStats?.totalCount || 0}
@@ -222,7 +239,12 @@ const Dashboard = () => {
             </Col>
 
             <Col xs={24} sm={12} lg={6}>
-              <Card loading={overviewLoading}>
+              <Card
+                loading={overviewLoading}
+                hoverable
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate('/assets')}
+              >
                 <Statistic
                   title="资产总数"
                   value={assetStats?.totalCount || 0}
