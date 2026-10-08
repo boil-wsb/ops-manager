@@ -225,6 +225,73 @@ class TestDedupDifferentStartsAt:
             await _cleanup_alerts(alertname, instance)
 
 
+class TestOrphanFiringConvergence:
+    """孤儿收敛: resolved 事件顺带恢复同目标早周期的 firing 记录.
+
+    场景: 旧周期 resolved 丢失导致记录永久停留 firing(孤儿);新周期 resolved
+    到达时(startsAt 为新周期),同目标 starts_at <= 本次 的 firing 应一并收敛。
+    """
+
+    async def test_resolved_converges_older_orphan_firing(self):
+        alertname = _unique_alertname()
+        instance = _unique_instance()
+        now = now_shanghai()
+        orphan_starts = now - timedelta(days=30)
+        current_starts = now - timedelta(minutes=5)
+
+        try:
+            # 周期 A: 30 天前的 firing 孤儿(resolved 丢失)
+            await _create_history(
+                alertname=alertname,
+                instance=instance,
+                starts_at=orphan_starts,
+                status="firing",
+                notification_sent=True,
+            )
+            # 周期 B: 5 分钟前触发
+            await _create_history(
+                alertname=alertname,
+                instance=instance,
+                starts_at=current_starts,
+                status="firing",
+                notification_sent=True,
+            )
+
+            # 周期 B 的 resolved 到达(startsAt 为周期 B)
+            with patch(
+                "app.services.alerts.notification_task.prepare_alert_notification"
+            ) as prepare_fn:
+                prepare_fn.return_value = None
+                with patch("app.api.v1.alerts.alert_inhibition_service") as inhib:
+                    inhib.check_alert_inhibition = AsyncMock(return_value=(False, None))
+
+                    alert_data = _make_alert_data(
+                        alertname=alertname,
+                        instance=instance,
+                        starts_at=current_starts.isoformat(),
+                        status="resolved",
+                    )
+                    with patch("app.api.v1.alerts.settings") as mock_settings:
+                        mock_settings.alert_aggregation_window_seconds = 0
+                        await _run_process_alert(alert_data)
+
+            # ★ 核心断言: 孤儿与新周期记录都被收敛为 resolved
+            async def _op(session):
+                result = await session.execute(
+                    text(
+                        "SELECT status FROM alert_history "
+                        "WHERE alertname = :name AND labels->>'instance' = :inst"
+                    ),
+                    {"name": alertname, "inst": instance},
+                )
+                return [r[0] for r in result.fetchall()]
+
+            statuses = await db_operation_with_retry(_op, max_retries=2, retry_delay=0.5)
+            assert statuses and all(s == "resolved" for s in statuses), statuses
+        finally:
+            await _cleanup_alerts(alertname, instance)
+
+
 class TestDedupAggregationWindow:
     """不变式 3: 聚合窗口内已通知记录 → is_aggregated=True."""
 

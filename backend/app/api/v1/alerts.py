@@ -151,6 +151,10 @@ async def process_alert(
     # ND-2 修复（第二轮审查）：原 starts_at=None 时整个批量 resolve 块被跳过，
     # 旧 firing 记录状态保持 firing。Alertmanager 协议保证总会带 startsAt，
     # 但防御性处理：starts_at 为 None 时 fallback 使用当前时间，避免漏处理。
+    # 孤儿收敛（2026-10-08）：starts_at 由 == 放宽为 <=。同目标每次重新触发都是新周期
+    # （新 starts_at 新记录），若某周期的 resolved 事件丢失，该记录将永久停留 firing
+    # 且永远等不到属于它的 resolved（Alertmanager resolved 只携带当次 startsAt）。
+    # resolved 到达即证明目标当前已恢复，故将同目标所有早于本次周期的 firing 一并收敛。
     if status_str == "resolved" and alertname and instance:
         effective_starts_at = starts_at if starts_at is not None else now_shanghai()
         try:
@@ -158,7 +162,7 @@ async def process_alert(
                 and_(
                     AlertHistory.alertname == alertname,
                     AlertHistory.labels.op("->>")("instance") == instance,
-                    AlertHistory.starts_at == effective_starts_at,
+                    AlertHistory.starts_at <= effective_starts_at,
                     AlertHistory.status == AlertHistoryStatus.FIRING.value,
                 )
             )
