@@ -406,3 +406,40 @@ async def test_reset_password_success_and_employee_login(client: AsyncClient):
         json={"employee_id": employee_id, "password": employee_id},
     )
     assert login_resp.status_code == 200, login_resp.text
+
+
+@pytest.mark.asyncio
+async def test_list_users_org_name_filter(client: AsyncClient):
+    """公司服务端过滤: 未归属(__none__)与指定公司互斥。"""
+    headers = await get_auth_headers(client)
+    username = unique_name("OrgFilter")
+    await client.post(
+        "/api/v1/users",
+        headers=headers,
+        json={
+            "username": username,
+            "password": "test123456",
+            "email": f"{uuid.uuid4().hex[:8]}@example.com",
+            "must_change_password": False,
+        },
+    )
+
+    # 无部门用户应出现在"未归属"结果中
+    resp_none = await client.get(
+        "/api/v1/users",
+        headers=headers,
+        params={"org_name": "__none__", "keyword": username},
+    )
+    assert resp_none.status_code == 200
+    items = resp_none.json()["items"]
+    assert any(u["username"] == username for u in items)
+
+    # 无部门用户不应出现在指定公司结果中
+    resp_org = await client.get(
+        "/api/v1/users",
+        headers=headers,
+        params={"org_name": "大连美恒", "keyword": username},
+    )
+    assert resp_org.status_code == 200
+    items_org = resp_org.json()["items"]
+    assert not any(u["username"] == username for u in items_org)

@@ -15,6 +15,7 @@ from app.core.logging import get_logger
 from app.core.security import get_password_hash
 from app.crud.crud_user import crud_user
 from app.crud.crud_user_ip_binding import crud_user_ip_binding
+from app.models.department import Department
 from app.models.permission import Role
 from app.models.user import User
 from app.schemas.user import UserCreate, UserResponse, UserUpdate
@@ -29,13 +30,14 @@ async def list_users(
     page_size: int = 20,
     keyword: str | None = None,
     is_active: bool | None = None,
+    org_name: str | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permissions(["user:read"])),
 ):
     """Get user list with filters."""
     skip = (page - 1) * page_size
 
-    cache_key = f"users:list:{keyword}:{is_active}:{page}:{page_size}"
+    cache_key = f"users:list:{keyword}:{is_active}:{org_name}:{page}:{page_size}"
 
     async def _fetch_users():
         query = (
@@ -51,6 +53,15 @@ async def list_users(
 
         if is_active is not None:
             query = query.where(User.is_active == is_active)
+
+        # 服务端公司过滤("__none__" 表示未归属任何公司)
+        if org_name == "__none__":
+            query = query.where(
+                (User.department_id.is_(None))
+                | User.department.has(Department.org_name.is_(None))
+            )
+        elif org_name:
+            query = query.where(User.department.has(Department.org_name == org_name))
 
         count_query = select(func.count()).select_from(query.subquery())
         total_result = await db.execute(count_query)

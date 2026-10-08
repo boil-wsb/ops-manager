@@ -29,8 +29,8 @@ const UserList = () => {
     page_size: 10,
     keyword: '',
     isActive: undefined as boolean | undefined,
+    orgFilter: undefined as string | undefined,
   });
-  const [orgFilter, setOrgFilter] = useState<string | undefined>(undefined);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [messageModalOpen, setMessageModalOpen] = useState(false);
@@ -49,6 +49,7 @@ const UserList = () => {
       page_size: searchParams.page_size,
       keyword: searchParams.keyword,
       is_active: searchParams.isActive,
+      org_name: searchParams.orgFilter,
     }),
     enabled: viewMode === 'list',
   });
@@ -225,11 +226,6 @@ const UserList = () => {
         };
         return <Tag color={colorMap[org] || 'blue'}>{org}</Tag>;
       },
-      filteredValue: orgFilter ? [orgFilter] : null,
-      onFilter: (value: React.Key | boolean, record: User) => {
-        const v = String(value);
-        return v === '__none__' ? !record.orgName : record.orgName === v;
-      },
     },
     {
       title: '部门',
@@ -263,17 +259,6 @@ const UserList = () => {
       key: 'isActive',
       sorter: (a: User, b: User) => (a.isActive === b.isActive ? 0 : a.isActive ? -1 : 1),
       render: (isActive: boolean) => <StatusTag status={isActive ? 'active' : 'inactive'} type="user" />,
-    },
-    {
-      title: '超级管理员',
-      dataIndex: 'isSuperuser',
-      key: 'isSuperuser',
-      sorter: (a: User, b: User) => (a.isSuperuser === b.isSuperuser ? 0 : a.isSuperuser ? -1 : 1),
-      render: (isSuperuser: boolean) => (
-        <Tag color={isSuperuser ? 'purple' : 'default'}>
-          {isSuperuser ? '是' : '否'}
-        </Tag>
-      ),
     },
     {
       title: '最后登录',
@@ -571,8 +556,8 @@ const UserList = () => {
               </Select>
               <Select
                 placeholder="公司"
-                value={orgFilter}
-                onChange={(value) => setOrgFilter(value)}
+                value={searchParams.orgFilter}
+                onChange={(value) => setSearchParams({ ...searchParams, orgFilter: value, page: 1 })}
                 style={{ width: 160 }}
                 allowClear
                 showSearch

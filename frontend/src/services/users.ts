@@ -6,6 +6,7 @@ export interface UserListParams {
   page_size?: number;
   keyword?: string;
   is_active?: boolean;
+  org_name?: string;
 }
 
 export const userApi = {
