@@ -306,3 +306,103 @@ async def test_user_permissions(client: AsyncClient):
     data = response.json()
     assert "permissions" in data
     assert isinstance(data["permissions"], list)
+
+
+# =============================================================================
+# 重置密码为工号（仅超级管理员）
+# =============================================================================
+
+
+async def _create_user(
+    client: AsyncClient, headers: dict, *, employee_id: str | None = None
+) -> dict:
+    """Helper: create a normal user and return its response data."""
+    payload = {
+        "username": unique_name("ResetPwd"),
+        "password": "test123456",
+        "email": f"{uuid.uuid4().hex[:8]}@example.com",
+        "full_name": "Reset Pwd Target",
+        "must_change_password": False,
+    }
+    if employee_id is not None:
+        payload["employee_id"] = employee_id
+    response = await client.post("/api/v1/users", headers=headers, json=payload)
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+@pytest.mark.asyncio
+async def test_reset_password_unauthorized(client: AsyncClient):
+    """Test reset password without authentication."""
+    response = await client.post("/api/v1/users/1/reset-password")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_reset_password_forbidden_non_superuser(client: AsyncClient):
+    """Test reset password by non-superuser → 403."""
+    admin_headers = await get_auth_headers(client)
+    target = await _create_user(client, admin_headers, employee_id="RST001")
+
+    # 创建普通用户并登录
+    plain_username = unique_name("PlainUser")
+    await client.post(
+        "/api/v1/users",
+        headers=admin_headers,
+        json={
+            "username": plain_username,
+            "password": "test123456",
+            "email": f"{uuid.uuid4().hex[:8]}@example.com",
+            "must_change_password": False,
+        },
+    )
+    login_resp = await client.post(
+        "/api/v1/auth/login", json={"username": plain_username, "password": "test123456"}
+    )
+    assert login_resp.status_code == 200, login_resp.text
+    plain_headers = {"Authorization": f"Bearer {login_resp.json()['access_token']}"}
+
+    response = await client.post(
+        f"/api/v1/users/{target['id']}/reset-password", headers=plain_headers
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_reset_password_no_employee_id(client: AsyncClient):
+    """Test reset password for user without employee_id → 400."""
+    headers = await get_auth_headers(client)
+    target = await _create_user(client, headers, employee_id=None)
+
+    response = await client.post(f"/api/v1/users/{target['id']}/reset-password", headers=headers)
+    assert response.status_code == 400
+    assert "工号" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_reset_password_not_found(client: AsyncClient):
+    """Test reset password for non-existent user → 404."""
+    headers = await get_auth_headers(client)
+    response = await client.post("/api/v1/users/99999/reset-password", headers=headers)
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_reset_password_success_and_employee_login(client: AsyncClient):
+    """Test reset password as superuser → 200, then login with employee_id as password."""
+    headers = await get_auth_headers(client)
+    employee_id = f"RST{uuid.uuid4().hex[:6]}"
+    target = await _create_user(client, headers, employee_id=employee_id)
+
+    response = await client.post(f"/api/v1/users/{target['id']}/reset-password", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["must_change_password"] is True
+    assert data["employee_id"] == employee_id
+
+    # 闭环: 用工号 + 工号本身作为密码登录成功
+    login_resp = await client.post(
+        "/api/v1/auth/external/login",
+        json={"employee_id": employee_id, "password": employee_id},
+    )
+    assert login_resp.status_code == 200, login_resp.text

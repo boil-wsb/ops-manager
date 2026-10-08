@@ -8,10 +8,11 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import get_db, require_permissions
+from app.api.deps import get_current_active_user, get_db, require_permissions
 from app.core.audit import audit_log
 from app.core.cache import cache_delete_pattern, cache_get_or_set
 from app.core.logging import get_logger
+from app.core.security import get_password_hash
 from app.crud.crud_user import crud_user
 from app.crud.crud_user_ip_binding import crud_user_ip_binding
 from app.models.permission import Role
@@ -223,6 +224,74 @@ async def update_user(
     logger.info(
         f"用户 '{user.username}' 更新成功",
         extra={"action": "user.update", "username": user.username, "user_id": user.id},
+    )
+
+    await cache_delete_pattern("users:list:*")
+
+    return UserResponse.model_validate(user)
+
+
+@router.post("/{user_id}/reset-password", response_model=UserResponse)
+@audit_log(operation_type="CHANGE_PASSWORD", module="user", object_type="User")
+async def reset_user_password(
+    request: Request,
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """重置用户密码为其工号（仅超级管理员），并置下次登录强制改密标记。
+
+    与 auth_service.reset-password（外部 CRM 调用）同一密码写入路径
+    get_password_hash(employee_id)，差异：本端点走 JWT 认证 + 超管校验。
+    """
+    if not current_user.is_superuser:
+        logger.warning(
+            "非超级管理员尝试重置用户密码",
+            extra={
+                "action": "user.reset_password",
+                "operator": current_user.username,
+                "target_user_id": user_id,
+            },
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="只有超级管理员才能重置用户密码",
+        )
+
+    user = await crud_user.get(db, id=user_id)
+    if not user:
+        logger.warning(
+            f"用户 ID={user_id} 不存在", extra={"action": "user.reset_password", "user_id": user_id}
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="用户不存在",
+        )
+
+    employee_id = (user.employee_id or "").strip()
+    if not employee_id:
+        logger.warning(
+            f"用户 '{user.username}' 未配置工号，无法重置密码",
+            extra={"action": "user.reset_password", "user_id": user_id, "username": user.username},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="该用户未配置工号，无法重置密码",
+        )
+
+    user.hashed_password = get_password_hash(employee_id)
+    user.must_change_password = True
+    await db.commit()
+    await db.refresh(user)
+
+    logger.info(
+        f"用户 '{user.username}' 密码已重置为工号",
+        extra={
+            "action": "user.reset_password",
+            "operator": current_user.username,
+            "target_user_id": user_id,
+            "target_username": user.username,
+        },
     )
 
     await cache_delete_pattern("users:list:*")

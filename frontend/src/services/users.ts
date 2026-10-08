@@ -33,8 +33,9 @@ export const userApi = {
     await api.delete(`/users/${id}`);
   },
 
-  resetPassword: async (id: number, newPassword: string): Promise<void> => {
-    await api.post(`/users/${id}/reset-password`, { new_password: newPassword });
+  resetPasswordToEmployeeId: async (id: number): Promise<User> => {
+    const response = await api.post<ApiResponse<User>>(`/users/${id}/reset-password`);
+    return response.data.data;
   },
 
   assignRoles: async (id: number, roleIds: number[]): Promise<void> => {

@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { UserOutlined, LockOutlined, SaveOutlined } from '@ant-design/icons';
 import { useAuthStore } from '../../stores/authStore';
 import { userApi } from '../../services/users';
+import api from '../../services/api';
 import type { User } from '../../types';
 
 const Profile = () => {
@@ -28,13 +29,24 @@ const Profile = () => {
   });
 
   const changePasswordMutation = useMutation({
-    mutationFn: ({ newPassword }: { oldPassword: string; newPassword: string }) => {
+    mutationFn: async ({ oldPassword, newPassword }: { oldPassword: string; newPassword: string }) => {
       if (!user) throw new Error('User not found');
-      return userApi.resetPassword(user.id, newPassword);
+      const response = await api.post<{
+        access_token: string;
+        refresh_token: string;
+      }>('/auth/change-password', {
+        old_password: oldPassword,
+        new_password: newPassword,
+      });
+      return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       message.success('密码修改成功');
       passwordForm.resetFields();
+      // 改密后后端重新签发无待改密标记的 token，替换本地令牌
+      if (data?.access_token) {
+        useAuthStore.getState().updateToken(data.access_token, data.refresh_token);
+      }
     },
     onError: () => {
       message.error('密码修改失败');

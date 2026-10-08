@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Table, Button, Input, Select, Tag, Space, Card, App, Popconfirm, Modal, Tooltip, Tree, Segmented, Empty } from 'antd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, SendOutlined, SyncOutlined, UserOutlined, ApartmentOutlined, CrownOutlined, DisconnectOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, SendOutlined, SyncOutlined, UserOutlined, ApartmentOutlined, CrownOutlined, DisconnectOutlined, SafetyCertificateOutlined, KeyOutlined } from '@ant-design/icons';
 import { userApi } from '../../services/users';
 import { departmentApi, type DepartmentNode } from '../../services/departments';
 import { fuzzyFilterOption } from '../../utils/selectFilter';
 import { PermissionGuard } from '../../components/PermissionGuard';
 import StatusTag from '../../components/StatusTag';
 import UserFormModal from './UserFormModal';
+import { useAuthStore } from '../../stores/authStore';
 import type { User, UserIpBinding } from '../../types';
 
 const { Option } = Select;
@@ -22,6 +23,7 @@ interface TreeDataItem {
 const UserList = () => {
   const queryClient = useQueryClient();
   const { message } = App.useApp();
+  const currentUser = useAuthStore((state) => state.user);
   const [searchParams, setSearchParams] = useState({
     page: 1,
     page_size: 10,
@@ -129,6 +131,18 @@ const UserList = () => {
     },
     onError: (error: unknown) => {
       const errorMsg = error instanceof Error ? error.message : 'IP 解绑失败';
+      message.error(errorMsg);
+    },
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: (id: number) => userApi.resetPasswordToEmployeeId(id),
+    onSuccess: () => {
+      message.success('密码已重置为该用户工号，首次登录需修改密码');
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (error: unknown) => {
+      const errorMsg = error instanceof Error ? error.message : '密码重置失败';
       message.error(errorMsg);
     },
   });
@@ -321,6 +335,19 @@ const UserList = () => {
                 </Button>
               </Popconfirm>
             </PermissionGuard>
+            {currentUser?.isSuperuser && (
+              <Popconfirm
+                title="确定将该用户密码重置为其工号吗？"
+                description="重置后用户下次登录需使用工号登录，并强制修改密码。"
+                onConfirm={() => resetPasswordMutation.mutate(record.id)}
+                okText="确定重置"
+                cancelText="取消"
+              >
+                <Button type="link" icon={<KeyOutlined />}>
+                  重置密码
+                </Button>
+              </Popconfirm>
+            )}
             <PermissionGuard permissions="user:delete">
               <Popconfirm
                 title="确定要删除这个用户吗？"
