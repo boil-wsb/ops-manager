@@ -21,6 +21,7 @@ from app.config import settings
 from app.core.logging import get_logger
 from app.core.tz import now_shanghai
 from app.db.session import db_operation_with_retry
+from app.services.alerts.notification_task import ALERT_SUMMARY_CHAT_ID_CONFIG_KEY
 
 logger = get_logger(__name__)
 
@@ -28,7 +29,6 @@ SEVERITY_ORDER = {"critical": 0, "warning": 1, "info": 2}
 CARD_MAX_ITEMS = 50  # 卡片最多展示的合并条数，防止消息超长
 DESC_MAX_LEN = 200  # 卡片中单条描述截断长度
 
-SUMMARY_CHAT_ID_CONFIG_KEY = "alert_summary.chat_id"
 FIRING_GROUP_TYPE = "alert_firing"
 
 
@@ -190,7 +190,7 @@ async def _prepare_summary(db) -> dict[str, Any]:
     )
 
     # 收件人：群聊 chat_id + alert_firing 通知组成员
-    chat_id = await crud_system_config.get_value(db, SUMMARY_CHAT_ID_CONFIG_KEY)
+    chat_id = await crud_system_config.get_value(db, ALERT_SUMMARY_CHAT_ID_CONFIG_KEY)
     if chat_id is None:
         chat_id = settings.alert_summary_chat_id
 
@@ -250,7 +250,7 @@ async def _send_summary(summary: dict[str, Any]) -> dict[str, Any]:
     else:
         logger.warning(
             "告警汇总群聊 chat_id 未配置，跳过群发",
-            extra={"action": "alert.summary", "config_key": SUMMARY_CHAT_ID_CONFIG_KEY},
+            extra={"action": "alert.summary", "config_key": ALERT_SUMMARY_CHAT_ID_CONFIG_KEY},
         )
 
     feishu_svc = get_feishu_notification_service()

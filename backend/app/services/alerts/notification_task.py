@@ -23,6 +23,7 @@ from typing import Any
 from sqlalchemy import case, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.core.logging import get_logger
 from app.core.tz import now_shanghai, to_shanghai
 from app.models.alert import AlertTemplate
@@ -33,6 +34,9 @@ from app.services.alerts.alert_template import alert_template_service
 from app.services.alerts.feishu_notification import get_feishu_notification_service
 
 logger = get_logger(__name__)
+
+# 告警群发群聊配置键（与每日汇总任务共用；system_config 优先，fallback settings）
+ALERT_SUMMARY_CHAT_ID_CONFIG_KEY = "alert_summary.chat_id"
 
 
 @dataclass
@@ -52,6 +56,8 @@ class NotificationContext:
     annotations: dict[str, Any]
     alerts_list: list[dict[str, Any]]
     recipient_open_ids: list[str]
+    # 告警群发群聊 ID（firing 时同步发一份到群；resolved 时群卡片随 1:N 更新）
+    group_chat_id: str | None = None
     card: dict[str, Any] | None = None
     # C-05 修复: firing 路径使用的 alert_history.id（由调用方 alerts.py 传入）
     # 用于 _save_firing_alert_card_messages 精确查询，避免依赖 status='firing'
@@ -246,6 +252,7 @@ async def prepare_alert_notification(
         logger.info(f"飞书卡片JSON内容: {card}", extra={"action": "alert.notify"})
 
     # --- DB 操作: 预占位标记 / resolved 查询 ---
+    group_chat_id = await _get_summary_chat_id(db)
     ctx = NotificationContext(
         alertname=alertname,
         instance=instance,
@@ -257,6 +264,7 @@ async def prepare_alert_notification(
         annotations=annotations,
         alerts_list=alerts_list,
         recipient_open_ids=recipient_open_ids,
+        group_chat_id=group_chat_id,
         card=card,
         history_id=history_id_from_caller,
     )
@@ -341,7 +349,8 @@ async def prepare_alert_notification(
             return None
     else:
         # firing: 预占位标记
-        if recipient_open_ids:
+        # 有 P2P 收件人或配置了群发群聊 → 走发送分支
+        if recipient_open_ids or group_chat_id:
             await _update_alert_history_notification_sent(
                 db=db, alertname=alertname, instance=instance, starts_at=starts_at
             )
@@ -349,7 +358,7 @@ async def prepare_alert_notification(
         else:
             # 无收件人也要标记（P0-C 修复）
             logger.info(
-                f"未找到资产负责人: instance={instance}，跳过飞书通知",
+                f"未找到资产负责人且未配置群发群聊: instance={instance}，跳过飞书通知",
                 extra={"action": "alert.notify", "instance": instance},
             )
             await _update_alert_history_notification_sent(
@@ -358,6 +367,26 @@ async def prepare_alert_notification(
             return None
 
     return ctx
+
+
+async def _get_summary_chat_id(db: AsyncSession) -> str | None:
+    """读取告警群发群聊 ID：system_config 优先，fallback 环境配置.
+
+    Returns:
+        chat_id（oc_ 开头）或 None（未配置）
+    """
+    from app.crud.crud_system_config import crud_system_config
+
+    try:
+        value = await crud_system_config.get_value(db, ALERT_SUMMARY_CHAT_ID_CONFIG_KEY)
+    except Exception as exc:
+        logger.warning(
+            f"读取告警群发配置异常，使用环境配置兜底: {exc}",
+            extra={"action": "alert.notify", "config_key": ALERT_SUMMARY_CHAT_ID_CONFIG_KEY},
+        )
+        value = None
+    chat_id = (value or settings.alert_summary_chat_id or "").strip()
+    return chat_id or None
 
 
 async def execute_feishu_notification(ctx: NotificationContext) -> FeishuResult:
@@ -373,53 +402,106 @@ async def execute_feishu_notification(ctx: NotificationContext) -> FeishuResult:
     feishu_svc = get_feishu_notification_service()
     result = FeishuResult()
 
-    if ctx.needs_feishu_send and ctx.card and ctx.recipient_open_ids:
+    if ctx.needs_feishu_send and ctx.card:
         sent_cards: list[dict] = []
-        for recipient_open_id in ctx.recipient_open_ids:
-            try:
-                send_result = await asyncio.to_thread(
-                    feishu_svc.send_p2p_card_message,
-                    open_id=recipient_open_id,
-                    card_content=ctx.card,
-                )
-                if send_result.get("success"):
-                    message_id = send_result.get("message_id")
-                    if message_id:
-                        sent_cards.append(
-                            {
-                                "open_message_id": message_id,
-                                "recipient_open_id": recipient_open_id,
-                            }
+        # P2P 发送（仅在有收件人时执行；无收件人但配置群聊时只群发）
+        if ctx.recipient_open_ids:
+            for recipient_open_id in ctx.recipient_open_ids:
+                try:
+                    send_result = await asyncio.to_thread(
+                        feishu_svc.send_p2p_card_message,
+                        open_id=recipient_open_id,
+                        card_content=ctx.card,
+                    )
+                    if send_result.get("success"):
+                        message_id = send_result.get("message_id")
+                        if message_id:
+                            sent_cards.append(
+                                {
+                                    "open_message_id": message_id,
+                                    "recipient_open_id": recipient_open_id,
+                                }
+                            )
+                        logger.info(
+                            f"P2P飞书卡片已发送: instance={ctx.instance}, open_id={recipient_open_id}",
+                            extra={
+                                "action": "alert.notify",
+                                "instance": ctx.instance,
+                                "open_id": recipient_open_id,
+                            },
                         )
-                    logger.info(
-                        f"P2P飞书卡片已发送: instance={ctx.instance}, open_id={recipient_open_id}",
+                    else:
+                        logger.warning(
+                            f"P2P飞书卡片发送失败: instance={ctx.instance}, open_id={recipient_open_id}",
+                            extra={
+                                "action": "alert.notify",
+                                "instance": ctx.instance,
+                                "open_id": recipient_open_id,
+                            },
+                        )
+                except Exception as exc:
+                    logger.error(
+                        f"P2P飞书卡片发送异常: instance={ctx.instance}, open_id={recipient_open_id}, error={exc}",
                         extra={
                             "action": "alert.notify",
                             "instance": ctx.instance,
                             "open_id": recipient_open_id,
+                        },
+                    )
+        result.sent_cards = sent_cards
+        result.success = len(sent_cards) > 0
+        result.needs_save = len(sent_cards) > 0
+
+        # firing 同步群发：卡片发到告警群（chat_id），message_id 随 sent_cards
+        # 存入 alert_card_messages（recipient_open_id=oc_...），resolved 时随 1:N 更新
+        if ctx.group_chat_id:
+            from app.integrations.feishu.service import get_feishu_service
+
+            try:
+                group_result = await asyncio.to_thread(
+                    get_feishu_service().send_message_to_user,
+                    user_id=ctx.group_chat_id,
+                    msg_type="interactive",
+                    content=ctx.card,
+                    receive_id_type="chat_id",
+                )
+                if group_result.get("message_id"):
+                    result.sent_cards.append(
+                        {
+                            "open_message_id": group_result["message_id"],
+                            "recipient_open_id": ctx.group_chat_id,
+                        }
+                    )
+                    result.needs_save = True
+                    result.success = len(result.sent_cards) > 0
+                    logger.info(
+                        f"告警卡片已群发: instance={ctx.instance}, chat_id={ctx.group_chat_id}",
+                        extra={
+                            "action": "alert.notify",
+                            "instance": ctx.instance,
+                            "chat_id": ctx.group_chat_id,
                         },
                     )
                 else:
                     logger.warning(
-                        f"P2P飞书卡片发送失败: instance={ctx.instance}, open_id={recipient_open_id}",
+                        f"告警卡片群发未返回 message_id: chat_id={ctx.group_chat_id}",
                         extra={
                             "action": "alert.notify",
                             "instance": ctx.instance,
-                            "open_id": recipient_open_id,
+                            "chat_id": ctx.group_chat_id,
                         },
                     )
             except Exception as exc:
                 logger.error(
-                    f"P2P飞书卡片发送异常: instance={ctx.instance}, open_id={recipient_open_id}, error={exc}",
+                    f"告警卡片群发异常: instance={ctx.instance}, "
+                    f"chat_id={ctx.group_chat_id}, error={exc}",
                     extra={
                         "action": "alert.notify",
                         "instance": ctx.instance,
-                        "open_id": recipient_open_id,
+                        "chat_id": ctx.group_chat_id,
+                        "error": str(exc),
                     },
                 )
-        result.sent_cards = sent_cards
-        result.success = len(sent_cards) > 0
-        result.needs_save = len(sent_cards) > 0
 
     elif ctx.needs_feishu_update and ctx.resolved_card_messages:
         try:

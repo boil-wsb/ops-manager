@@ -194,6 +194,31 @@ def mock_feishu_svc():
         yield svc
 
 
+@pytest.fixture(autouse=True)
+def _patch_summary_chat_id_lookup():
+    """默认无群发配置（group_chat_id=None），保证既有测试行为不变.
+
+    群发链路测试通过参数引用本 fixture 覆盖 return_value.
+    """
+    with patch(
+        "app.services.alerts.notification_task._get_summary_chat_id",
+        new_callable=AsyncMock,
+    ) as fn:
+        fn.return_value = None
+        yield fn
+
+
+@pytest.fixture
+def mock_chat_sender():
+    """patch get_feishu_service（FeishuService 单例，支持 chat_id 群发）."""
+    svc = MagicMock()
+    svc.send_message_to_user = MagicMock(
+        return_value={"message_id": "om_group_1", "code": 0, "msg": "ok"}
+    )
+    with patch("app.integrations.feishu.service.get_feishu_service", return_value=svc):
+        yield svc
+
+
 class TestSendAlertNoInstance:
     """场景 7: 无 instance → 直接返回,不发送."""
 
@@ -934,3 +959,190 @@ class TestUpdateAlertHistoryNotificationSent:
         await _update_alert_history_notification_sent(db, "HighCpu", "192.168.102.109")
 
         db.rollback.assert_awaited_once()
+
+
+# =============================================================================
+# 告警群发链路（firing 同步发一份到 alert_summary.chat_id 群聊）
+# 群卡片 message_id 存入 alert_card_messages（recipient_open_id=oc_...），
+# resolved 时随既有 1:N 更新逻辑一起更新，无需专门 resolved 逻辑。
+# =============================================================================
+
+
+class TestGroupChatNotification:
+    """firing 卡片同步群发到 alert_summary.chat_id 配置的群聊."""
+
+    async def test_prepare_sets_group_chat_id(
+        self,
+        mock_db_with_feishu_template,
+        patched_template_render,
+        patched_owner_lookup,
+        patched_group_lookup,
+        _patch_summary_chat_id_lookup,
+        mock_feishu_svc,
+    ):
+        """prepare 读取配置 → ctx.group_chat_id 正确设置."""
+        _patch_summary_chat_id_lookup.return_value = "oc_group_abc"
+
+        ctx = await prepare_alert_notification(mock_db_with_feishu_template, _make_alert_data())
+
+        assert ctx is not None
+        assert ctx.group_chat_id == "oc_group_abc"
+
+    async def test_firing_sends_group_card_and_records_it(
+        self,
+        mock_db_with_feishu_template,
+        patched_template_render,
+        patched_owner_lookup,
+        patched_group_lookup,
+        patched_mark_sent,
+        patched_save_message_id,
+        mock_feishu_svc,
+        mock_chat_sender,
+        _patch_summary_chat_id_lookup,
+    ):
+        """firing → P2P 照常发送 + 群发一份,群卡随 sent_cards 记录供阶段 3 保存."""
+        _patch_summary_chat_id_lookup.return_value = "oc_group_abc"
+        patched_owner_lookup.return_value = "ou_owner_123"
+        patched_group_lookup.return_value = []
+
+        alert_data = _make_alert_data(status="firing")
+
+        ctx = await prepare_alert_notification(mock_db_with_feishu_template, alert_data)
+        result = await execute_feishu_notification(ctx)
+
+        # P2P 照常发送
+        mock_feishu_svc.send_p2p_card_message.assert_called_once()
+        # 群发调用: chat_id + interactive + receive_id_type=chat_id
+        mock_chat_sender.send_message_to_user.assert_called_once()
+        call_kwargs = mock_chat_sender.send_message_to_user.call_args.kwargs
+        assert call_kwargs["user_id"] == "oc_group_abc"
+        assert call_kwargs["msg_type"] == "interactive"
+        assert call_kwargs["receive_id_type"] == "chat_id"
+        assert call_kwargs["content"] is ctx.card
+        # sent_cards = P2P 卡 + 群卡（recipient_open_id=chat_id,供 resolved 1:N 更新）
+        assert len(result.sent_cards) == 2
+        group_card = next(c for c in result.sent_cards if c["recipient_open_id"] == "oc_group_abc")
+        assert group_card["open_message_id"] == "om_group_1"
+        assert result.needs_save is True
+
+    async def test_group_send_failure_does_not_break_p2p(
+        self,
+        mock_db_with_feishu_template,
+        patched_template_render,
+        patched_owner_lookup,
+        patched_group_lookup,
+        patched_mark_sent,
+        patched_save_message_id,
+        mock_feishu_svc,
+        mock_chat_sender,
+        _patch_summary_chat_id_lookup,
+    ):
+        """群发异常 → 只记日志,P2P 结果与保存不受影响."""
+        _patch_summary_chat_id_lookup.return_value = "oc_group_abc"
+        patched_owner_lookup.return_value = "ou_owner_123"
+        patched_group_lookup.return_value = []
+        mock_chat_sender.send_message_to_user.side_effect = RuntimeError("feishu api error")
+
+        alert_data = _make_alert_data(status="firing")
+
+        ctx = await prepare_alert_notification(mock_db_with_feishu_template, alert_data)
+        result = await execute_feishu_notification(ctx)
+
+        # P2P 正常,群卡未入 sent_cards
+        assert len(result.sent_cards) == 1
+        assert result.sent_cards[0]["recipient_open_id"] == "ou_owner_123"
+        assert result.success is True
+        assert result.needs_save is True
+
+    async def test_no_p2p_recipient_but_group_configured_sends_group(
+        self,
+        mock_db_with_feishu_template,
+        patched_template_render,
+        patched_owner_lookup,
+        patched_group_lookup,
+        patched_mark_sent,
+        patched_save_message_id,
+        mock_feishu_svc,
+        mock_chat_sender,
+        _patch_summary_chat_id_lookup,
+    ):
+        """无 P2P 收件人但配置了群聊 → 标记 + 仅群发 + 保存群卡."""
+        _patch_summary_chat_id_lookup.return_value = "oc_group_abc"
+        patched_owner_lookup.return_value = None
+        patched_group_lookup.return_value = []
+
+        alert_data = _make_alert_data(status="firing")
+
+        ctx = await prepare_alert_notification(mock_db_with_feishu_template, alert_data)
+        result = await execute_feishu_notification(ctx)
+        await save_notification_result(AsyncMock(), ctx, result)
+
+        # P0-C: 仍必须标记 notification_sent
+        patched_mark_sent.assert_awaited_once()
+        # 不发 P2P,只群发
+        mock_feishu_svc.send_p2p_card_message.assert_not_called()
+        mock_chat_sender.send_message_to_user.assert_called_once()
+        # 群卡入 sent_cards → 阶段 3 保存
+        assert len(result.sent_cards) == 1
+        assert result.sent_cards[0]["recipient_open_id"] == "oc_group_abc"
+        patched_save_message_id.assert_awaited_once()
+
+    async def test_no_group_and_no_recipient_skips_send(
+        self,
+        mock_db_with_feishu_template,
+        patched_template_render,
+        patched_owner_lookup,
+        patched_group_lookup,
+        patched_mark_sent,
+        patched_save_message_id,
+        mock_feishu_svc,
+        mock_chat_sender,
+        _patch_summary_chat_id_lookup,
+    ):
+        """无收件人且未配置群聊 → 标记但不发送（P0-C 原语义保持）."""
+        _patch_summary_chat_id_lookup.return_value = None
+        patched_owner_lookup.return_value = None
+        patched_group_lookup.return_value = []
+
+        alert_data = _make_alert_data(status="firing")
+
+        await _run_three_stage(alert_data, mock_db_with_feishu_template)
+
+        patched_mark_sent.assert_awaited_once()
+        mock_feishu_svc.send_p2p_card_message.assert_not_called()
+        mock_chat_sender.send_message_to_user.assert_not_called()
+        patched_save_message_id.assert_not_awaited()
+
+    async def test_group_card_saved_into_alert_card_messages(
+        self,
+        mock_db_with_feishu_template,
+        patched_template_render,
+        patched_owner_lookup,
+        patched_group_lookup,
+        patched_mark_sent,
+        mock_feishu_svc,
+        mock_chat_sender,
+        _patch_summary_chat_id_lookup,
+    ):
+        """阶段 3: 群卡以 recipient_open_id=chat_id 写入 alert_card_messages（真实 save 逻辑）."""
+        from app.services.alerts.notification_task import save_notification_result
+
+        _patch_summary_chat_id_lookup.return_value = "oc_group_abc"
+        patched_owner_lookup.return_value = None
+        patched_group_lookup.return_value = []
+
+        alert_data = _make_alert_data(status="firing")
+
+        ctx = await prepare_alert_notification(mock_db_with_feishu_template, alert_data)
+        result = await execute_feishu_notification(ctx)
+
+        db = AsyncMock()
+        await save_notification_result(db, ctx, result)
+
+        # 群卡 INSERT 被执行,参数含 chat_id
+        insert_calls = [
+            c for c in db.execute.call_args_list
+            if "INSERT INTO alert_card_messages" in str(c.args[0])
+        ]
+        assert len(insert_calls) == 1
+        assert insert_calls[0].args[1]["oid"] == "oc_group_abc"
