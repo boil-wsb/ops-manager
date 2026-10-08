@@ -32,8 +32,11 @@ const Profile = () => {
     mutationFn: async ({ oldPassword, newPassword }: { oldPassword: string; newPassword: string }) => {
       if (!user) throw new Error('User not found');
       const response = await api.post<{
-        access_token: string;
-        refresh_token: string;
+        access_token?: string;
+        refresh_token?: string;
+        // 响应拦截器会统一转 camelCase,两种形态都兼容
+        accessToken?: string;
+        refreshToken?: string;
       }>('/auth/change-password', {
         old_password: oldPassword,
         new_password: newPassword,
@@ -43,13 +46,25 @@ const Profile = () => {
     onSuccess: (data) => {
       message.success('密码修改成功');
       passwordForm.resetFields();
-      // 改密后后端重新签发无待改密标记的 token，替换本地令牌
-      if (data?.access_token) {
-        useAuthStore.getState().updateToken(data.access_token, data.refresh_token);
+      // 改密后后端重新签发无待改密标记的 token,替换本地令牌
+      const accessToken = data?.accessToken ?? data?.access_token;
+      const refreshToken = data?.refreshToken ?? data?.refresh_token;
+      if (accessToken) {
+        useAuthStore.getState().updateToken(accessToken, refreshToken ?? '');
+        // 替换 token 后整页刷新,确保所有请求使用新令牌
+        window.location.reload();
       }
     },
-    onError: () => {
-      message.error('密码修改失败');
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { detail?: unknown } } };
+      const detail = err?.response?.data?.detail;
+      const errorMsg =
+        typeof detail === 'string'
+          ? detail
+          : Array.isArray(detail)
+            ? detail.map((d) => (d as { msg?: string }).msg).join('; ')
+            : '密码修改失败';
+      message.error(errorMsg);
     },
   });
 
