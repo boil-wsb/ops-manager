@@ -20,11 +20,13 @@ import {
 import { roleApi, type Role } from '../../services/permissions';
 import RoleFormModal from './RoleFormModal';
 import RolePermissionModal from './RolePermissionModal';
+import { useAuthStore } from '../../stores/authStore';
 
 const { Search } = Input;
 
 const RoleList = () => {
   const { message } = App.useApp();
+  const currentUser = useAuthStore((state) => state.user);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
@@ -188,12 +190,12 @@ const RoleList = () => {
               权限
             </Button>
           </Tooltip>
-          <Tooltip title="编辑">
+          <Tooltip title={record.isSystem && !currentUser?.isSuperuser ? '系统角色不能编辑' : '编辑'}>
             <Button
               type="text"
               icon={<EditOutlined />}
               onClick={() => handleEdit(record)}
-              disabled={record.isSystem}
+              disabled={!!record.isSystem && !currentUser?.isSuperuser}
             />
           </Tooltip>
           <Popconfirm
