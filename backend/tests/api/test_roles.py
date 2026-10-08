@@ -107,3 +107,16 @@ async def test_create_role_duplicate_name(client: AsyncClient):
     await client.post("/api/v1/roles", headers=headers, json=role_data)
     response = await client.post("/api/v1/roles", headers=headers, json=role_data)
     assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_system_role_not_editable_even_for_superuser(client: AsyncClient):
+    """系统预设角色不可编辑——即使超级管理员(防止破坏依赖角色名的内置逻辑)。"""
+    headers = await get_auth_headers(client)
+    response = await client.put(
+        "/api/v1/roles/10",  # viewer
+        headers=headers,
+        json={"description": "attempt to modify system role"},
+    )
+    assert response.status_code == 403
+    assert "系统预设角色" in response.json()["detail"]
