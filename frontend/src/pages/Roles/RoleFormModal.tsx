@@ -18,7 +18,6 @@ interface RoleFormModalProps {
 const RoleFormModal = ({ visible, onCancel, onSuccess, role }: RoleFormModalProps) => {
   const [form] = Form.useForm();
   const isEditing = !!role;
-  const isSystemRole = !!role?.isSystem;
 
   useEffect(() => {
     if (visible && role) {
@@ -79,14 +78,13 @@ const RoleFormModal = ({ visible, onCancel, onSuccess, role }: RoleFormModalProp
         <Form.Item
           name="name"
           label="角色名称"
-          extra={isEditing && isSystemRole ? '系统预设角色的名称不可修改' : undefined}
           rules={[
             { required: true, message: '请输入角色名称' },
             { min: 2, message: '角色名称至少2个字符' },
             { max: 50, message: '角色名称最多50个字符' },
           ]}
         >
-          <Input placeholder="请输入角色名称" disabled={isEditing && isSystemRole} />
+          <Input placeholder="请输入角色名称" />
         </Form.Item>
 
         <Form.Item

@@ -192,20 +192,10 @@ async def update_role(
         )
 
     if role.is_system:
-        # 超管可编辑系统角色(权限/描述/状态);普通用户一律拒绝
-        if not current_user.is_superuser:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="系统预设角色不能修改",
-            )
-        # 名称与编码锁定,防止破坏依赖角色名的内置逻辑(如 assets 的 viewer 过滤)
-        if (role_in.name and role_in.name != role.name) or (
-            role_in.code and role_in.code != role.code
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="系统预设角色的名称与编码不可修改",
-            )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="系统预设角色不能修改",
+        )
 
     if role_in.name and role_in.name != role.name:
         existing_role = await crud_role.get_by_name(db, name=role_in.name)
