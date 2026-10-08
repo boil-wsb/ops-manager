@@ -109,6 +109,15 @@ BUILTIN_TASKS = [
         "description": "基于 Prometheus 的每日系统健康巡检",
     },
     {
+        "task_id": "daily-alert-summary",
+        "name": "告警每日汇总通知",
+        "task_function": "app.tasks.alert_summary_tasks.daily_alert_summary_task",
+        "trigger_type": "cron",
+        "trigger_config": {"hour": 9, "minute": 5},
+        "category": "alert",
+        "description": "每日 09:05 汇总上一日未解决告警，去重合并后发送飞书通知（群聊 + alert_firing 通知组成员）",
+    },
+    {
         "task_id": "sync-git-prometheus-conf",
         "name": "Prometheus 监控配置远端同步",
         "task_function": "app.tasks.git_repo_sync_tasks.sync_git_repo_with_remote_task",
@@ -217,6 +226,12 @@ async def _init_default_configs(db):
             "value": settings.itreporter_report_path,
             "group": "itreporter",
             "description": "IT巡检报告在 MinIO 中的默认路径",
+        },
+        {
+            "key": "alert_summary.chat_id",
+            "value": settings.alert_summary_chat_id,
+            "group": "alert",
+            "description": "每日 09:05 未解决告警汇总通知的飞书群聊 ID（为空则跳过群发）",
         },
     ]
     for config in default_configs:

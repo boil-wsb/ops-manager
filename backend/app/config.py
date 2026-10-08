@@ -146,6 +146,9 @@ class Settings(BaseSettings):
         default=300, alias="ALERT_AGGREGATION_WINDOW_SECONDS"
     )
 
+    # Alert Daily Summary（每日 09:05 未解决告警汇总通知的群聊 ID；为空则跳过群发）
+    alert_summary_chat_id: str = Field(default="", alias="ALERT_SUMMARY_CHAT_ID")
+
     # CRM Sync Configuration
     crm_sync_url: str = Field(default="http://192.168.23.36:9091", alias="CRM_SYNC_URL")
     crm_sync_timeout: int = Field(default=30, alias="CRM_SYNC_TIMEOUT")
