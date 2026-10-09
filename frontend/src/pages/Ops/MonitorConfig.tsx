@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   Table,
   Button,
@@ -19,6 +19,7 @@ import {
   ReloadOutlined,
   EditOutlined,
   MinusCircleOutlined,
+  ApiOutlined,
 } from '@ant-design/icons';
 import {
   monitorConfigApi,
@@ -48,8 +49,11 @@ const commonLinuxJobs = [
   'PD3-服务器监控',
 ];
 
+const VERIFY_INTERVAL_MS = 30_000;
+const VERIFY_MAX_ATTEMPTS = 20; // 30s × 20 = 10 分钟,与 Prometheus file_sd refresh_interval 匹配
+
 const MonitorConfig = () => {
-  const { message, modal } = App.useApp();
+  const { message, modal, notification } = App.useApp();
   const { hasAnyPermission } = usePermission();
   const canCreate = hasAnyPermission(['monitor:create']);
   const canWrite = hasAnyPermission(['monitor:update']);
@@ -61,11 +65,72 @@ const MonitorConfig = () => {
   const [form] = Form.useForm();
   const [committing, setCommitting] = useState(false);
   const selectedFile = (form.getFieldValue('file') as 'linux' | 'windows' | undefined) ?? 'linux';
+  // 新增确认推送后待验证的主机(job + target=ip:port)
+  const pendingVerifyRef = useRef<{ job: string; target: string } | null>(null);
 
   const { data: hosts, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['monitorHosts'],
     queryFn: monitorConfigApi.getHosts,
   });
+
+  // 单次验证: 查询 Prometheus up{job, instance="ip:port"} 并通知结果
+  const verifyOnce = useCallback(
+    async (job: string, target: string, silent: boolean = false) => {
+      try {
+        const res = await monitorConfigApi.verifyHost(job, target);
+        if (res.found && res.up) {
+          notification.success({
+            message: '监听确认成功',
+            description: `${target} 已被 Prometheus 正常监听(up=1)`,
+          });
+          return 'up' as const;
+        }
+        if (res.found) {
+          notification.warning({
+            message: '目标已加载但抓取失败',
+            description: `${target} 已加入 Prometheus,但抓取失败(up=0),请检查 exporter 与网络连通性`,
+          });
+          return 'down' as const;
+        }
+        if (!silent) {
+          notification.info({
+            message: '暂未监听到该主机',
+            description: `${target} 尚未出现在 Prometheus 中,file_sd 配置刷新最长约 10 分钟,请稍后重试`,
+          });
+        }
+        return 'pending' as const;
+      } catch {
+        if (!silent) message.error('监听验证失败,请稍后重试');
+        return 'error' as const;
+      }
+    },
+    [notification, message]
+  );
+
+  // 轮询确认: 推送成功后每 30s 验证一次,最长 10 分钟
+  const startVerifyPolling = useCallback(
+    (job: string, target: string) => {
+      let attempts = 0;
+      const timer = setInterval(async () => {
+        attempts += 1;
+        if (attempts > VERIFY_MAX_ATTEMPTS) {
+          clearInterval(timer);
+          notification.info({
+            message: '监听确认超时',
+            description: `${target} 在 10 分钟内未被 Prometheus 监听到,请检查 exporter 并在列表中手动「验证」`,
+          });
+          return;
+        }
+        const status = await verifyOnce(job, target, true);
+        if (status === 'up' || status === 'down') {
+          clearInterval(timer);
+        }
+      }, VERIFY_INTERVAL_MS);
+      // 立即执行第一次验证
+      void verifyOnce(job, target, true);
+    },
+    [verifyOnce, notification]
+  );
 
   // 后端为准的待提交操作（刷新/多标签页能恢复，驱动提交按钮状态）
   const { data: pendingOps = [], refetch: refetchPending } = useQuery({
@@ -90,13 +155,26 @@ const MonitorConfig = () => {
 
   const addMutation = useMutation<OperationResult, Error, HostPayload>({
     mutationFn: (payload) => monitorConfigApi.addHost(payload),
-    onSuccess: (result) => {
+    onSuccess: (result, variables) => {
       message.success(result?.message || '新增已暂存');
       setEditOpen(false);
       setEditing(null);
       form.resetFields();
       refetch();
       refetchPending();
+      // 新增主机: 提示用户确认记录并推送,确认后自动 commit+push 并轮询监听状态
+      const target = `${variables.ip}:${variables.port}`;
+      modal.confirm({
+        title: '确认记录并推送',
+        content: `主机 ${target} 已暂存。是否确认记录并立即提交推送到 Prometheus 配置仓库?`,
+        okText: '确认并推送',
+        cancelText: '稍后手动提交',
+        onOk: () => {
+          pendingVerifyRef.current = { job: variables.job || '', target };
+          setCommitting(true);
+          commitMutation.mutate(`add: 新增监控主机 ${target}`);
+        },
+      });
     },
     onError: (e: Error) => message.error(`新增失败: ${e.message || '未知错误'}`),
   });
@@ -126,6 +204,13 @@ const MonitorConfig = () => {
       refetch();
       refetchPending();
       refetchSync();
+      // 新增确认推送流程: 自动轮询确认新主机被 Prometheus 监听
+      const pendingVerify = pendingVerifyRef.current;
+      pendingVerifyRef.current = null;
+      if (pendingVerify && result?.message?.includes('已提交并推送')) {
+        message.info('已推送,Prometheus 加载配置最长约 10 分钟,将自动确认监听状态...');
+        startVerifyPolling(pendingVerify.job, pendingVerify.target);
+      }
     },
     onError: (e: Error) => {
       setCommitting(false);
@@ -270,7 +355,7 @@ const MonitorConfig = () => {
     {
       title: '操作',
       key: 'action',
-      width: 100,
+      width: 130,
       render: (_: unknown, record: MonitorHost) => (
         <Space>
           <Button
@@ -279,6 +364,12 @@ const MonitorConfig = () => {
             disabled={!canWrite}
             title={canWrite ? undefined : '无编辑权限'}
             onClick={() => handleEdit(record)}
+          />
+          <Button
+            size="small"
+            icon={<ApiOutlined />}
+            title="验证是否已被 Prometheus 监听"
+            onClick={() => void verifyOnce(record.job, `${record.ip}:${record.port}`)}
           />
         </Space>
       ),

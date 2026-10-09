@@ -52,9 +52,22 @@ export interface PendingOp {
   addr: string;
 }
 
+export interface HostVerifyResult {
+  found: boolean;
+  up: boolean;
+  checked_at: string;
+}
+
 export const monitorConfigApi = {
   getHosts: async (): Promise<MonitorHost[]> => {
     const response = await api.get<{ data: MonitorHost[] }>('/monitor-config/hosts');
+    return response.data.data;
+  },
+
+  verifyHost: async (job: string, instance: string): Promise<HostVerifyResult> => {
+    const response = await api.get<{ data: HostVerifyResult }>('/monitor-config/verify', {
+      params: { job, instance },
+    });
     return response.data.data;
   },
 

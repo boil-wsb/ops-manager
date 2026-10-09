@@ -9,7 +9,7 @@ Prometheus 监控主机配置管理 API 路由。
 
 import asyncio
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 
 from app.api.deps import require_permissions
 from app.core.audit import audit_log
@@ -31,6 +31,52 @@ async def list_hosts(
     except Exception as e:
         return api_error(str(getattr(e, "detail", e)))
     return api_response(result)
+
+
+@router.get("/verify")
+async def verify_host(
+    job: str = Query(..., min_length=1),
+    instance: str = Query(..., min_length=1),
+    _: None = Depends(require_permissions(["monitor:read"])),
+):
+    """确认主机已被 Prometheus 监听:查询 up{job, instance="ip:port"} 指标。
+
+    - found=True 且 up=True  → 目标已加载且抓取正常
+    - found=True 且 up=False → 目标已加载但抓取失败(exporter/网络问题)
+    - found=False            → Prometheus 尚未加载该目标(file_sd 刷新最长约 10 分钟)
+    """
+    from app.core.tz import now_shanghai
+    from app.services.prometheus import PrometheusClient
+
+    # 防注入:PromQL 字符串内的引号与反斜杠转义
+    safe_job = job.replace("\\", "\\\\").replace('"', '\\"')
+    safe_instance = instance.replace("\\", "\\\\").replace('"', '\\"')
+
+    client = PrometheusClient()
+    try:
+        data = await client.query(f'up{{job="{safe_job}", instance="{safe_instance}"}}')
+    finally:
+        await client.close()
+
+    if data.get("status") != "success":
+        return api_error(str(data.get("error") or "Prometheus 查询失败"))
+
+    results = data.get("data", {}).get("result", [])
+    found = bool(results)
+    up = False
+    if found:
+        try:
+            up = float(results[0]["value"][1]) == 1
+        except (KeyError, ValueError, IndexError, TypeError):
+            up = False
+
+    return api_response(
+        {
+            "found": found,
+            "up": up,
+            "checked_at": now_shanghai().isoformat(),
+        }
+    )
 
 
 @router.get("/pending")
