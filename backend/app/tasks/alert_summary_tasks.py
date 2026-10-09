@@ -288,10 +288,25 @@ async def _send_summary(summary: dict[str, Any]) -> dict[str, Any]:
 
 
 async def daily_alert_summary_task() -> dict[str, Any]:
-    """每日 09:05 汇总上一日未解决告警并发送飞书通知（群聊 + 通知组 P2P）。"""
+    """每日 09:05 汇总上一日未解决告警并发送飞书通知（群聊 + 通知组 P2P）。
+
+    无未解决告警（total=0）时跳过通知，不打扰接收人。
+    """
     logger.info("开始每日告警汇总", extra={"action": "alert.summary"})
     try:
         summary = await db_operation_with_retry(_prepare_summary, max_retries=3, retry_delay=2.0)
+
+        if summary["total"] == 0:
+            logger.info(
+                "昨日无未解决告警,跳过通知",
+                extra={"action": "alert.summary", "total": 0},
+            )
+            return {
+                "status": "success",
+                "result_summary": "昨日无未解决告警,未发送通知",
+                "total": 0,
+            }
+
         send_result = await _send_summary(summary)
         result_summary = (
             f"昨日未解决告警 {summary['total']} 条, "

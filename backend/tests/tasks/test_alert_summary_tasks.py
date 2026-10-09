@@ -169,3 +169,51 @@ class TestBuildSummaryMarkdown:
         ]
         md = build_summary_markdown(merged, self.w_start, self.w_end)
         assert f"其余 {len(merged) - CARD_MAX_ITEMS} 条已省略" in md
+
+
+class TestDailyAlertSummaryTask:
+    """任务级行为: 无未解决告警时跳过通知。"""
+
+    async def test_zero_alerts_skips_notification(self):
+        from unittest.mock import AsyncMock, patch
+
+        from app.tasks.alert_summary_tasks import daily_alert_summary_task
+
+        summary = {"total": 0, "card": {}, "chat_id": "", "recipient_open_ids": []}
+        with (
+            patch(
+                "app.tasks.alert_summary_tasks.db_operation_with_retry",
+                new=AsyncMock(return_value=summary),
+            ),
+            patch(
+                "app.tasks.alert_summary_tasks._send_summary", new=AsyncMock()
+            ) as send_mock,
+        ):
+            result = await daily_alert_summary_task()
+
+        assert result["status"] == "success"
+        assert result["total"] == 0
+        assert "未发送通知" in result["result_summary"]
+        send_mock.assert_not_awaited()
+
+    async def test_nonzero_alerts_sends_notification(self):
+        from unittest.mock import AsyncMock, patch
+
+        from app.tasks.alert_summary_tasks import daily_alert_summary_task
+
+        summary = {"total": 3, "card": {}, "chat_id": "", "recipient_open_ids": []}
+        with (
+            patch(
+                "app.tasks.alert_summary_tasks.db_operation_with_retry",
+                new=AsyncMock(return_value=summary),
+            ),
+            patch(
+                "app.tasks.alert_summary_tasks._send_summary",
+                new=AsyncMock(return_value={"chat_ok": True, "p2p_sent": 2, "p2p_failed": 0}),
+            ) as send_mock,
+        ):
+            result = await daily_alert_summary_task()
+
+        assert result["status"] == "success"
+        assert result["total"] == 3
+        send_mock.assert_awaited_once()
