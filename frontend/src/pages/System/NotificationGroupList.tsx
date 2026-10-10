@@ -119,6 +119,14 @@ const NotificationGroupList = () => {
     [fetchUserOptions]
   );
 
+  // 卸载时清除未触发的搜索防抖定时器,避免卸载后触发请求与状态更新
+  useEffect(
+    () => () => {
+      if (userSearchTimerRef.current) window.clearTimeout(userSearchTimerRef.current);
+    },
+    []
+  );
+
   const handleCreate = () => {
     setEditingGroup(null);
     form.resetFields();
