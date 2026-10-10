@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Table,
   Button,
@@ -24,7 +24,6 @@ import {
 import { notificationGroupApi, type NotificationGroup, type NotificationGroupCreate, type NotificationGroupUpdate } from '../../services/notification_group';
 import { userApi } from '../../services/users';
 import { fuzzyFilterOption } from '../../utils/selectFilter';
-import type { User } from '../../types';
 
 const { Search } = Input;
 
@@ -49,7 +48,11 @@ const NotificationGroupList = () => {
 
   const [memberModalVisible, setMemberModalVisible] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<NotificationGroup | null>(null);
-  const [allUsers, setAllUsers] = useState<User[]>([]);
+  // 成员候选用户(服务端搜索,不再受分页 100 条截断)
+  const [userOptions, setUserOptions] = useState<Array<{ value: number; label: string }>>([]);
+  const [userSearching, setUserSearching] = useState(false);
+  const knownUserOptionsRef = useRef<Map<number, string>>(new Map());
+  const userSearchTimerRef = useRef<number | null>(null);
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
   const [memberLoading, setMemberLoading] = useState(false);
 
@@ -74,14 +77,47 @@ const NotificationGroupList = () => {
     fetchGroups();
   }, [fetchGroups]);
 
-  const fetchAllUsers = useCallback(async () => {
-    try {
-      const response = await userApi.getUsers({ page_size: 100 });
-      setAllUsers(response.items);
-    } catch {
-      message.error('获取用户列表失败');
-    }
-  }, []);
+  // 用户候选标签:姓名 + 飞书绑定标识
+  const formatUserLabel = (user: {
+    fullName?: string | null;
+    username?: string;
+    feishuOpenId?: string | null;
+  }) => `${user.fullName || user.username}${user.feishuOpenId ? ' ✓' : ' (无飞书)'}`;
+
+  // 服务端关键字搜索用户(生产用户 200+,一次拉取会被分页截断)
+  const fetchUserOptions = useCallback(
+    async (keyword: string) => {
+      setUserSearching(true);
+      try {
+        const response = await userApi.getUsers({
+          page: 1,
+          page_size: 50,
+          keyword: keyword || undefined,
+        });
+        const merged = new Map(knownUserOptionsRef.current);
+        for (const user of response.items) {
+          merged.set(user.id, formatUserLabel(user));
+        }
+        knownUserOptionsRef.current = merged;
+        setUserOptions([...merged.entries()].map(([value, label]) => ({ value, label })));
+      } catch {
+        message.error('获取用户列表失败');
+      } finally {
+        setUserSearching(false);
+      }
+    },
+    []
+  );
+
+  const handleUserSearch = useCallback(
+    (value: string) => {
+      if (userSearchTimerRef.current) window.clearTimeout(userSearchTimerRef.current);
+      userSearchTimerRef.current = window.setTimeout(() => {
+        void fetchUserOptions(value.trim());
+      }, 300);
+    },
+    [fetchUserOptions]
+  );
 
   const handleCreate = () => {
     setEditingGroup(null);
@@ -132,7 +168,12 @@ const NotificationGroupList = () => {
   const handleManageMembers = (group: NotificationGroup) => {
     setSelectedGroup(group);
     setSelectedUserIds(group.members.map((m) => m.id));
-    fetchAllUsers();
+    // 先用现有成员作为候选(保证已选用户标签可见),再拉取首批用户
+    knownUserOptionsRef.current = new Map(
+      group.members.map((m) => [m.id, formatUserLabel(m)])
+    );
+    setUserOptions(group.members.map((m) => ({ value: m.id, label: formatUserLabel(m) })));
+    void fetchUserOptions('');
     setMemberModalVisible(true);
   };
 
@@ -372,17 +413,16 @@ const NotificationGroupList = () => {
           </p>
           <Select
             mode="multiple"
-            placeholder="选择用户"
+            placeholder="输入用户名/姓名/邮箱搜索用户"
             style={{ width: '100%' }}
             value={selectedUserIds}
             onChange={setSelectedUserIds}
             showSearch
-            optionFilterProp="label"
-            filterOption={fuzzyFilterOption}
-            options={allUsers.map((user) => ({
-              value: user.id,
-              label: `${user.fullName || user.username}${user.feishuOpenId ? ' ✓' : ' (无飞书)'}`,
-            }))}
+            filterOption={false}
+            onSearch={handleUserSearch}
+            loading={userSearching}
+            notFoundContent={userSearching ? '搜索中...' : '暂无匹配用户'}
+            options={userOptions}
           />
         </div>
       </Modal>
